@@ -114,4 +114,3 @@ Contrast targets: body and muted text at least 4.5:1 on their surfaces; action l
 - Do not change behavior, layout, Agent execution, API contracts, protocol, or deployment pins.
 - Keep Terminal as an explicit opt-in Appearance preset. Preserve its upstream identity: ink blue `#0A47C4` in light and phosphor green `#4DE3A2` in dark. Keep those values isolated from Classic focus and action tokens.
 - Exclude anime/Plum Pocket and Pockymoe account/device branding.
-
