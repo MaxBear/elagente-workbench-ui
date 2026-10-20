@@ -29,7 +29,7 @@ import {
 } from "./chunk-32RNZQEK.js";
 import {
   GraphMoleculeViewer
-} from "./chunk-NS7Q66D6.js";
+} from "./chunk-PDANMHOA.js";
 import "./chunk-TZBWAOOO.js";
 
 // src/components/ThreadGraphWorkspacePanel.tsx
@@ -1990,7 +1990,7 @@ function iconForNode(node, expanded) {
     "yml",
     "py"
   ].includes(extension)) {
-    return /* @__PURE__ */ jsx2(FileCode2, { className: "h-4 w-4 text-emerald-600" });
+    return /* @__PURE__ */ jsx2(FileCode2, { className: "h-4 w-4 text-sky-700 dark:text-sky-300" });
   }
   return /* @__PURE__ */ jsx2(File, { className: "h-4 w-4 text-slate-400 dark:text-slate-500" });
 }
@@ -2728,7 +2728,7 @@ function WorkspaceExplorerPanel({
           onClick: () => onSelect(node.id),
           className: `thread-graph-tree-row flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm transition sm:min-h-7 sm:py-1 ${selectedNodeId === node.id ? "is-selected" : ""}`,
           children: [
-            /* @__PURE__ */ jsx4(FileCode22, { className: "h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" }),
+            /* @__PURE__ */ jsx4(FileCode22, { className: "h-4 w-4 shrink-0 text-sky-700 dark:text-sky-300" }),
             /* @__PURE__ */ jsx4("span", { className: "min-w-0 flex-1 truncate", children: node.name })
           ]
         },
@@ -2895,7 +2895,7 @@ function WorkspaceFileTabs({
                       onClick: () => onSelect(tab.path),
                       className: `flex h-full min-w-0 flex-1 items-center gap-1.5 px-2.5 text-left text-xs ${tab.pinned ? "" : "italic"}`,
                       children: [
-                        /* @__PURE__ */ jsx7(FileCode23, { className: "h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" }),
+                        /* @__PURE__ */ jsx7(FileCode23, { className: "h-3.5 w-3.5 shrink-0 text-sky-700 dark:text-sky-300" }),
                         /* @__PURE__ */ jsx7(MiddleName, { name: tab.name })
                       ]
                     }

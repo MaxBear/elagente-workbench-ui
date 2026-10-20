@@ -118,7 +118,7 @@ export function ComposerHooksPanel({
         </p>
       ) : null}
       {hookConfigSuccess ? (
-        <p className="mb-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-3 text-sm text-emerald-100/90">
+        <p className="mb-2 rounded-xl border border-sky-500/35 bg-sky-500/10 px-3 py-3 text-sm text-sky-100/90">
           {hookConfigSuccess}
         </p>
       ) : null}
@@ -322,7 +322,7 @@ export function ComposerHooksPanel({
                       event.stopPropagation();
                       void onTrustHook(hook);
                     }}
-                    className={`${composerChipButtonClassName} rounded-full border border-stone-700 px-2 py-0.5 text-[10px] normal-case tracking-normal text-emerald-100 transition hover:border-emerald-300/35 hover:bg-emerald-300/10 disabled:cursor-not-allowed disabled:opacity-50`}
+                    className={`${composerChipButtonClassName} rounded-full border border-stone-700 px-2 py-0.5 text-[10px] normal-case tracking-normal text-sky-100 transition hover:border-sky-300/35 hover:bg-sky-300/10 disabled:cursor-not-allowed disabled:opacity-50`}
                   >
                     Trust
                   </button>

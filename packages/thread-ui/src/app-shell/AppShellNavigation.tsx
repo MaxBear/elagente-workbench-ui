@@ -497,7 +497,7 @@ export function AppShellSettingsDialog({
                   <p className="mt-2 text-xs text-rose-300">{pluginImportState.error}</p>
                 )}
                 {pluginImportState.message && (
-                  <p className="mt-2 text-xs text-emerald-300">{pluginImportState.message}</p>
+                  <p className="mt-2 text-xs text-sky-300">{pluginImportState.message}</p>
                 )}
               </div>
               {plugins.error && <p className="mt-2 text-xs text-rose-300">{plugins.error}</p>}

@@ -87,7 +87,7 @@ export function ComposerMcpPanel({
         </p>
       ) : null}
       {mcpConfigSuccess ? (
-        <p className="mb-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-3 py-3 text-sm text-emerald-100/90">
+        <p className="mb-2 rounded-xl border border-sky-500/35 bg-sky-500/10 px-3 py-3 text-sm text-sky-100/90">
           {mcpConfigSuccess}
         </p>
       ) : null}

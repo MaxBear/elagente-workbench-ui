@@ -473,7 +473,7 @@
   background: var(--theme-accent-solid); box-shadow: 0 0 0 1px var(--theme-accent-solid);
 }
 .thread-ui-shell .thread-graph-molecule-scrubber:focus-visible,
-.thread-ui-shell .thread-graph-molecule-file-link:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: 3px; }
+.thread-ui-shell .thread-graph-molecule-file-link:focus-visible { outline: 2px solid var(--theme-focus-ring); outline-offset: 3px; }
 .thread-ui-shell .thread-graph-molecule-frame-scale {
   display: flex; justify-content: space-between; color: var(--theme-fg-muted); font-size: 0.625rem; font-variant-numeric: tabular-nums;
 }
@@ -807,7 +807,7 @@
 }
 
 .thread-ui-shell .thread-graph-zoomable-image-trigger:focus-visible {
-  outline: 2px solid var(--theme-accent-ring);
+  outline: 2px solid var(--theme-focus-ring);
   outline-offset: 3px;
 }
 
@@ -1051,8 +1051,8 @@
 }
 
 .thread-ui-shell .thread-graph-tool-badge.is-completed {
-  background: oklch(0.94 0.052 155);
-  color: oklch(0.43 0.095 155);
+  background: var(--theme-muted);
+  color: var(--theme-fg-soft);
 }
 
 .thread-ui-shell .thread-graph-tool-badge.is-failed {
@@ -1074,8 +1074,8 @@
 .thread-ui-shell[data-theme-effective='dark']
   .thread-graph-tool-badge.is-completed,
 .thread-ui-shell.dark .thread-graph-tool-badge.is-completed {
-  background: oklch(0.31 0.05 155);
-  color: oklch(0.8 0.115 155);
+  background: var(--theme-muted);
+  color: var(--theme-fg-soft);
 }
 
 .thread-ui-shell.thread-ui-theme-dark .thread-graph-tool-badge.is-failed,
@@ -1270,7 +1270,7 @@
 .thread-ui-shell
   .thread-graph-history-tool.is-agent
   .thread-graph-history-tool-icon {
-  color: oklch(0.58 0.11 170);
+  color: var(--theme-status-info);
 }
 
 .thread-ui-shell
@@ -1522,7 +1522,7 @@
 .thread-ui-shell
   .thread-graph-history-event.is-context
   .thread-graph-history-event-icon {
-  color: oklch(0.58 0.11 170);
+  color: var(--theme-status-info);
 }
 
 .thread-ui-shell
@@ -1537,7 +1537,7 @@
 .thread-ui-shell
   .thread-graph-history-event.is-file-change
   .thread-graph-history-event-icon {
-  color: oklch(0.62 0.12 145);
+  color: var(--theme-fg-muted);
 }
 
 .thread-ui-shell
@@ -2294,15 +2294,15 @@
 }
 
 .thread-ui-shell .thread-graph-message-sender {
-  background: oklch(0.96 0.025 155);
-  color: oklch(0.42 0.11 155);
+  background: var(--theme-muted);
+  color: var(--theme-fg-soft);
 }
 
 .thread-ui-shell.thread-ui-theme-dark .thread-graph-message-sender,
 .thread-ui-shell[data-theme-effective='dark'] .thread-graph-message-sender,
 .thread-ui-shell.dark .thread-graph-message-sender {
-  background: rgb(52 211 153 / 0.1);
-  color: rgb(110 231 183);
+  background: var(--theme-muted);
+  color: var(--theme-fg-soft);
 }
 
 .thread-ui-shell .thread-graph-message-copy {

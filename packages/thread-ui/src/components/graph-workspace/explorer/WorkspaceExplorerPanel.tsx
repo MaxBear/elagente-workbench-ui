@@ -429,7 +429,7 @@ export function WorkspaceExplorerPanel({
               onClick={() => onSelect(node.id)}
               className={`thread-graph-tree-row flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm transition sm:min-h-7 sm:py-1 ${selectedNodeId === node.id ? 'is-selected' : ''}`}
             >
-              <FileCode2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
+              <FileCode2 className="h-4 w-4 shrink-0 text-sky-700 dark:text-sky-300" />
               <span className="min-w-0 flex-1 truncate">{node.name}</span>
             </button>
           ))}

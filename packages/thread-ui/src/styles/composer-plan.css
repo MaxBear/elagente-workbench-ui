@@ -64,8 +64,8 @@
 }
 
 .thread-ui-shell .ui-status-success {
-  background: oklch(0.94 0.052 155);
-  color: oklch(0.43 0.095 155);
+  background: var(--theme-muted);
+  color: var(--theme-fg-soft);
 }
 
 .thread-ui-shell .ui-status-danger {
@@ -90,8 +90,8 @@
 .thread-ui-shell.thread-ui-theme-dark .ui-status-success,
 .thread-ui-shell[data-theme-effective="dark"] .ui-status-success,
 .thread-ui-shell.dark .ui-status-success {
-  background: oklch(0.31 0.05 155);
-  color: oklch(0.8 0.115 155);
+  background: var(--theme-muted);
+  color: var(--theme-fg-soft);
 }
 
 .thread-ui-shell.thread-ui-theme-dark .ui-status-danger,
@@ -976,8 +976,8 @@
 }
 
 .thread-ui-shell .thread-graph-plan-status.is-completed {
-  background: rgb(52 211 153 / 0.14);
-  color: rgb(167 243 208);
+  background: var(--theme-muted);
+  color: var(--theme-fg-soft);
 }
 
 .thread-ui-shell .thread-graph-plan-status.is-running {

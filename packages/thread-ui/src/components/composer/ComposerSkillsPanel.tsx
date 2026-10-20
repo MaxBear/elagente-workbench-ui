@@ -47,7 +47,7 @@ export function ComposerSkillsPanel({
                     type="button"
                     className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 normal-case tracking-normal transition ${
                       copiedSkillName === skill.name
-                        ? 'border-emerald-400/45 bg-emerald-400/12 text-emerald-100'
+                        ? 'border-sky-400/45 bg-sky-400/12 text-sky-100'
                         : `${composerChipButtonClassName} border-stone-700 text-stone-300 hover:border-stone-500`
                     }`}
                     onClick={() => void onCopySkillInvokeName(skill.name)}

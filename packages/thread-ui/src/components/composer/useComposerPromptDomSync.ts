@@ -86,21 +86,21 @@ function createPromptAttachmentToken(
     'gap-2',
     'rounded-[0.95rem]',
     'border',
-    'border-emerald-300/35',
-    'bg-emerald-300/10',
+    'border-slate-300/35',
+    'bg-slate-300/10',
     'px-2.5',
     'py-2',
     'text-[10px]',
     'font-medium',
     'tracking-[0.08em]',
-    'text-emerald-50',
+    'text-slate-100',
     'shadow-sm',
     'shadow-stone-950/20',
   );
 
   const icon = document.createElement('span');
   icon.className =
-    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-200/25 bg-emerald-300/12 text-[9px]';
+    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200/25 bg-slate-300/12 text-[9px]';
   icon.textContent = 'FILE';
 
   const label = document.createElement('span');
