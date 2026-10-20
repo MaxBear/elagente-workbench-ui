@@ -16,14 +16,10 @@ import {
 function RunningDots({
   tone = 'amber',
 }: {
-  tone?: 'amber' | 'emerald' | 'sky';
+  tone?: 'amber' | 'sky';
 }) {
   const dotClassName =
-    tone === 'emerald'
-      ? 'bg-sky-200/90'
-      : tone === 'sky'
-        ? 'bg-sky-300/90'
-        : 'bg-amber-200/90';
+    tone === 'sky' ? 'bg-sky-300/90' : 'bg-amber-200/90';
 
   return (
     <span className="ml-1.5 inline-flex items-center gap-1" aria-hidden="true">
@@ -204,7 +200,7 @@ function TurnStatusIndicator({
       title={label}
       className="inline-flex min-w-[1.25rem] items-center justify-center text-sky-200"
     >
-      <RunningDots tone="emerald" />
+      <RunningDots tone="sky" />
     </span>
   );
 }

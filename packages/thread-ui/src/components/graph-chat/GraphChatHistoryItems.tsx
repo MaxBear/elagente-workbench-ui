@@ -267,14 +267,10 @@ function fileChangeSummarySegments(
 function RunningDots({
   tone = 'amber',
 }: {
-  tone?: 'amber' | 'emerald' | 'sky';
+  tone?: 'amber' | 'sky';
 }) {
   const dotClassName =
-    tone === 'emerald'
-      ? 'bg-sky-200/90'
-      : tone === 'sky'
-        ? 'bg-sky-300/90'
-        : 'bg-amber-200/90';
+    tone === 'sky' ? 'bg-sky-300/90' : 'bg-amber-200/90';
 
   return (
     <span className="ml-1.5 inline-flex items-center gap-1" aria-hidden="true">
@@ -586,7 +582,7 @@ export const GraphChatContextCompactionItem = memo(
           <span className="thread-graph-history-event-primary">
             {primaryText}
           </span>
-          {isRunning ? <RunningDots tone="emerald" /> : null}
+          {isRunning ? <RunningDots tone="sky" /> : null}
         </div>
         {secondaryText ? (
           <p
@@ -1241,10 +1237,10 @@ export const GraphChatToolCallGroupItem = memo(
       <GraphChatHistoryGroupFrame
         className="thread-graph-history-group-tool"
         count={items.length}
-        countBadgeClassName="border-teal-200/35 text-teal-100"
-        desktopIconClassName="border-teal-300/30 bg-teal-300/[0.14] text-teal-100"
+        countBadgeClassName="border-sky-200/35 text-sky-100"
+        desktopIconClassName="border-sky-300/30 bg-sky-300/[0.14] text-sky-100"
         expanded={expanded}
-        expandedListClassName="border-teal-300/12"
+        expandedListClassName="border-sky-300/12"
         icon={
           firstKind === 'agentToolCall' ? (
             <Bot className="h-3.5 w-3.5" />
@@ -1509,10 +1505,10 @@ export const GraphChatFileChangeGroupItem = memo(
       <GraphChatHistoryGroupFrame
         className="thread-graph-history-group-file-change"
         count={items.length}
-        countBadgeClassName="border-lime-200/35 text-lime-100"
-        desktopIconClassName="border-lime-300/30 bg-lime-300/[0.14] text-lime-100"
+        countBadgeClassName="border-slate-300/35 text-slate-100"
+        desktopIconClassName="border-slate-300/30 bg-slate-300/[0.14] text-slate-100"
         expanded={expanded}
-        expandedListClassName="border-lime-300/12"
+        expandedListClassName="border-slate-300/12"
         icon={<FileChangeIcon />}
         onToggleExpanded={onToggleExpanded}
         summary={

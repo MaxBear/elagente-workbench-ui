@@ -32,6 +32,10 @@
   --theme-accent-soft: #0f2b20;
   --theme-accent-strong: #4de3a2;
   --theme-accent-border: #2c8a62;
+  --theme-focus-ring: #4de3a2;
+  --theme-status-info: #8fc2e8;
+  --theme-status-warning: var(--term-warn);
+  --theme-status-error: var(--term-danger);
   --matter-chrome: #0b0d0c;
   --theme-shadow: none;
   --overlay-scrim: rgb(0 0 0 / 70%);
@@ -63,6 +67,10 @@
   --theme-border: #d6d6d1;
   --theme-border-strong: #a9a9a3;
   --theme-border-contrast: #6a6a65;
+  --theme-focus-ring: #0a47c4;
+  --theme-status-info: #285ea8;
+  --theme-status-warning: var(--term-warn);
+  --theme-status-error: var(--term-danger);
   --theme-accent-solid: #0a47c4;
   --theme-accent-solid-hover: #0839a0;
   --theme-accent-solid-fg: #ffffff;

@@ -1,4 +1,3 @@
-import { MiddleName } from '../../MiddleName';
 import {
   ChevronDown,
   ChevronRight,
@@ -55,7 +54,7 @@ function iconForNode(node: WorkspaceTreeNode, expanded: boolean) {
       'py',
     ].includes(extension)
   ) {
-    return <FileCode2 className="h-4 w-4 text-emerald-600" />;
+    return <FileCode2 className="h-4 w-4 text-sky-700 dark:text-sky-300" />;
   }
   return <File className="h-4 w-4 text-slate-400 dark:text-slate-500" />;
 }

@@ -1526,7 +1526,7 @@ function GraphMoleculeViewer({
           viewer.addLine({
             start: points[i - 1],
             end: points[i],
-            color: focusedMeasurement === measurement.id ? "#00cc76" : dark ? "#a7b0b7" : "#5b6269",
+            color: focusedMeasurement === measurement.id ? dark ? "#e64c7f" : "#28377a" : dark ? "#a7b0b7" : "#5b6269",
             linewidth: focusedMeasurement === measurement.id ? 3 : 1,
             dashed: true
           })
@@ -1542,7 +1542,7 @@ function GraphMoleculeViewer({
           position,
           fontSize: 12,
           backgroundColor: dark ? "#1a2026" : "white",
-          fontColor: dark ? "#1bdb8a" : "#005c38",
+          fontColor: dark ? "#f0f1f5" : "#ffffff",
           inFront: true
         },
         void 0,
@@ -1557,7 +1557,7 @@ function GraphMoleculeViewer({
           {
             position: atom,
             fontSize: 12,
-            backgroundColor: "#00a764",
+            backgroundColor: dark ? "#e64c7f" : "#28377a",
             fontColor: "white",
             inFront: true
           },

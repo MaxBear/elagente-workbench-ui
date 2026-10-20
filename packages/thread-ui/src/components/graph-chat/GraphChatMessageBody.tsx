@@ -372,10 +372,10 @@ export const GraphChatUserMessageBody = memo(
               className="mx-[0.14rem] inline-flex align-middle"
             >
               <span
-                className="inline-flex max-w-[12rem] items-center gap-2 rounded-[0.95rem] border border-emerald-300/28 bg-emerald-300/[0.08] px-2.5 py-2 text-[10px] font-medium tracking-[0.08em] text-emerald-50 shadow-sm shadow-stone-950/20"
+                className="inline-flex max-w-[12rem] items-center gap-2 rounded-[0.95rem] border border-slate-300/28 bg-slate-300/[0.08] px-2.5 py-2 text-[10px] font-medium tracking-[0.08em] text-slate-100 shadow-sm shadow-stone-950/20"
                 title={segment.path}
               >
-                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-200/20 bg-emerald-300/12 text-[9px]">
+                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200/20 bg-slate-300/12 text-[9px]">
                   FILE
                 </span>
                 <span className="min-w-0 truncate">{fileName}</span>

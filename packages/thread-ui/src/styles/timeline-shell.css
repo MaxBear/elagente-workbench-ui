@@ -307,9 +307,9 @@
 }
 
 .thread-ui-shell .token-badge-in {
-  border-color: rgb(22 101 52 / 0.32);
-  background: rgb(220 252 231 / 0.72);
-  color: rgb(20 83 45);
+  border-color: rgb(40 94 168 / 0.32);
+  background: rgb(244 248 255 / 0.82);
+  color: #285ea8;
 }
 
 .thread-ui-shell .token-badge-cache {
@@ -331,9 +331,9 @@
 }
 
 .thread-ui-shell .token-badge-total {
-  border-color: rgb(77 124 15 / 0.3);
-  background: rgb(236 252 203 / 0.72);
-  color: rgb(63 98 18);
+  border-color: var(--theme-border);
+  background: var(--theme-muted);
+  color: var(--theme-fg-soft);
 }
 
 .thread-ui-shell .token-badge-empty {
@@ -389,7 +389,14 @@
 :root[data-theme-effective="dark"] .thread-ui-shell .token-badge-in,
 .thread-ui-shell.thread-ui-theme-dark .token-badge-in,
 .thread-ui-shell.dark .token-badge-in {
-  color: rgb(134 239 172);
+  color: var(--theme-status-info);
+}
+
+.thread-ui-shell[data-theme-effective="dark"] .token-badge-total,
+:root[data-theme-effective="dark"] .thread-ui-shell .token-badge-total,
+.thread-ui-shell.thread-ui-theme-dark .token-badge-total,
+.thread-ui-shell.dark .token-badge-total {
+  color: var(--theme-fg-soft);
 }
 
 .thread-ui-shell[data-theme-effective="dark"] .token-badge-cache,

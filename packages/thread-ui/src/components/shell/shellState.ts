@@ -110,7 +110,7 @@ export function buildConnectionButtonState({
         ? 'Connect shell'
         : 'Create shell';
   const className = activeRuntime.shellInputEnabled
-    ? 'border-emerald-300/45 bg-emerald-300/18 text-emerald-50 ring-1 ring-emerald-300/20 hover:bg-emerald-300/24'
+    ? 'border-sky-300/45 bg-sky-300/18 text-sky-50 ring-1 ring-sky-300/20 hover:bg-sky-300/24'
     : activeShell && !isLiveShell(activeShell)
       ? 'border-stone-600 bg-stone-800/90 text-stone-100 hover:border-stone-500 hover:bg-stone-800'
       : workspacePathMissing

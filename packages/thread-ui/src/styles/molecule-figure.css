@@ -4,7 +4,7 @@
   position: relative;
   min-width: 0;
   height: 100%;
-  color: var(--theme-fg, #121416);
+  color: var(--theme-fg, #0a0a0a);
 }
 .molecule-figure-frame.is-timeline {
   height: auto;
@@ -125,7 +125,7 @@
 .molecule-figure summary:focus-visible,
 .molecule-figure select:focus-visible,
 .molecule-figure [tabindex="0"]:focus-visible {
-  outline: 2px solid var(--theme-accent-solid, #00b26a);
+  outline: 2px solid var(--theme-focus-ring, #28377a);
   outline-offset: 2px;
 }
 .molecule-figure button[aria-pressed="true"] {

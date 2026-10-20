@@ -8,7 +8,7 @@
 .workbench-preference-row small, .workbench-preference-note { font-size: 12px; line-height: 1.6; color: var(--theme-fg-muted); }
 .workbench-preference-row select { min-height: 40px; max-width: 42%; border: 1px solid var(--theme-border-strong); border-radius: 5px; padding: 6px 10px; background: var(--theme-panel); color: var(--theme-fg); }
 .workbench-preference-row input { accent-color: var(--theme-accent-solid); width: 20px; height: 20px; flex-shrink: 0; }
-.thread-ui-shell :is(button, a, input, select):focus-visible { outline: 2px solid var(--theme-accent-strong); outline-offset: 2px; }
+.thread-ui-shell :is(button, a, input, select):focus-visible { outline: 2px solid var(--theme-focus-ring); outline-offset: 2px; }
 .thread-timeline-frame { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .thread-timeline-frame[hidden], .matter-topbar[hidden], .matter-breadcrumb[hidden] { display: none !important; }
 .thread-timeline-pending { display: flex; flex: 1; min-height: 0; flex-direction: column; }

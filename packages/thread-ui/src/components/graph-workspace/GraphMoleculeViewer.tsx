@@ -535,7 +535,9 @@ export function GraphMoleculeViewer({
             end: points[i],
             color:
               focusedMeasurement === measurement.id
-                ? '#00cc76'
+                ? dark
+                  ? '#e64c7f'
+                  : '#28377a'
                 : dark
                   ? '#a7b0b7'
                   : '#5b6269',
@@ -557,7 +559,7 @@ export function GraphMoleculeViewer({
           position,
           fontSize: 12,
           backgroundColor: dark ? '#1a2026' : 'white',
-          fontColor: dark ? '#1bdb8a' : '#005c38',
+          fontColor: dark ? '#f0f1f5' : '#ffffff',
           inFront: true,
         },
         undefined,
@@ -572,7 +574,7 @@ export function GraphMoleculeViewer({
           {
             position: atom,
             fontSize: 12,
-            backgroundColor: '#00a764',
+            backgroundColor: dark ? '#e64c7f' : '#28377a',
             fontColor: 'white',
             inFront: true,
           },
