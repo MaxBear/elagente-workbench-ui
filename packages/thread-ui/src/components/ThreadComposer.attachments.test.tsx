@@ -56,7 +56,7 @@ async function transfer(kind: 'paste' | 'drop', files: File[]) {
     { value: { files, items: [], getData: () => '' } },
   );
   await act(async () =>
-    host.querySelector('[contenteditable="true"]')?.dispatchEvent(event),
+    host.querySelector('[role="textbox"]')?.dispatchEvent(event),
   );
   return event;
 }
@@ -168,7 +168,7 @@ describe('composer attachment capability admission', () => {
     await render({ files: true, images: false });
     expect(draft.attachments).toEqual([photo]);
     expect(host.querySelector('img')?.getAttribute('src')).toBe('blob:preview');
-    const editor = host.querySelector<HTMLElement>('[contenteditable="true"]')!;
+    const editor = host.querySelector<HTMLElement>('[role="textbox"]')!;
     vi.useFakeTimers();
     await act(async () => {
       editor.replaceChildren();

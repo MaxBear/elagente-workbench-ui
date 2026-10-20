@@ -2,6 +2,8 @@ import { externalLinkProps } from '../externalLinkProps';
 import { WorkspaceFileLink } from '../WorkspaceFileLink';
 import { ZoomableImage as GraphWorkspaceZoomableImage } from '../ZoomableImage';
 import {
+  createContext,
+  useContext,
   lazy,
   memo,
   Suspense,
@@ -9,12 +11,14 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
 } from 'react';
 import {
   BookOpen,
   ChevronRight,
   Code2,
   Download,
+  ExternalLink,
   Pencil,
   PanelLeftOpen,
   PanelRightClose,
@@ -55,6 +59,19 @@ export type GraphWorkspacePreviewTarget =
   | { kind: 'event'; node: WorkspaceTreeNode }
   | { kind: 'meta'; node: WorkspaceTreeNode }
   | null;
+
+export function canShowInlinePdf(nav: {pdfViewerEnabled?: boolean} | undefined = typeof navigator === 'undefined' ? undefined : navigator) {
+  return nav?.pdfViewerEnabled !== false;
+}
+function WorkspacePdfPreview({src, name}: {src: string; name: string}) {
+  return canShowInlinePdf() ? <div className="thread-graph-file-preview-frame min-h-0 flex-1 overflow-hidden">
+    <iframe src={src} title={`PDF preview: ${name}`} className="h-full w-full border-0" referrerPolicy="no-referrer" />
+  </div> : <div className="thread-graph-download-preview">
+    <strong>{name}</strong><p>Open or download this PDF to read it on your device.</p>
+    <a href={src} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} />Open PDF</a>
+    <a href={src} download={name}><Download size={16} />Download PDF</a>
+  </div>;
+}
 
 function DownloadFilePreview({
   node,
@@ -332,6 +349,34 @@ const GraphWorkspaceCodePreview = memo(function GraphWorkspaceCodePreview({
   );
 });
 
+const WorkspaceMarkdownContext = createContext<{
+  resolvePath: (url: string | undefined) => string | null;
+  onOpenWorkspaceFile?: ((path: string) => void) | undefined;
+  resolveWorkspaceFileUrl?: ((path: string) => string | null) | undefined;
+}>({resolvePath: () => null});
+function WorkspaceMarkdownLink({ href, children, ...props }: ComponentProps<'a'>) {
+  const {resolvePath, onOpenWorkspaceFile} = useContext(WorkspaceMarkdownContext);
+  const workspacePath = resolvePath(href);
+  if (workspacePath && onOpenWorkspaceFile) {
+    return <WorkspaceFileLink path={workspacePath} onOpen={({ path }) => onOpenWorkspaceFile(path)}>{children}</WorkspaceFileLink>;
+  }
+  if (href && localFileHref(href, typeof window === 'undefined' ? undefined : window.location.origin)) return <span>{children}</span>;
+  return <a {...props} {...externalLinkProps(href)} href={href}>{children}</a>;
+}
+
+function WorkspaceMarkdownImage({ src, alt, ...props }: ComponentProps<'img'>) {
+  const {resolvePath, resolveWorkspaceFileUrl} = useContext(WorkspaceMarkdownContext);
+  const workspacePath = resolvePath(src);
+  const local = src && localFileHref(src, typeof window === 'undefined' ? undefined : window.location.origin);
+  const resolvedSrc = local ? workspacePath ? resolveWorkspaceFileUrl?.(workspacePath) : null : src;
+  if (!resolvedSrc) return null;
+  return <GraphWorkspaceZoomableImage src={resolvedSrc} alt={alt ?? ''} loading="lazy" className={props.className} />;
+}
+
+const workspaceMarkdownComponents: import("react-markdown").Components = {
+  a: WorkspaceMarkdownLink,
+  img: WorkspaceMarkdownImage,
+};
 const GraphWorkspaceMarkdownPreview = memo(
   function GraphWorkspaceMarkdownPreview({
     content,
@@ -357,7 +402,7 @@ const GraphWorkspaceMarkdownPreview = memo(
 
     return (
       <div className="thread-graph-markdown thread-graph-markdown-preview min-h-0 flex-1 overflow-auto px-5 py-4 sm:px-7 sm:py-6">
-        <ReactMarkdown
+        <WorkspaceMarkdownContext.Provider value={{resolvePath, onOpenWorkspaceFile, resolveWorkspaceFileUrl}}><ReactMarkdown
           urlTransform={(url) =>
             localFileHref(
               url,
@@ -369,66 +414,10 @@ const GraphWorkspaceMarkdownPreview = memo(
               : defaultUrlTransform(url)
           }
           remarkPlugins={[remarkGfm]}
-          components={{
-            a({ href, children, ...props }) {
-              const workspacePath = resolvePath(href);
-              if (workspacePath && onOpenWorkspaceFile) {
-                return (
-                  <WorkspaceFileLink
-                    path={workspacePath}
-                    onOpen={({ path }) => onOpenWorkspaceFile(path)}
-                  >
-                    {children}
-                  </WorkspaceFileLink>
-                );
-              }
-              if (
-                href &&
-                localFileHref(
-                  href,
-                  typeof window === 'undefined'
-                    ? undefined
-                    : window.location.origin,
-                )
-              )
-                return <span>{children}</span>;
-              return (
-                <a {...props} {...externalLinkProps(href)} href={href}>
-                  {children}
-                </a>
-              );
-            },
-            img({ src, alt, ...props }) {
-              const workspacePath = resolvePath(src);
-              const local =
-                src &&
-                localFileHref(
-                  src,
-                  typeof window === 'undefined'
-                    ? undefined
-                    : window.location.origin,
-                );
-              const resolvedSrc = local
-                ? workspacePath
-                  ? resolveWorkspaceFileUrl?.(workspacePath)
-                  : null
-                : src;
-              if (!resolvedSrc) {
-                return null;
-              }
-              return (
-                <GraphWorkspaceZoomableImage
-                  src={resolvedSrc}
-                  alt={alt ?? ''}
-                  loading="lazy"
-                  className={props.className}
-                />
-              );
-            },
-          }}
+          components={workspaceMarkdownComponents}
         >
           {content}
-        </ReactMarkdown>
+        </ReactMarkdown></WorkspaceMarkdownContext.Provider>
       </div>
     );
   },
@@ -823,16 +812,7 @@ export function GraphWorkspacePreviewPane({
             />
           </div>
         ) : selectedTarget.kind === 'workspace-file' && pdfUrl ? (
-          <div className="thread-graph-file-preview-frame min-h-0 flex-1 overflow-hidden">
-            <iframe
-              src={pdfUrl}
-              referrerPolicy="no-referrer"
-              title={`PDF preview: ${
-                selectedTarget.node.path || selectedTarget.node.name
-              }`}
-              className="h-full w-full border-0"
-            />
-          </div>
+          <WorkspacePdfPreview src={pdfUrl} name={selectedTarget.node.name} />
         ) : selectedTarget.kind === 'workspace-file' && previewFile ? (
           <div className="flex min-h-0 flex-1 flex-col">
             {breadcrumbSegments.length > 1 ||

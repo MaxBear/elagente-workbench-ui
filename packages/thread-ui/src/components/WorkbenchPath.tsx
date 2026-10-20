@@ -9,7 +9,8 @@ export function WorkbenchPath({ path }: { path: string }) {
     if (!node) return;
     const normalized = path.replace(/\\/g, '/')
       .replace(/^(?:\/home\/[^/]+|\/Users\/[^/]+|[A-Za-z]:\/Users\/[^/]+|\/root)(?=\/|$)/, '~');
-    const measure = document.createElement('canvas').getContext('2d');
+    const measure = typeof document.createElement('canvas').getContext === 'function'
+      ? document.createElement('canvas').getContext('2d') : null;
     const update = () => {
       if (!measure) return;
       measure.font = getComputedStyle(node).font;
@@ -31,11 +32,11 @@ export function WorkbenchPath({ path }: { path: string }) {
       }
       setLabel(`${root}…`);
     };
-    const observer = new ResizeObserver(update);
-    observer.observe(node);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(node);
     update();
-    void document.fonts.ready.then(update);
-    return () => observer.disconnect();
+    if (document.fonts?.ready) void document.fonts.ready.then(update);
+    return () => observer?.disconnect();
   }, [path]);
   return <span ref={ref} className="matter-workspace-path" title={path} aria-label={path}>{label}</span>;
 }

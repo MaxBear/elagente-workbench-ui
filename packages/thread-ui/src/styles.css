@@ -7,3 +7,6 @@
 @import "./styles/matter-workbench.css";
 @import './styles/settings.css';
 @import './styles/molecule-figure.css';
+
+@import './styles/workbench-preferences.css';
+@import './styles/terminal-theme.css';

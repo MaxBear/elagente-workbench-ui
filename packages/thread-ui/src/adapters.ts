@@ -139,6 +139,8 @@ export interface ThreadWorkspaceAdapter {
     workspaceId?: string | null;
     path: string;
   }) => string;
+  /** Authenticated bytes supplied by the host. No host filesystem access is implied. */
+  readRawFile?: (input: {threadId: string; workspaceId?: string | null; path: string; signal?: AbortSignal}) => Promise<Blob>;
   uploadFile?: (input: {
     threadId: string;
     workspaceId?: string | null;

@@ -1,3 +1,4 @@
+import { useCompactPrompt } from './useCompactPrompt';
 import type {
   FormEvent,
   MutableRefObject,
@@ -65,6 +66,7 @@ export function ComposerFrame({
   goalSlot,
   shellPromptSlot,
 }: ComposerFrameProps) {
+  const compact = useCompactPrompt(formRef, activeView);
   return (
     <div className={layerClassName}>
       <ComposerHiddenAttachmentInputs
@@ -88,6 +90,7 @@ export function ComposerFrame({
 
       <form
         ref={formRef}
+        data-composer-layout={compact}
         data-testid={activeView === 'chat' ? 'chat-composer' : undefined}
         onSubmit={onSubmit}
         className={formClassName}

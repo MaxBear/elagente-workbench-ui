@@ -304,6 +304,39 @@ describe('ThreadTimeline', () => {
     expect(element.textContent).toContain('Final checkpoint');
   });
 
+  it('uses hydrated deferred flags so an empty expansion cannot show a stale step count', async () => {
+    const summary: ThreadTurnDto = {
+      ...completedTurn([
+        { id: 'prompt', kind: 'userMessage', text: 'Prompt' },
+        { id: 'answer', kind: 'agentMessage', text: 'Answer' },
+      ]),
+      hasDeferredItems: true,
+      deferredItemCount: 7,
+    };
+    const hydrated = {
+      ...summary,
+      hasDeferredItems: false,
+      deferredItemCount: 0,
+    };
+    const element = render(
+      <ThreadTimeline
+        autoCollapseCompletedTurns={false}
+        liveOutput=""
+        onLoadTurnDetail={vi.fn().mockResolvedValue(hydrated)}
+        turns={[summary]}
+      />,
+    );
+
+    const expand = Array.from(element.querySelectorAll('button')).find(
+      (button) => button.getAttribute('aria-label')?.includes('Expand turn 1'),
+    );
+    flushSync(() => expand?.click());
+    await vi.waitFor(() => {
+      expect(element.textContent).not.toContain('7 activities');
+      expect(element.textContent).toContain('Worked');
+    });
+  });
+
   it('shows Worked and a separate collapsed reasoning disclosure without tool activity', () => {
     const element = render(
       <ThreadTimeline

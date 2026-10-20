@@ -11,6 +11,8 @@ export function ThemedPortal({ children }: { children: ReactNode }) {
     if (!target) return;
     const update = () => {
       const style = getComputedStyle(source ?? document.documentElement);
+      target.dataset.workbenchTheme = source?.dataset.workbenchTheme ?? 'classic';
+      target.dataset.reduceMotion = source?.dataset.reduceMotion ?? 'false';
       target.dataset.themeEffective = source?.dataset.themeEffective ?? document.documentElement.dataset.themeEffective ?? 'light';
       for (let i = 0; i < style.length; i++) {
         const key = style[i]!;
@@ -20,7 +22,7 @@ export function ThemedPortal({ children }: { children: ReactNode }) {
     update();
     const observer = new MutationObserver(update);
     for (const node of new Set([source, document.documentElement])) {
-      if (node) observer.observe(node, { attributes: true, attributeFilter: ['class', 'style', 'data-theme-effective', 'data-theme-mode'] });
+      if (node) observer.observe(node, { attributes: true, attributeFilter: ['class', 'style', 'data-theme-effective', 'data-theme-mode', 'data-workbench-theme', 'data-reduce-motion'] });
     }
     return () => observer.disconnect();
   }, []);

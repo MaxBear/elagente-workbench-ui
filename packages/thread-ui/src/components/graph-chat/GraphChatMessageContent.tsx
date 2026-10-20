@@ -1,5 +1,7 @@
 import { externalLinkProps } from '../externalLinkProps';
 import {
+  createContext,
+  useContext,
   memo,
   useEffect,
   isValidElement,
@@ -39,6 +41,11 @@ type CodeRendererProps = ComponentProps<'code'> & {
   inline?: boolean | undefined;
   node?: unknown;
 };
+const CodeRendererContext = createContext<((props: CodeRendererProps) => ReactElement | null) | null>(null);
+function StableCodeRenderer(props: CodeRendererProps) {
+  return useContext(CodeRendererContext)?.(props) ?? null;
+}
+
 
 type OpenWorkspaceFileHandler = (input: {
   path: string;
@@ -391,7 +398,7 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
 
   return (
     <div ref={rootRef} data-markdown-ready={highlighter ? 'true' : 'false'} className={`thread-graph-message-markdown ${className}`}>
-      <ReactMarkdown
+      <CodeRendererContext.Provider value={CodeBlockRenderer}><ReactMarkdown
         urlTransform={url => !readOnly && localFileHref(url, typeof window === 'undefined' ? undefined : window.location.origin) ? url : defaultUrlTransform(url)}
         remarkPlugins={[remarkGfm, remarkMath, remarkLatex, remarkCjkFriendly]}
         rehypePlugins={[rehypeKatex]}
@@ -421,12 +428,13 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
             if (readOnly && !resolved?.startsWith('data:image/') && !/^https?:\/\//i.test(resolved ?? '')) return <span>{alt || 'Image unavailable'}</span>;
             return resolved ? <ZoomableImage src={resolved} alt={alt ?? ''} /> : <span>{alt || 'Image unavailable'}</span>;
           },
-          code: CodeBlockRenderer,
+          code: StableCodeRenderer,
+          table: ({children}) => <div className="thread-markdown-table-scroll" tabIndex={0} role="region" aria-label="Table"> <table>{children}</table></div>,
           pre: PreRenderer,
         }}
       >
         {processedContent}
-      </ReactMarkdown>
+      </ReactMarkdown></CodeRendererContext.Provider>
     </div>
   );
 });

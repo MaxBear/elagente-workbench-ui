@@ -16,6 +16,7 @@ import type {
   ThreadDetailUiAdapter,
   ThreadTimelineAdapter,
 } from '../../adapters';
+import { useWorkbenchPreferences } from '../workbenchPreferences';
 import { ThreadComposer, type ThreadComposerProps } from '../ThreadComposer';
 import {
   ThreadTimeline,
@@ -48,6 +49,7 @@ interface GraphChatThreadChatPanelProps {
   floatingDesktopComposer?: boolean;
   floatingMobileComposerBottomOffset?: number;
   composerHostRef?: RefObject<HTMLDivElement | null>;
+  timelinePending?: ReactNode;
 }
 
 export function GraphChatThreadChatPanel({
@@ -64,7 +66,9 @@ export function GraphChatThreadChatPanel({
   floatingDesktopComposer = false,
   floatingMobileComposerBottomOffset = 0,
   composerHostRef,
+  timelinePending,
 }: GraphChatThreadChatPanelProps) {
+  const preferences = useWorkbenchPreferences();
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [mobileComposerHeight, setMobileComposerHeight] = useState(0);
   const [mobileComposerOverlap, setMobileComposerOverlap] = useState(0);
@@ -364,6 +368,7 @@ export function GraphChatThreadChatPanel({
 
     return (
       <TimelineComponent
+        key={detail.thread.id}
         threadId={detail.thread.id}
         turns={detail.turns}
         totalTurnCount={detail.totalTurnCount ?? detail.turns.length}
@@ -373,6 +378,7 @@ export function GraphChatThreadChatPanel({
         liveOutput={liveOutput}
         className="thread-timeline-surface min-h-0 flex-1"
         {...timelineProps}
+        autoCollapseCompletedTurns={preferences.autoCollapseWork}
         scrollRequestKey={timelineProps?.scrollRequestKey ?? latestRequest}
         previousTurnScrollRequestKey={timelineProps?.previousTurnScrollRequestKey ?? previousRequest}
         nextTurnScrollRequestKey={timelineProps?.nextTurnScrollRequestKey ?? nextRequest}
@@ -386,6 +392,7 @@ export function GraphChatThreadChatPanel({
       />
     );
   }, [
+    preferences.autoCollapseWork,
     TimelineComponent,
     adapter.openThread,
     detail.pendingRequests,
@@ -408,9 +415,10 @@ export function GraphChatThreadChatPanel({
       className="thread-graph-chat-panel relative flex h-full min-h-0 flex-col"
       style={panelStyle}
     >
-      {beforeTimelineContent}
-      {timelineElement}
-      <div className="thread-chat-usage-footer hidden shrink-0 items-center px-4 py-1 text-[10px] leading-4 sm:flex">
+      {!timelinePending && beforeTimelineContent}
+      <div className="thread-timeline-frame" hidden={Boolean(timelinePending)} inert={Boolean(timelinePending)}>{timelineElement}</div>
+      {timelinePending && <div className="thread-timeline-pending">{timelinePending}</div>}
+      <div className="thread-chat-usage-footer hidden shrink-0 items-center px-4 py-1 text-[10px] leading-4 sm:flex" hidden={Boolean(timelinePending)}>
         <span className="min-w-0">
           {detail.turns.length} turn{detail.turns.length !== 1 ? 's' : ''}
           <span className="mx-1 text-[var(--theme-border-contrast)]">|</span>
@@ -431,6 +439,7 @@ export function GraphChatThreadChatPanel({
             }
           >
             <ThreadComposer
+              key={detail.thread.id}
               {...resolvedComposerProps}
               activeView="chat"
               edgeToEdgeMobile
@@ -443,6 +452,7 @@ export function GraphChatThreadChatPanel({
             className="thread-graph-composer-host shrink-0"
           >
             <ThreadComposer
+              key={detail.thread.id}
               {...resolvedComposerProps}
               activeView="chat"
               onSubmit={adapter.sendPrompt}

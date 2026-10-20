@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useRef } from 'react';
+import { useModalFocus } from './menu/useModalFocus';
 import { ThemedPortal } from './ThemedPortal';
 
 interface ConfirmDialogProps {
@@ -22,22 +23,8 @@ export function ConfirmDialog({
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !busy) {
-        onCancel();
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [busy, onCancel, open]);
+  const modalRef = useRef<HTMLDivElement>(null);
+  useModalFocus(modalRef, open, busy ? undefined : onCancel, 'button[data-cancel]');
 
   if (!open) {
     return null;
@@ -55,6 +42,8 @@ export function ConfirmDialog({
         className="absolute inset-0 bg-[var(--overlay-scrim)] backdrop-blur-sm disabled:cursor-not-allowed"
       />
       <div
+        ref={modalRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -81,6 +70,7 @@ export function ConfirmDialog({
         <div className="mt-5 flex items-center justify-end gap-2">
           <button
             type="button"
+            data-cancel
             onClick={onCancel}
             disabled={busy}
             className="rounded-md border border-[var(--theme-border)] px-4 py-2 text-sm font-medium text-[var(--theme-fg-soft)] transition hover:bg-[var(--theme-hover)] disabled:cursor-not-allowed disabled:opacity-60"

@@ -15,6 +15,7 @@ import {
   Terminal,
   X,
 } from 'lucide-react';
+import { useWorkbenchPreferences } from './workbenchPreferences';
 import { WorkbenchContext } from './WorkbenchContext';
 import { WorkbenchPath } from './WorkbenchPath';
 
@@ -98,6 +99,7 @@ export function MatterWorkbench({
   revealExplorer: number;
   children: ReactNode;
 }) {
+  const preferences = useWorkbenchPreferences();
   const tabs = o.workspaceThreads ?? o.threads.filter(thread => thread.key === o.currentKey);
   const tabsRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -116,6 +118,7 @@ export function MatterWorkbench({
     query.addEventListener('change', change);
     return () => query.removeEventListener('change', change);
   }, []);
+  const phoneDock = mobile && preferences.phoneDock;
   const [workspaceFocus, setWorkspaceFocus] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches);
   useEffect(() => {
     const query = window.matchMedia('(max-width: 1023px)');
@@ -221,7 +224,8 @@ export function MatterWorkbench({
   );
   return (
     <div
-      className={`matter-workbench ${sidebarHidden ? 'is-sidebar-hidden' : ''} ${o.hideRail ? 'has-host-rail' : ''} ${o.renderNavigationHeader ? 'has-host-navigation' : ''}`}
+      className={`matter-workbench ${sidebarHidden ? 'is-sidebar-hidden' : ''} ${o.hideRail ? 'has-host-rail' : ''} ${o.renderNavigationHeader ? 'has-host-navigation' : ''} ${phoneDock ? 'has-phone-dock' : ''}`}
+      data-phone-hand={preferences.phoneHand}
       onClick={(e) => {
         if (
           e.target instanceof Element &&
@@ -266,9 +270,9 @@ export function MatterWorkbench({
             <Terminal />
           </button>
         )}
-        <div className="matter-rail-bottom">{settings}</div>
+        {!phoneDock && <div className="matter-rail-bottom">{settings}</div>}
       </nav>}
-      <header className="matter-topbar">
+      <header className="matter-topbar" hidden={phoneDock}>
         <button
           ref={navigationToggleRef}
           aria-controls={navigationId}
@@ -306,7 +310,7 @@ export function MatterWorkbench({
             <button aria-label="Chat" aria-pressed={o.activeView === 'chat'} onClick={() => o.onViewChange('chat')}><MessageSquare /></button>
             {o.terminalEnabled && <button aria-label="Terminal" aria-pressed={o.activeView === 'shell'} onClick={() => o.onViewChange('shell')}><Terminal /></button>}
           </>}
-          {(mobile || o.hideRail) && settings}
+          {!phoneDock && (mobile || o.hideRail) && settings}
           <div className="matter-connection">{connection}</div>
           {o.showNotifications !== false && <button
             aria-label="Notifications"
@@ -403,7 +407,7 @@ export function MatterWorkbench({
         </div>
       </aside>
       <main className="matter-main" inert={mobile && sidebarOpen}>
-        <div className="matter-tabs-row">
+        <div className="matter-tabs-row" data-phone-dock={phoneDock}>
         <nav ref={tabsRef} className="matter-thread-tabs" aria-label="Workspace threads">
           {tabs.map((t) => (
             <a
@@ -427,7 +431,7 @@ export function MatterWorkbench({
           <button aria-label={workspaceFocus ? 'Show workspace' : 'Toggle Explorer'} aria-controls={workspaceId} aria-expanded={explorerOpen} aria-pressed={workspaceFocus ? explorerOpen : undefined} onClick={() => setExplorerOpen(workspaceFocus || !explorerOpen)}><PanelRight /><span>Workspace</span></button>
         </div>}
         {!o.emptyWorkspace && <button className="matter-toolbar-toggle" aria-label="Thread tools" aria-expanded={toolbarOpen} aria-controls={toolsId} onClick={() => setToolbarOpen(open => !open)} title={toolbarOpen ? 'Hide thread tools' : 'Show thread tools'}><SlidersHorizontal /></button>}
-        {toolbarOpen && <div className="matter-breadcrumb" id={toolsId}>
+        <div className="matter-breadcrumb" hidden={!toolbarOpen} id={toolsId}>
           <WorkbenchPath path={o.workspacePath} />
           <ChevronRight />
           <span className="matter-current-title" title={title}>
@@ -446,7 +450,7 @@ export function MatterWorkbench({
             {threadMenu}
 
           </div>
-        </div>}
+        </div>
         </div>
         <div ref={contentRef} style={{ '--explorer-width': `${visibleExplorerWidth}px` } as CSSProperties} className={`matter-content ${explorerOpen ? 'has-explorer' : ''} ${workspaceFocus ? 'is-workspace-focus' : ''}`}>
           <div className="matter-chat" hidden={workspaceFocus && explorerOpen} inert={workspaceFocus && explorerOpen}>
@@ -477,6 +481,15 @@ export function MatterWorkbench({
             </aside>
           )}
         </div>
+        {phoneDock && <nav className="workbench-phone-dock" aria-label="Phone navigation">
+          <button ref={navigationToggleRef} type="button" className="phone-conversations" aria-label="Conversations and Agents" aria-controls={navigationId} aria-expanded={sidebarOpen}
+            onClick={() => setSidebarOpen(open => !open)}><PanelLeft /><span>Conversations</span></button>
+          {Boolean(explorer) && <button type="button" aria-label={explorerOpen ? 'Show chat' : 'Show workspace'} aria-pressed={explorerOpen} onClick={() => setExplorerOpen(!explorerOpen)}><PanelRight /><span>{explorerOpen ? 'Chat' : 'Files'}</span></button>}
+          {!o.emptyWorkspace && <button type="button" aria-label="Thread tools" aria-expanded={toolbarOpen} aria-controls={toolsId} onClick={() => setToolbarOpen(open => !open)}><SlidersHorizontal /><span>Tools</span></button>}
+          {o.showSearch !== false && <button type="button" aria-label={o.searchLabel ?? 'Search conversation'} disabled={o.emptyWorkspace} onClick={o.onSearch}><Search /><span>Search</span></button>}
+          <div className="phone-settings">{settings}</div>
+        </nav>}
+
       </main>
       {bellOpen && (
         <>

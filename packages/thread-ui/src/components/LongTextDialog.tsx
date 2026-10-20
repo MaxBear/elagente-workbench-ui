@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useRef } from 'react';
+import { useModalFocus } from './menu/useModalFocus';
 import { ThemedPortal } from './ThemedPortal';
 import { DiffDetail } from './DiffDetail';
 import { GraphChatMessageContent } from './graph-chat/GraphChatMessageContent';
@@ -9,6 +10,8 @@ interface LongTextDialogProps {
   title: string;
   text: string;
   kind?: string | undefined;
+  error?: string | undefined;
+  onRetry?: (() => void) | undefined;
   onClose: () => void;
   onOpenWorkspaceFile?: ThreadTimelineAdapter['onOpenWorkspaceFile'];
   workspaceRootPath?: string;
@@ -20,25 +23,12 @@ export function LongTextDialog({
   title,
   text,
   kind,
+  error, onRetry,
   onClose,
   onOpenWorkspaceFile, workspaceRootPath, resolveHref,
 }: LongTextDialogProps) {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [onClose, open]);
+  const modalRef = useRef<HTMLDivElement>(null);
+  useModalFocus(modalRef, open, onClose, undefined);
 
   if (!open) {
     return null;
@@ -55,6 +45,8 @@ export function LongTextDialog({
         className="absolute inset-0 bg-[var(--overlay-scrim)] backdrop-blur-sm"
       />
       <div
+        ref={modalRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -78,7 +70,8 @@ export function LongTextDialog({
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-5">
-          {kind === 'fileChange' && /^@@ /m.test(text) ? <DiffDetail text={text} /> : ['toolCall', 'agentToolCall', 'skillToolCall'].includes(kind ?? '') ? <GraphChatMessageContent content={text} readOnly onOpenWorkspaceFile={onOpenWorkspaceFile} workspaceRootPath={workspaceRootPath} resolveHref={resolveHref} /> : <pre className="whitespace-pre-wrap break-words text-sm leading-6">
+          {error ? <div role="alert" className="thread-detail-error"><p>{error}</p>{onRetry && <button type="button" onClick={onRetry}>Retry</button>}</div> : null}
+          {error ? null : kind === 'fileChange' && /^@@ /m.test(text) ? <DiffDetail text={text} /> : ['toolCall', 'agentToolCall', 'skillToolCall'].includes(kind ?? '') ? <GraphChatMessageContent content={text} readOnly onOpenWorkspaceFile={onOpenWorkspaceFile} workspaceRootPath={workspaceRootPath} resolveHref={resolveHref} /> : <pre className="whitespace-pre-wrap break-words text-sm leading-6">
             {text}
           </pre>}
         </div>

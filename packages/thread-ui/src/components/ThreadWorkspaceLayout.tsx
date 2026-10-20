@@ -1,3 +1,4 @@
+import { WorkbenchPreferencesPanel, useWorkbenchPreferences } from './workbenchPreferences';
 import { SettingsPanels } from "./SettingsPanels";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -8,7 +9,6 @@ import {
   Copy,
   Folder,
   MessageSquare,
-  MoreHorizontal,
   LoaderCircle,
   CircleAlert,
   Monitor,
@@ -28,7 +28,6 @@ import {
 import type { AgentRuntimeStatusDto, ThreadDto } from "@remote-codex/shared";
 import { useAppShellNav } from "../app-shell/AppShellNavContext";
 import {
-  formatShortTimestamp,
   threadStatusClassName,
   threadStatusLabel,
 } from "./threadPresentation";
@@ -785,18 +784,20 @@ export function ThreadWorkspaceLayout({
     );
   }
 
+  const workbenchPreferences = useWorkbenchPreferences();
   function renderSettingsDialog() {
     if (
       !settingsContent &&
       !metaContent &&
       !globalSettingsContent &&
       !settingsSections?.length &&
-      !canUpdateThemeMode
+      !canUpdateThemeMode && !workbench
     ) {
       return null;
     }
 
     const sections = [
+      ...(workbench ? [{id: "workbench", label: "Workbench", description: "Appearance, reading and phone controls.", content: <WorkbenchPreferencesPanel />}]: []),
       ...(settingsContent || metaContent ? [{ id: "session", label: "Session", description: "Controls and details for this conversation.", content: <div className="space-y-5">{settingsContent}{metaContent && <details className="settings-detail"><summary>Session details</summary><div>{metaContent}</div></details>}</div> }] : []),
       ...(settingsSections ?? (globalSettingsContent ? [{ id: "preferences", label: "Preferences", content: globalSettingsContent }] : [])),
     ];
@@ -822,6 +823,7 @@ export function ThreadWorkspaceLayout({
         </DialogTrigger>
         <DialogContent
           data-testid="settings-dialog"
+          data-workbench-theme={workbenchPreferences.theme}
           data-theme-effective={effectiveTheme}
           data-theme-mode={themeMode}
           className={`thread-graph-settings-dialog thread-graph-dialog ${workbench ? 'matter-settings-dialog' : ''}`}
@@ -830,7 +832,7 @@ export function ThreadWorkspaceLayout({
           <DialogHeader>
             <DialogTitle>Settings</DialogTitle>
             <DialogDescription>
-              Your workspace, connected device, and personal preferences.
+              Your workspace and personal preferences.
             </DialogDescription>
           </DialogHeader>
           {canUpdateThemeMode && !settingsSections ? (

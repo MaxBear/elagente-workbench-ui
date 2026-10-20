@@ -82,83 +82,19 @@ export function measureSelectionOffset(
   container: Node,
   offset: number,
 ) {
-  let resolvedChild: ChildNode | null = null;
-  let offsetWithinChild = offset;
-
-  if (container === root) {
-    const childNodes = Array.from(root.childNodes);
-    let total = 0;
-    for (
-      let index = 0;
-      index < Math.min(offset, childNodes.length);
-      index += 1
-    ) {
-      const child = childNodes[index];
-      if (child) {
-        total += segmentNodeText(child).length;
-      }
-    }
-    return total;
+  // Native dictation/IME can wrap or split text nodes. Measure the serialized
+  // prefix, including block line breaks and attachment placeholders, rather
+  // than assuming the selection lives in a direct child of the editor.
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  try {
+    range.setEnd(container, offset);
+  } catch {
+    return serializeEditorPrompt(root).length;
   }
-
-  if (container.nodeType === Node.TEXT_NODE) {
-    resolvedChild = container as ChildNode;
-  } else {
-    const nearestChild = Array.from(root.childNodes).find((child) =>
-      child.contains(container),
-    );
-    if (!nearestChild) {
-      return serializeEditorPrompt(root).length;
-    }
-    resolvedChild = nearestChild;
-
-    if (
-      nearestChild instanceof HTMLElement &&
-      nearestChild.dataset.segmentType === 'attachment'
-    ) {
-      const range = document.createRange();
-      range.selectNodeContents(nearestChild);
-      const placeholderLength = segmentNodeText(nearestChild).length;
-      try {
-        range.setEnd(container, offset);
-        const visibleOffset = range.toString().length;
-        const attachmentTextLength = nearestChild.textContent?.length ?? 0;
-        if (attachmentTextLength === 0) {
-          offsetWithinChild = placeholderLength;
-        } else {
-          offsetWithinChild = Math.round(
-            Math.min(1, visibleOffset / attachmentTextLength) *
-              placeholderLength,
-          );
-        }
-      } catch {
-        offsetWithinChild = placeholderLength;
-      }
-    } else {
-      const range = document.createRange();
-      range.selectNodeContents(nearestChild);
-      try {
-        range.setEnd(container, offset);
-        offsetWithinChild = range.toString().length;
-      } catch {
-        offsetWithinChild = segmentNodeText(nearestChild).length;
-      }
-    }
-  }
-
-  const childNodes = Array.from(root.childNodes);
-  let total = 0;
-  for (const child of childNodes) {
-    if (child === resolvedChild) {
-      if (child.nodeType === Node.TEXT_NODE) {
-        return total + offsetWithinChild;
-      }
-      return total + Math.min(offsetWithinChild, segmentNodeText(child).length);
-    }
-    total += segmentNodeText(child).length;
-  }
-
-  return total;
+  const prefix = document.createElement('div');
+  prefix.append(range.cloneContents());
+  return serializePromptContent(prefix).length;
 }
 
 export function snapshotEditorSelection(editor: HTMLDivElement) {
@@ -189,71 +125,43 @@ export function resolveOffsetToDomPosition(
   root: HTMLDivElement,
   targetOffset: number,
 ) {
-  let remaining = Math.max(0, targetOffset);
-  const childNodes = Array.from(root.childNodes);
-
-  for (const [index, child] of childNodes.entries()) {
-    const childText = segmentNodeText(child);
-    const childLength = childText.length;
-
-    if (child.nodeType === Node.TEXT_NODE) {
-      if (remaining <= childLength) {
-        return {
-          node: child,
-          offset: remaining,
-        };
-      }
-
-      remaining -= childLength;
-      continue;
-    }
-
-    if (
-      child instanceof HTMLElement &&
-      child.dataset.segmentType === 'attachment'
-    ) {
-      if (remaining === 0) {
-        return {
-          node: root,
-          offset: index,
-        };
-      }
-
-      if (remaining <= childLength) {
-        const nextChild = childNodes[index + 1];
-        if (
-          remaining === childLength &&
-          nextChild?.nodeType === Node.TEXT_NODE
-        ) {
-          return {
-            node: nextChild,
-            offset: 0,
-          };
+  const target = Math.max(0, targetOffset);
+  let text = '';
+  type Position = { node: Node; offset: number };
+  function visit(parent: Node): Position | null {
+    const children = Array.from(parent.childNodes);
+    for (const [index, child] of children.entries()) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const end = text.length + (child.textContent?.length ?? 0);
+        if (target <= end) return { node: child, offset: target - text.length };
+        text += child.textContent ?? '';
+      } else if (child instanceof HTMLElement) {
+        if (child.dataset.segmentType === 'attachment' && child.dataset.placeholder) {
+          if (target === text.length) return { node: parent, offset: index };
+          text += child.dataset.placeholder;
+          if (target <= text.length) {
+            const next = children[index + 1];
+            return target === text.length && next?.nodeType === Node.TEXT_NODE
+              ? { node: next, offset: 0 }
+              : { node: parent, offset: index + 1 };
+          }
+        } else if (child.tagName === 'BR') {
+          if (target === text.length) return { node: parent, offset: index };
+          text += '\n';
+          if (target === text.length) return { node: parent, offset: index + 1 };
+        } else {
+          if (BLOCK_PROMPT_TAGS.has(child.tagName) && text.length > 0 && !text.endsWith('\n')) {
+            text += '\n';
+            if (target <= text.length) return { node: child, offset: 0 };
+          }
+          const position = visit(child);
+          if (position) return position;
         }
-        return {
-          node: root,
-          offset: index + 1,
-        };
       }
-
-      remaining -= childLength;
-      continue;
     }
-
-    if (remaining <= childLength) {
-      return {
-        node: root,
-        offset: index + 1,
-      };
-    }
-
-    remaining -= childLength;
+    return null;
   }
-
-  return {
-    node: root,
-    offset: root.childNodes.length,
-  };
+  return visit(root) ?? { node: root, offset: root.childNodes.length };
 }
 
 export function restoreEditorSelection(

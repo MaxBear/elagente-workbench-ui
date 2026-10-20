@@ -9,6 +9,8 @@ export interface ExpandedTextState {
   title: string;
   text: string;
   kind?: string;
+  error?: string;
+  onRetry?: () => void;
 }
 
 type HistoryItemDetailLoader = (
@@ -125,15 +127,11 @@ export function useDeferredHistoryDetail({
         if (requestIdRef.current !== requestId) {
           return;
         }
-        resolveDetail(
-          item,
-          inlineDetail(
-            item,
-            fallbackTitle,
-            caught instanceof Error ? caught.message : errorText,
-          ),
-          useSelectionCallback,
-        );
+        // Failure belongs to the loader UI, never to the scientific tool output.
+        setExpandedText({title: fallbackTitle, text: '',
+          error: caught instanceof Error ? caught.message : errorText,
+          onRetry: () => { void openDeferredDetail({item, fallbackTitle, fallbackText, loadingText, errorText, useSelectionCallback}); },
+        });
       }
     },
     [

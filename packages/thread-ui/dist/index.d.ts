@@ -1,5 +1,5 @@
-import { T as ThreadShellControlState$1, P as PromptAttachmentUpload, a as ThreadTimelineAdapter, b as ThreadShellAdapter, c as ThreadGraphWorkspacePanelProps, d as PluginContextValue, e as ThreadDetailUiAdapter, f as ThreadGraphWorkspaceFeatures } from './workspace-panel-Tn_ohcwH.js';
-export { E as ExtensionPluginApi, g as PluginContext, S as SendPromptInput, h as ShellSocketConnection, i as ShellSocketHandlers, j as ThreadWorkspaceAdapter, k as ThreadWorkspaceArchiveFormat, l as ThreadWorkspaceCapabilities, m as ThreadWorkspaceTrashEntry, n as ThreadWorkspaceTrashList, W as WorkspaceTab, o as createDefaultPluginContextValue, p as createExtensionPluginApi, q as extensionModuleAvailable, r as mergePluginState } from './workspace-panel-Tn_ohcwH.js';
+import { T as ThreadShellControlState$1, P as PromptAttachmentUpload, a as ThreadTimelineAdapter, b as ThreadShellAdapter, c as ThreadGraphWorkspacePanelProps, d as PluginContextValue, e as ThreadDetailUiAdapter, f as ThreadGraphWorkspaceFeatures } from './workspace-panel-Ce-yewuv.js';
+export { E as ExtensionPluginApi, g as PluginContext, S as SendPromptInput, h as ShellSocketConnection, i as ShellSocketHandlers, j as ThreadWorkspaceAdapter, k as ThreadWorkspaceArchiveFormat, l as ThreadWorkspaceCapabilities, m as ThreadWorkspaceTrashEntry, n as ThreadWorkspaceTrashList, W as WorkspaceTab, o as createDefaultPluginContextValue, p as createExtensionPluginApi, q as extensionModuleAvailable, r as mergePluginState } from './workspace-panel-Ce-yewuv.js';
 import * as react from 'react';
 import { Dispatch, SetStateAction, ReactNode, RefObject, Ref, ComponentType, ForwardRefExoticComponent, RefAttributes, ComponentProps } from 'react';
 import { ReasoningEffortDto, CollaborationModeDto, SandboxModeDto, ModelOptionDto, ThreadContextUsageDto, AgentProviderCapabilitiesDto, AgentBackendToolboxItemSchemaDto, AgentBackendHookCommandTemplateDto, AgentBackendManagementSchemaDto, PromptAttachmentKindDto, ThreadSkillsDto, ThreadMcpServersDto, ThreadHooksDto, ThreadForkTurnOptionDto, ThreadGoalDto, CreateThreadHookInput, UpdateThreadHookInput, ThreadGoalStatusDto, ProviderHostFileDto, AgentSubscriptionUsageDto, UpdateThreadSettingsInput, AgentBackendIdDto, ThreadDto, AgentRuntimeStatusDto, StructuredUsage, ThreadTurnDto, ThreadActionRequestDto, ThreadHistoryItemDto, RespondThreadActionRequestInput, ThreadAnsweredRequestNoteDto, ThreadActivityNoteDto, ThreadPendingSteerDto, ThreadHistoryItemDetailDto, ShellStatusDto, ThreadExportTurnOptionsDto, ThreadExportFormatDto, ExportThreadTranscriptInput, ThreadDetailDto, PluginDto, ImportPluginInput, UpdatePluginInput } from '@remote-codex/shared';
@@ -501,12 +501,14 @@ interface LongTextDialogProps {
     title: string;
     text: string;
     kind?: string | undefined;
+    error?: string | undefined;
+    onRetry?: (() => void) | undefined;
     onClose: () => void;
     onOpenWorkspaceFile?: ThreadTimelineAdapter['onOpenWorkspaceFile'];
     workspaceRootPath?: string;
     resolveHref?: ThreadTimelineAdapter['resolveHref'];
 }
-declare function LongTextDialog({ open, title, text, kind, onClose, onOpenWorkspaceFile, workspaceRootPath, resolveHref, }: LongTextDialogProps): react.JSX.Element | null;
+declare function LongTextDialog({ open, title, text, kind, error, onRetry, onClose, onOpenWorkspaceFile, workspaceRootPath, resolveHref, }: LongTextDialogProps): react.JSX.Element | null;
 
 declare function formatShortTimestamp(value: string | null): string;
 declare function formatLongTimestamp(value: string | null): string;
@@ -677,4 +679,17 @@ declare function DialogHeader({ className, ...props }: ComponentProps<'div'>): r
 declare function DialogTitle({ className, ...props }: ComponentProps<typeof DialogPrimitive.Title>): react.JSX.Element;
 declare function DialogDescription({ className, ...props }: ComponentProps<typeof DialogPrimitive.Description>): react.JSX.Element;
 
-export { type AgentBackendId, AppShellMenuButton, AppShellNavContext, type AppShellNavContextValue, type AppShellNavigationItem, AppShellNavigationMenu, type AppShellNavigationMenuProps, AppShellSettingsDialog, type AppShellSettingsDialogProps, ConfirmDialog, type CreateThreadShareInput, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, ExportTranscriptDialog, ExtensionHostAdapter, FrontendPluginModule, LongTextDialog, MatterWorkbench, type MatterWorkbenchOptions, MemoizedThreadGraphWorkspacePanel, PluginContextValue, PluginProvider, PromptAttachmentUpload, PublicTranscript, type PublicTranscriptSnapshot, SettingsPanels, type SettingsSection, type ThemeMode, ThreadActionsDialog, type ThreadActionsDialogProps, ThreadCards, ThreadComposer, type ThreadComposerProps, ThreadDetailSurface, type ThreadDetailSurfaceProps, ThreadDetailUiAdapter, ThreadGraphWorkspaceFeatures, ThreadGraphWorkspacePanel, ThreadGraphWorkspacePanelProps, type ThreadShareSummary, ThreadShellAdapter, ThreadShellControlState$1 as ThreadShellControlState, ThreadShellPanel, type ThreadShellPanelHandle, ThreadTimeline, ThreadTimelineAdapter, type ThreadTimelineProps, ThreadWorkspaceLayout, type WorkbenchNotification, type WorkbenchThread, formatLongTimestamp, formatShortTimestamp, hasLikelyMarkdownSyntax, historyItemAccentClassName, historyItemLabel, threadStatusClassName, threadStatusLabel, transcriptSnapshot, turnStatusLabel, useAppShellNav, usePlugins };
+interface WorkbenchPreferences {
+    theme: 'classic' | 'terminal';
+    textSize: number;
+    phoneDock: boolean;
+    phoneHand: 'left' | 'right';
+    compactComposer: boolean;
+    autoCollapseWork: boolean;
+    reduceMotion: boolean;
+}
+declare function updateWorkbenchPreferences(update: Partial<WorkbenchPreferences>): void;
+declare function useWorkbenchPreferences(): WorkbenchPreferences;
+declare function WorkbenchPreferencesPanel(): react.JSX.Element;
+
+export { type AgentBackendId, AppShellMenuButton, AppShellNavContext, type AppShellNavContextValue, type AppShellNavigationItem, AppShellNavigationMenu, type AppShellNavigationMenuProps, AppShellSettingsDialog, type AppShellSettingsDialogProps, ConfirmDialog, type CreateThreadShareInput, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, ExportTranscriptDialog, ExtensionHostAdapter, FrontendPluginModule, LongTextDialog, MatterWorkbench, type MatterWorkbenchOptions, MemoizedThreadGraphWorkspacePanel, PluginContextValue, PluginProvider, PromptAttachmentUpload, PublicTranscript, type PublicTranscriptSnapshot, SettingsPanels, type SettingsSection, type ThemeMode, ThreadActionsDialog, type ThreadActionsDialogProps, ThreadCards, ThreadComposer, type ThreadComposerProps, ThreadDetailSurface, type ThreadDetailSurfaceProps, ThreadDetailUiAdapter, ThreadGraphWorkspaceFeatures, ThreadGraphWorkspacePanel, ThreadGraphWorkspacePanelProps, type ThreadShareSummary, ThreadShellAdapter, ThreadShellControlState$1 as ThreadShellControlState, ThreadShellPanel, type ThreadShellPanelHandle, ThreadTimeline, ThreadTimelineAdapter, type ThreadTimelineProps, ThreadWorkspaceLayout, type WorkbenchNotification, type WorkbenchPreferences, WorkbenchPreferencesPanel, type WorkbenchThread, formatLongTimestamp, formatShortTimestamp, hasLikelyMarkdownSyntax, historyItemAccentClassName, historyItemLabel, threadStatusClassName, threadStatusLabel, transcriptSnapshot, turnStatusLabel, updateWorkbenchPreferences, useAppShellNav, usePlugins, useWorkbenchPreferences };

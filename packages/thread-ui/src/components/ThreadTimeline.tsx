@@ -677,7 +677,7 @@ function ThreadTimelineComponent({
                     const mergedItems = new Map(loadedTurn?.items.map((item) => [item.id, item]));
                     for (const item of turn.items) mergedItems.set(item.id, mergedItems.has(item.id) ? mergeTimelineItem(mergedItems.get(item.id)!, item, mergeThreadHistoryItem) : item);
                     const hydratedTurn = loadedTurn
-                      ? { ...loadedTurn, ...turn, items: [...mergedItems.values()] }
+                      ? { ...turn, ...loadedTurn, items: [...mergedItems.values()] }
                       : turn;
                     const displayTurn = mergeOptimisticTurnItems(
                       hydratedTurn,
@@ -983,6 +983,8 @@ function ThreadTimelineComponent({
         title={expandedText?.title ?? 'Full text'}
         text={expandedText?.text ?? ''}
         kind={expandedText?.kind}
+        error={expandedText?.error}
+        onRetry={expandedText?.onRetry}
         onClose={closeExpandedText}
         onOpenWorkspaceFile={adapter?.onOpenWorkspaceFile}
         workspaceRootPath={adapter?.workspaceRootPath}

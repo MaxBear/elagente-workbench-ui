@@ -1,3 +1,4 @@
+import { MiddleName } from '../../MiddleName';
 import {
   ChevronDown,
   ChevronRight,

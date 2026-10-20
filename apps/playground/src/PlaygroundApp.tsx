@@ -306,6 +306,29 @@ export function PlaygroundApp() {
           currentThreadId={mockDetail.thread.id}
           currentWorkspaceId={mockDetail.workspace.id}
           currentWorkspaceLabel={mockDetail.workspace.label}
+          workbench={{
+            brandName: 'ElAgente Workbench',
+            threads: mockThreads.map((thread) => ({
+              key: thread.id,
+              title: thread.title,
+              subtitle: thread.provider,
+              href: `#${thread.id}`,
+              status: thread.status,
+              favorite: thread.isPinned,
+            })),
+            currentKey: mockDetail.thread.id,
+            favorite: mockDetail.thread.isPinned,
+            workspacePath: mockDetail.workspace.absPath,
+            activeView,
+            terminalEnabled: true,
+            onViewChange: setActiveView,
+            onToggleFavorite: () => {},
+            onNavigate: () => {},
+            onSearch: () => {},
+            notifications: [],
+            unreadCount: 0,
+            onReadNotifications: () => {},
+          }}
           activeView={activeView}
           appMenuButton={<AppShellMenuButton />}
           threadActionsButton={threadActionsButton}

@@ -1,4 +1,6 @@
-import { FormEvent, useEffect } from 'react';
+import { useRef } from 'react';
+import { useModalFocus } from './menu/useModalFocus';
+import { type FormEvent } from 'react';
 import { ThemedPortal } from './ThemedPortal';
 
 interface RenameDialogProps {
@@ -22,22 +24,8 @@ export function RenameDialog({
   onCancel,
   onSubmit,
 }: RenameDialogProps) {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !busy) {
-        onCancel();
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [busy, onCancel, open]);
+  const modalRef = useRef<HTMLFormElement>(null);
+  useModalFocus(modalRef, open, busy ? undefined : onCancel, 'input');
 
   if (!open) {
     return null;
@@ -60,6 +48,8 @@ export function RenameDialog({
         className="absolute inset-0 bg-[var(--overlay-scrim)] backdrop-blur-sm disabled:cursor-not-allowed"
       />
       <form
+        ref={modalRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}

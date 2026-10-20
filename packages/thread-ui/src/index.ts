@@ -105,7 +105,11 @@ export { MatterWorkbench } from './components/MatterWorkbench';
 export { PublicTranscript, transcriptSnapshot, type PublicTranscriptSnapshot } from './components/PublicTranscript';
 
 export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./components/graph-ui/Dialog";
+export { WorkbenchPreferencesPanel, useWorkbenchPreferences, updateWorkbenchPreferences, type WorkbenchPreferences } from './components/workbenchPreferences';
 export { SettingsPanels, type SettingsSection } from './components/SettingsPanels';
 
 export {createExtensionPluginApi, extensionModuleAvailable, type ExtensionPluginApi} from './plugins/extension-api';
 export type {ExtensionHostAdapter, ExtensionRenderContext, ViewerToolbarContext, ViewerToolbarContribution} from './plugins/plugin-types';
+
+import './styles/workbench-preferences.css';
+import './styles/terminal-theme.css';

@@ -84,7 +84,7 @@ it('persists bounded keyboard resizing and desktop collapse preferences', () => 
 });
 it('makes mobile navigation modal, cycles focus and restores its opener on Escape and selection', () => {
   const {host} = mount({renderNavigationHeader: ({closeNavigation}) => <button onClick={closeNavigation}>Select agent</button>}, true);
-  const toggle = host.querySelector('[aria-label="Toggle navigation sidebar"]') as HTMLButtonElement;
+  const toggle = host.querySelector('[aria-label="Conversations and Agents"]') as HTMLButtonElement;
   const sidebar = host.querySelector('.matter-sidebar')!;
   expect(sidebar.hasAttribute('inert')).toBe(true);
   toggle.focus();

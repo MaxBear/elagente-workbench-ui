@@ -18,12 +18,10 @@ interface UseComposerPromptDomSyncInput {
   promptSegments: PromptSegment[];
   attachmentPreviewUrls: Record<string, string>;
   previewSignature: string;
-  editorSanitizeNonce: number;
   pendingSelectionRef: MutableRefObject<PromptSelectionRange | null>;
   pendingInsertedAttachmentIdsRef: MutableRefObject<string[]>;
   selectionSnapshotRef: MutableRefObject<PromptSelectionRange | null>;
   renderedPreviewSignatureRef: MutableRefObject<string>;
-  renderedSanitizeNonceRef: MutableRefObject<number>;
   serializeEditorPrompt: () => string;
   restoreSelection: (selection: PromptSelectionRange | null) => void;
 }
@@ -140,12 +138,10 @@ export function useComposerPromptDomSync({
   promptSegments,
   attachmentPreviewUrls,
   previewSignature,
-  editorSanitizeNonce,
   pendingSelectionRef,
   pendingInsertedAttachmentIdsRef,
   selectionSnapshotRef,
   renderedPreviewSignatureRef,
-  renderedSanitizeNonceRef,
   serializeEditorPrompt,
   restoreSelection,
 }: UseComposerPromptDomSyncInput) {
@@ -156,18 +152,24 @@ export function useComposerPromptDomSync({
     }
 
     const pendingSelection = pendingSelectionRef.current;
-    const shouldSyncDom =
-      serializeEditorPrompt() !== prompt ||
-      renderedPreviewSignatureRef.current !== previewSignature ||
-      renderedSanitizeNonceRef.current !== editorSanitizeNonce;
+    const shouldSyncDom = serializeEditorPrompt() !== prompt;
 
     if (shouldSyncDom) {
       editor.replaceChildren(
         buildPromptFragment(promptSegments, attachmentPreviewUrls),
       );
-      renderedPreviewSignatureRef.current = previewSignature;
-      renderedSanitizeNonceRef.current = editorSanitizeNonce;
+    } else if (renderedPreviewSignatureRef.current !== previewSignature) {
+      // A thumbnail becoming available must not replace the text nodes tracked
+      // by native dictation/autocorrection, or disturb its live selection.
+      const attachments = new Map(promptSegments.flatMap(segment =>
+        segment.type === 'attachment' ? [[segment.attachment.clientId, segment] as const] : [],
+      ));
+      for (const token of editor.querySelectorAll<HTMLElement>('[data-segment-type="attachment"]')) {
+        const segment = attachments.get(token.dataset.clientId ?? '');
+        if (segment) token.replaceWith(createPromptAttachmentToken(segment, attachmentPreviewUrls));
+      }
     }
+    renderedPreviewSignatureRef.current = previewSignature;
 
     if (pendingSelection !== null) {
       editor.focus();
@@ -188,7 +190,6 @@ export function useComposerPromptDomSync({
     pendingInsertedAttachmentIdsRef.current = [];
   }, [
     attachmentPreviewUrls,
-    editorSanitizeNonce,
     isShellView,
     previewSignature,
     prompt,
@@ -197,7 +198,6 @@ export function useComposerPromptDomSync({
     pendingInsertedAttachmentIdsRef,
     pendingSelectionRef,
     renderedPreviewSignatureRef,
-    renderedSanitizeNonceRef,
     restoreSelection,
     selectionSnapshotRef,
     serializeEditorPrompt,

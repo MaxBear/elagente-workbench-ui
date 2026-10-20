@@ -93,7 +93,7 @@ export function ComposerPromptEditor({
           role="textbox"
           aria-label="Prompt"
           aria-multiline="true"
-          contentEditable={!disabled}
+          contentEditable={disabled ? false : 'plaintext-only'}
           inputMode="text"
           suppressContentEditableWarning
           onClick={event => {

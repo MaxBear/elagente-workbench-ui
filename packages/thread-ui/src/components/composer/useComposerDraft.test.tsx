@@ -215,6 +215,25 @@ describe('useComposerDraft', () => {
     harness.unmount();
   });
 
+  it('does not let a delayed host echo overwrite newer dictation or cancel its persistence', () => {
+    const onDraftChange = vi.fn();
+    const input = { isShellView: false, draftPrompt: '', draftAttachments: [], onDraftChange };
+    const harness = renderHookHarness(input);
+    flushSync(() => {
+      latestResult?.updateDraft(() => ({ prompt: 'first phrase', attachments: [] }));
+      latestResult?.updateDraft(() => ({ prompt: 'first phrase corrected', attachments: [] }), 'deferred');
+    });
+    harness.rerender({ ...input, draftPrompt: 'first phrase' });
+    expect(latestResult?.prompt).toBe('first phrase corrected');
+    flushSync(() => { vi.advanceTimersByTime(DRAFT_SYNC_DELAY_MS); });
+    expect(onDraftChange).toHaveBeenCalledTimes(2);
+    const sent = applyHostUpdate({ prompt: '', attachments: [] }, onDraftChange.mock.calls[1]![0]);
+    expect(sent.prompt).toBe('first phrase corrected');
+    harness.rerender({ ...input, draftPrompt: 'first phrase corrected' });
+    expect(latestResult?.prompt).toBe('first phrase corrected');
+    harness.unmount();
+  });
+
   it('treats shell mode as uncontrolled even when host draft props are present', () => {
     const onDraftChange = vi.fn();
     const harness = renderHookHarness({

@@ -1,5 +1,6 @@
 import {
   useMemo,
+  useRef,
   type ComponentType,
   type ForwardRefExoticComponent,
   type Ref,
@@ -31,7 +32,6 @@ import {
   type ThreadTimelineProps,
 } from "./components/ThreadTimeline";
 import {
-  ThreadComposer,
   type ThreadComposerProps,
 } from "./components/ThreadComposer";
 import {
@@ -371,11 +371,25 @@ export function ThreadDetailSurface({
         : 0,
     [detail],
   );
+  const lastDetail = useRef(detail);
+  if (detail) lastDetail.current = detail;
+  // A mounted host connection defines the owner/sandbox boundary. Across thread
+  // IDs retain only layout, never the previous thread's items, files or actions.
+  const previousDetail = lastDetail.current;
+  const sameThread = previousDetail?.thread.id === currentThreadId;
+  const pending = loading && !detail && previousDetail !== null;
+  const shownDetail = detail ?? (pending && previousDetail ? sameThread ? previousDetail : {
+    thread: {...previousDetail.thread, id: currentThreadId ?? '', title: '', activeTurnId: null, status: 'idle' as const},
+    workspace: {id: '', hostId: '', label: '', absPath: '', isFavorite: false, createdAt: '', lastOpenedAt: null},
+    workspacePathStatus: 'present' as const,
+    turns: [], pendingRequests: [], pendingSteers: [],
+  } : null);
+  const workspaceDetail = detail ?? (pending && sameThread ? previousDetail : null);
   const resolvedWorkspaceContent =
-    workspaceContent ??
-    (detail ? (
+    pending && !sameThread ? null : workspaceContent ??
+    (workspaceDetail ? (
       <ThreadGraphWorkspacePanel
-        detail={detail}
+        detail={workspaceDetail}
         status={status}
         plugins={plugins}
         workspaceAdapter={adapter.workspace ?? null}
@@ -387,15 +401,10 @@ export function ThreadDetailSurface({
       />
     ) : null);
 
-  const defaultContent = loading ? (
-    (loadingContent ?? (
-      <div className="flex flex-1 items-center justify-center px-6 py-12 text-center text-[var(--theme-fg-muted)]">
-        Loading thread detail...
-      </div>
-    ))
-  ) : detail ? (
+  const pendingContent = loadingContent ?? <div role="status" className="thread-loading-state">Loading conversation…</div>;
+  const defaultContent = loading && !shownDetail ? pendingContent : shownDetail ? (
     <div className={className}>
-      {floatingPanel ? (
+      {!pending && floatingPanel ? (
         <div className="fixed right-3 top-20 z-50 lg:absolute lg:right-4 lg:top-16">
           {floatingPanel}
         </div>
@@ -407,12 +416,12 @@ export function ThreadDetailSurface({
             {error}
           </div>
         ))}
-      {detail.workspacePathStatus === "missing" &&
+      {!pending && shownDetail.workspacePathStatus === "missing" &&
         (workspaceMissingContent ?? (
           <div className="shrink-0 border-b border-rose-500/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-100 sm:px-6">
             <p className="font-medium text-rose-50">Workspace path missing</p>
             <p className="mt-1 break-words text-rose-100/90">
-              {detail.workspace.absPath}
+              {shownDetail.workspace.absPath}
             </p>
           </div>
         ))}
@@ -422,7 +431,8 @@ export function ThreadDetailSurface({
         }
       >
         <GraphChatThreadChatPanel
-          detail={detail}
+          detail={shownDetail}
+          {...(pending ? {timelinePending: pendingContent} : {})}
           adapter={adapter}
           timelineAdapter={timelineAdapter}
           TimelineComponent={TimelineComponent}
@@ -433,8 +443,9 @@ export function ThreadDetailSurface({
           floatingMobileComposerBottomOffset={
             floatingMobileComposerBottomOffset
           }
-          {...(beforeTimelineContent ? { beforeTimelineContent } : {})}
-          {...(composerProps ? { composerProps } : {})}
+          {...(!pending && beforeTimelineContent ? { beforeTimelineContent } : {})}
+          {...(composerProps ? {composerProps: pending ? {...composerProps, disabled: true, canInterrupt: false, onInterrupt: undefined,
+            ...(!sameThread ? {draftPrompt: '', draftAttachments: [], onDraftChange: undefined} : {})} : composerProps} : {})}
           {...(timelineProps ? { timelineProps } : {})}
           {...(composerHostRef ? { composerHostRef } : {})}
         />
@@ -444,11 +455,11 @@ export function ThreadDetailSurface({
           activeView === "shell" ? "flex min-h-0 flex-1 flex-col" : "hidden"
         }
       >
-        {shellContent ??
-          (detail.thread.isLoaded && terminalPanelEnabled && adapter.shell ? (
+        {pending ? pendingContent : shellContent ??
+          (shownDetail.thread.isLoaded && terminalPanelEnabled && adapter.shell ? (
             <ShellPanelComponent
               ref={shellPanelRef}
-              threadId={detail.thread.id}
+              threadId={shownDetail.thread.id}
               shellAdapter={adapter.shell}
               effectiveTheme={shellEffectiveTheme}
               isVisible={activeView === "shell"}
@@ -459,7 +470,7 @@ export function ThreadDetailSurface({
                 ? { onStateChange: onShellStateChange }
                 : {})}
             />
-          ) : detail.thread.isLoaded && !terminalPanelEnabled ? (
+          ) : shownDetail.thread.isLoaded && !terminalPanelEnabled ? (
             (shellUnavailableContent ?? (
               <div className="flex min-h-0 flex-1 items-center justify-center p-4 sm:p-6">
                 <div className="thread-empty-surface max-w-md rounded-[1.6rem] border px-6 py-8 text-center">
@@ -507,14 +518,14 @@ export function ThreadDetailSurface({
       error={loading ? null : error}
       viewportConstrained
       currentThreadId={currentThreadId ?? detail?.thread.id}
-      currentThreadLabel={detail?.thread.title}
-      currentWorkspaceId={currentWorkspaceId !== undefined ? currentWorkspaceId : detail?.thread.workspaceId}
-      currentWorkspaceLabel={currentWorkspaceLabel ?? detail?.workspace.label}
+      currentThreadLabel={pending && !sameThread ? undefined : detail?.thread.title}
+      currentWorkspaceId={pending && !sameThread ? null : currentWorkspaceId !== undefined ? currentWorkspaceId : detail?.thread.workspaceId}
+      currentWorkspaceLabel={pending && !sameThread ? null : currentWorkspaceLabel ?? detail?.workspace.label}
       harnessLabel={composerProps?.agentLabel}
       sessionLabel={detail?.thread.providerSessionId ?? detail?.thread.id}
       usageLabel={topbarUsageLabel}
-      threadActionsButton={threadActionsButton}
-      topbarActions={surfaceActions}
+      threadActionsButton={pending ? undefined : threadActionsButton}
+      topbarActions={pending ? undefined : surfaceActions}
       metaContent={metaContent}
       settingsContent={settingsContent}
       globalSettingsContent={globalSettingsContent}

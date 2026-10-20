@@ -68,6 +68,7 @@ export function useComposerDraft({
   const draftSyncTimerRef = useRef<number | null>(null);
   const latestLocalDraftRef = useRef<ComposerDraft>(localControlledDraft);
   const lastSentDraftSignatureRef = useRef(draftSignature(localControlledDraft));
+  const pendingHostEchoesRef = useRef(new Set<string>());
   const isDraftControlled =
     !isShellView &&
     draftPrompt !== undefined &&
@@ -83,6 +84,7 @@ export function useComposerDraft({
   useLayoutEffect(() => {
     if (!isDraftControlled) {
       lastRenderedControlledPropsSignatureRef.current = '';
+      pendingHostEchoesRef.current.clear();
       return;
     }
 
@@ -94,6 +96,10 @@ export function useComposerDraft({
     }
 
     lastRenderedControlledPropsSignatureRef.current = hostSignature;
+    // Host acknowledgements may arrive after the next dictation/typing update.
+    // They acknowledge persistence; they must not roll back newer local text.
+    if (pendingHostEchoesRef.current.delete(hostSignature)) return;
+    pendingHostEchoesRef.current.clear();
     lastSentDraftSignatureRef.current = hostSignature;
     latestLocalDraftRef.current = hostDraft;
     if (draftSyncTimerRef.current !== null) {
@@ -114,6 +120,10 @@ export function useComposerDraft({
     }
 
     lastSentDraftSignatureRef.current = signature;
+    pendingHostEchoesRef.current.add(signature);
+    if (pendingHostEchoesRef.current.size > 32) {
+      pendingHostEchoesRef.current.delete(pendingHostEchoesRef.current.values().next().value!);
+    }
     onDraftChange(() => ({
       prompt: nextDraft.prompt,
       attachments: nextDraft.attachments as PromptAttachmentUpload[],

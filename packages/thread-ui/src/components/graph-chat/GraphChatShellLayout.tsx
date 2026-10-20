@@ -1,4 +1,5 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode, type CSSProperties } from 'react';
+import { useWorkbenchPreferences } from '../workbenchPreferences';
 
 export function GraphChatShellRoot({
   children,
@@ -13,6 +14,7 @@ export function GraphChatShellRoot({
   themeMode?: string | undefined;
   viewportConstrained: boolean;
 }) {
+  const preferences = useWorkbenchPreferences();
   return (
     <div
       className={`thread-ui-shell ${
@@ -25,6 +27,9 @@ export function GraphChatShellRoot({
       data-theme-effective={effectiveTheme}
       data-theme-mode={themeMode ?? effectiveTheme}
       data-thread-layout={layoutMode}
+      data-workbench-theme={preferences.theme}
+      data-reduce-motion={preferences.reduceMotion}
+      style={{'--chat-zoom': preferences.textSize / 100} as CSSProperties}
     >
       {children}
     </div>
