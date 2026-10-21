@@ -19,6 +19,8 @@ import {
   Trash2,
   Upload,
   X,
+  Check,
+  Eye,
 } from 'lucide-react';
 import {
   useCallback,
@@ -90,6 +92,8 @@ export function WorkspaceExplorerPanel({
   onToggle,
   onUpload,
   onCreateFile,
+  showHidden,
+  onShowHiddenChange,
   explorerScrollTopRef,
   explorerScrollerRef,
   selectedNodeId,
@@ -141,6 +145,9 @@ export function WorkspaceExplorerPanel({
   onSelectNode?: (node: WorkspaceTreeNode) => void;
   onToggle: (path: string) => void;
   onUpload?: () => void;
+  /** Present when the host can list entries its visibility rules hide. */
+  showHidden?: boolean;
+  onShowHiddenChange?: (value: boolean) => void;
   onCreateFile?: () => void;
   explorerScrollTopRef: MutableRefObject<number>;
   explorerScrollerRef: MutableRefObject<HTMLDivElement | null>;
@@ -238,9 +245,18 @@ export function WorkspaceExplorerPanel({
           </button>
           {canUpload || onDownloadWorkspace || onDownloadWorkspaceZip ||
           (onImportArchive && canImportArchive) || onTrashFile || onOpenTrash ||
-          onMoveFile || onDeleteFile || onEmptyGarbage ? (
+          onMoveFile || onDeleteFile || onEmptyGarbage || onShowHiddenChange ? (
             <ExplorerMoreMenu triggerClassName={iconButtonClassName}>
               {(close) => <>
+                {onShowHiddenChange ? (
+                  <button type="button" role="menuitemcheckbox" aria-checked={Boolean(showHidden)}
+                    onClick={() => { close(); onShowHiddenChange(!showHidden); }}
+                    className="flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm hover:bg-[var(--theme-hover)] focus-visible:bg-[var(--theme-hover)] focus-visible:outline-none">
+                    <Eye data-icon="show-hidden" className="h-4 w-4" />
+                    <span className="flex-1">{translate("files.showHiddenFiles")}</span>
+                    {showHidden ? <Check aria-hidden="true" className="h-4 w-4" /> : null}
+                  </button>
+                ) : null}
                 {canUpload ? (
                   <button
                     type="button"

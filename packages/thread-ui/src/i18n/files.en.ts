@@ -680,4 +680,5 @@ export const filesEn = {
   "files.propertiesClose": "Close",
   "files.propertiesOlderDevice": "This device's Supervisor does not report file times yet; they show after it updates.",
   "files.downloadZip": "Download as ZIP",
+  "files.showHiddenFiles": "Show hidden files",
 } as const;

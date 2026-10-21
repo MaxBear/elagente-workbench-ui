@@ -83,6 +83,8 @@ export function GraphWorkspaceExplorer({
     tree,
     workspaceError,
     workspaceIdentity,
+    showHidden,
+    setShowHidden,
   } = useWorkspaceExplorerController({
     activeView,
     detail,
@@ -527,6 +529,7 @@ export function GraphWorkspaceExplorer({
 
   const explorerPanel = (
     <WorkspaceExplorerPanel
+      {...(setShowHidden ? {showHidden, onShowHiddenChange: setShowHidden} : {})}
       canEmptyGarbage={Boolean(workspaceAdapter?.emptyGarbage)}
       canUpload={canUploadFiles}
       pending={pending}

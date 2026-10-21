@@ -680,4 +680,5 @@ export const filesZhCN = {
   "files.propertiesClose": "关闭",
   "files.propertiesOlderDevice": "这台设备的 Supervisor 还不提供文件时间，更新后可见。",
   "files.downloadZip": "下载为 ZIP",
+  "files.showHiddenFiles": "显示隐藏文件",
 } as const;

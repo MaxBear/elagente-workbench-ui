@@ -1320,7 +1320,36 @@ var chatEn = {
   "chat.attachmentOpenInFiles": "Open in files",
   "chat.attachmentRemove": "Remove",
   "chat.usageUnavailable": "Usage unavailable: {{value1}}",
-  "chat.table": "Table"
+  "chat.table": "Table",
+  "chat.chooseEffort": "Choose effort",
+  "chat.policyPresets": "Model preset",
+  "chat.policyGroups": "Model groups",
+  "chat.policyGroupsHeading": "Groups",
+  "chat.policyCustom": "Custom models",
+  "chat.policyCustomActive": "A custom group selection is active",
+  "chat.policyCustomActiveHint": "It stays until you choose a preset. Switch Settings to groups to edit it.",
+  "chat.policySavedOverrides": { one: "{{count}} saved override", other: "{{count}} saved overrides" },
+  "chat.policyOverrideCount": { one: "{{count}} override", other: "{{count}} overrides" },
+  "chat.policyNoOverrides": "Group defaults",
+  "chat.policyOverride": "Override",
+  "chat.policyDefaultTag": "Default",
+  "chat.policyDefaultIn": "default {{value1}}",
+  "chat.policyDefaultEffort": "default {{value1}}",
+  "chat.policyAllGroups": "All groups",
+  "chat.policyUseGroupDefault": "Use group default",
+  "chat.policyMembers": { one: "{{count}} role", other: "{{count}} roles" },
+  "chat.policySuspended": "Saved for custom: {{value1}}",
+  "chat.policyResetAll": { one: "Reset {{count}} override", other: "Reset all {{count}} overrides" },
+  "chat.policySearch": "Search groups",
+  "chat.policySearchCount": "{{value1}} of {{value2}} groups",
+  "chat.policyNoMatch": 'No groups match "{{value1}}"',
+  "chat.policyClearSearch": "Clear search",
+  "chat.policyLoading": "Loading model policy\u2026",
+  "chat.policyUnavailable": "Model policy unavailable",
+  "chat.policySaving": "Saving\u2026",
+  "chat.policyNoModels": "No compatible models are available for this group.",
+  "chat.policyDone": "Done",
+  "chat.policyChip": "Models: {{value1}}"
 };
 
 // src/i18n/common.en.ts
@@ -2570,7 +2599,8 @@ var filesEn = {
   "files.propertiesLinkYes": "Yes, listed as what it points to",
   "files.propertiesClose": "Close",
   "files.propertiesOlderDevice": "This device's Supervisor does not report file times yet; they show after it updates.",
-  "files.downloadZip": "Download as ZIP"
+  "files.downloadZip": "Download as ZIP",
+  "files.showHiddenFiles": "Show hidden files"
 };
 
 // src/i18n/settings.en.ts
@@ -5281,7 +5311,36 @@ var chatZhCN = {
   "chat.attachmentOpenInFiles": "\u5728\u6587\u4EF6\u4E2D\u6253\u5F00",
   "chat.attachmentRemove": "\u79FB\u9664",
   "chat.usageUnavailable": "\u7528\u91CF\u4E0D\u53EF\u7528\uFF1A{{value1}}",
-  "chat.table": "\u8868\u683C"
+  "chat.table": "\u8868\u683C",
+  "chat.chooseEffort": "\u9009\u62E9\u63A8\u7406\u5F3A\u5EA6",
+  "chat.policyPresets": "\u6A21\u578B\u9884\u8BBE",
+  "chat.policyGroups": "\u6A21\u578B\u5206\u7EC4",
+  "chat.policyGroupsHeading": "\u5206\u7EC4",
+  "chat.policyCustom": "\u81EA\u5B9A\u4E49\u6A21\u578B",
+  "chat.policyCustomActive": "\u5F53\u524D\u4F7F\u7528\u81EA\u5B9A\u4E49\u5206\u7EC4\u9009\u62E9",
+  "chat.policyCustomActiveHint": "\u9009\u62E9\u4E00\u4E2A\u9884\u8BBE\u524D\u4F1A\u4E00\u76F4\u4FDD\u7559\u3002\u8981\u7F16\u8F91\u5B83\uFF0C\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u5207\u6362\u5230\u5206\u7EC4\u663E\u793A\u3002",
+  "chat.policySavedOverrides": { one: "\u5DF2\u4FDD\u5B58 {{count}} \u9879\u8986\u76D6", other: "\u5DF2\u4FDD\u5B58 {{count}} \u9879\u8986\u76D6" },
+  "chat.policyOverrideCount": { one: "{{count}} \u9879\u8986\u76D6", other: "{{count}} \u9879\u8986\u76D6" },
+  "chat.policyNoOverrides": "\u5206\u7EC4\u9ED8\u8BA4\u503C",
+  "chat.policyOverride": "\u5DF2\u8986\u76D6",
+  "chat.policyDefaultTag": "\u9ED8\u8BA4",
+  "chat.policyDefaultIn": "\u9ED8\u8BA4 {{value1}}",
+  "chat.policyDefaultEffort": "\u9ED8\u8BA4 {{value1}}",
+  "chat.policyAllGroups": "\u5168\u90E8\u5206\u7EC4",
+  "chat.policyUseGroupDefault": "\u4F7F\u7528\u5206\u7EC4\u9ED8\u8BA4\u503C",
+  "chat.policyMembers": { one: "{{count}} \u4E2A\u89D2\u8272", other: "{{count}} \u4E2A\u89D2\u8272" },
+  "chat.policySuspended": "\u81EA\u5B9A\u4E49\u4E2D\u5DF2\u4FDD\u5B58\uFF1A{{value1}}",
+  "chat.policyResetAll": { one: "\u91CD\u7F6E {{count}} \u9879\u8986\u76D6", other: "\u91CD\u7F6E\u5168\u90E8 {{count}} \u9879\u8986\u76D6" },
+  "chat.policySearch": "\u641C\u7D22\u5206\u7EC4",
+  "chat.policySearchCount": "{{value2}} \u4E2A\u5206\u7EC4\u4E2D\u6709 {{value1}} \u4E2A",
+  "chat.policyNoMatch": "\u6CA1\u6709\u4E0E\u201C{{value1}}\u201D\u5339\u914D\u7684\u5206\u7EC4",
+  "chat.policyClearSearch": "\u6E05\u9664\u641C\u7D22",
+  "chat.policyLoading": "\u6B63\u5728\u52A0\u8F7D\u6A21\u578B\u7B56\u7565\u2026",
+  "chat.policyUnavailable": "\u6A21\u578B\u7B56\u7565\u4E0D\u53EF\u7528",
+  "chat.policySaving": "\u6B63\u5728\u4FDD\u5B58\u2026",
+  "chat.policyNoModels": "\u6B64\u5206\u7EC4\u6CA1\u6709\u53EF\u7528\u7684\u517C\u5BB9\u6A21\u578B\u3002",
+  "chat.policyDone": "\u5B8C\u6210",
+  "chat.policyChip": "\u6A21\u578B\uFF1A{{value1}}"
 };
 
 // src/i18n/common.zh-CN.ts
@@ -6531,7 +6590,8 @@ var filesZhCN = {
   "files.propertiesLinkYes": "\u662F\uFF0C\u663E\u793A\u4E3A\u5B83\u6307\u5411\u7684\u5185\u5BB9",
   "files.propertiesClose": "\u5173\u95ED",
   "files.propertiesOlderDevice": "\u8FD9\u53F0\u8BBE\u5907\u7684 Supervisor \u8FD8\u4E0D\u63D0\u4F9B\u6587\u4EF6\u65F6\u95F4\uFF0C\u66F4\u65B0\u540E\u53EF\u89C1\u3002",
-  "files.downloadZip": "\u4E0B\u8F7D\u4E3A ZIP"
+  "files.downloadZip": "\u4E0B\u8F7D\u4E3A ZIP",
+  "files.showHiddenFiles": "\u663E\u793A\u9690\u85CF\u6587\u4EF6"
 };
 
 // src/i18n/settings.zh-CN.ts

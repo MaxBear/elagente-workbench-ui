@@ -6,7 +6,7 @@ import type {
   ThreadContextUsageDto,
   UpdateThreadSettingsInput,
 } from '@remote-codex/shared';
-import type { CSSProperties, ReactNode } from 'react';
+import { useRef, type CSSProperties, type ReactNode } from 'react';
 
 import { InputGroupButton } from '../graph-ui/InputGroup';
 import type { SettingsMenu } from './types';
@@ -16,6 +16,8 @@ import { ComposerMenuSurface } from './ComposerMenuSurface';
 import { Check, ChevronDown, Send, Target } from 'lucide-react';
 import { useThemeFeature } from '../themeHooks';
 import { ComposerReasoningSlider } from './ComposerReasoningSlider';
+import { ComposerModelPolicyMenu } from './ComposerModelPolicyMenu';
+import { isCustomSelection, modelDisplayName, overrideCount, presetLabel, type ComposerModelPolicyProps } from './modelPolicy';
 
 /** Send, but later: an up arrow with a small clock. */
 function SendLaterIcon() {
@@ -54,8 +56,12 @@ export function ComposerSettingsToolbar({
   beforeSend,
   onSetOpenMenu,
   onUpdateSettings,
+  modelPolicy = null,
 }: {
   beforeSend?: ReactNode;
+  /** Group model policy: the chip summarizes it and the menu edits presets
+      and author groups instead of one thread-wide model. */
+  modelPolicy?: ComposerModelPolicyProps | null;
   openMenu: SettingsMenu;
   model: string | null | undefined;
   agent?: string | undefined;
@@ -91,6 +97,7 @@ export function ComposerSettingsToolbar({
   onUpdateSettings: (input: UpdateThreadSettingsInput) => void;
 }) {
   useI18n();
+  const modelTriggerRef = useRef<HTMLButtonElement>(null);
   // Theme flags: the harness avatar and a chevron on the model chip, and a
   // paper plane for sending now. Every theme shows the same three intents.
   const modelAvatar = useThemeFeature('composer.modelAvatar');
@@ -110,6 +117,24 @@ export function ComposerSettingsToolbar({
     translate('chat.selectModel');
   const supportsEffort = supportedEfforts.length > 0;
   const effortLabel = formatReasoningEffortLabel(reasoningEffort);
+  // With a group policy the chip never names one model: it shows the preset,
+  // or the custom selection and its override count.
+  const policyView = modelPolicy?.view ?? null;
+  const policyCustom = policyView ? isCustomSelection(policyView) : false;
+  const policyOverrides = policyView ? overrideCount(policyView) : 0;
+  const policyLabel = !modelPolicy ? null : !policyView
+    ? translate(modelPolicy.error ? 'chat.policyUnavailable' : 'chat.policyLoading')
+    : policyCustom ? translate('chat.policyCustom') : presetLabel(policyView);
+  const policyDetail = policyView && policyCustom
+    ? policyOverrides ? translate('chat.policyOverrideCount', { count: policyOverrides }) : translate('chat.policyNoOverrides')
+    : null;
+  const policyTitle = policyView && policyCustom
+    ? [policyLabel, ...policyView.groups.filter((group) => policyView.overrides[group.id]).map((group) => {
+        const value = policyView.overrides[group.id]!;
+        const option = group.models.find((entry) => entry.model === value.model);
+        return `${group.label}: ${modelDisplayName(group.models, value.model)}${option?.supportedReasoningEfforts.length ? ` · ${formatReasoningEffortLabel(value.reasoningEffort)}` : ''}`;
+      })].join('\n')
+    : policyLabel ?? '';
   // ElAgente: the context row and its title text show only when the host reports a
   // usable context reading; otherwise they are omitted, never "— / —" or "unavailable".
   const hasContext = contextUsage?.availability === 'available' && (
@@ -121,9 +146,12 @@ export function ComposerSettingsToolbar({
       <div className="composer-model-control relative min-w-0">
         <button
           type="button"
+          ref={modelTriggerRef}
           data-composer-menu-trigger="true"
           aria-label={
-            supportsEffort
+            policyLabel != null
+              ? translate('chat.policyChip', { value1: policyDetail ? `${policyLabel}, ${policyDetail}` : policyLabel })
+              : supportsEffort
               ? translate('chat.modelAndEffort', {
                   value1: selectedModelLabel,
                   value2: effortLabel,
@@ -133,27 +161,46 @@ export function ComposerSettingsToolbar({
           aria-haspopup="menu"
           aria-expanded={openMenu === 'model'}
           disabled={
-            modelControlsDisabled || settingsBusy || modelOptions.length === 0
+            modelPolicy
+              ? modelControlsDisabled
+              : modelControlsDisabled || settingsBusy || modelOptions.length === 0
           }
           onClick={() =>
             onSetOpenMenu((current) => (current === 'model' ? null : 'model'))
           }
           data-testid="composer-model-label"
-          title={`${selectedModelLabel}${supportsEffort ? ` · ${effortLabel}` : ''}${hasContext ? `\n${modelContextTitle}` : ''}`}
+          title={policyLabel != null
+            ? `${policyTitle}${policyDetail && !policyOverrides ? `\n${policyDetail}` : ''}${hasContext ? `\n${modelContextTitle}` : ''}`
+            : `${selectedModelLabel}${supportsEffort ? ` · ${effortLabel}` : ''}${hasContext ? `\n${modelContextTitle}` : ''}`}
+          data-model-policy={modelPolicy ? (policyCustom ? 'custom' : 'preset') : undefined}
           className="composer-model-label flex flex-col items-center justify-center whitespace-nowrap px-1 text-xs text-stone-400"
         >
           {modelAvatar && agent ? (
             <span className="matter-thread-avatar composer-model-avatar" data-agent={agent} aria-hidden="true" />
           ) : null}
-          <span className="composer-model-name">{selectedModelLabel}</span>
-          {supportsEffort && (
+          <span className="composer-model-name">{policyLabel ?? selectedModelLabel}</span>
+          {policyLabel != null ? (
+            policyDetail ? <span className="composer-model-effort composer-model-policy-detail">{policyDetail}</span> : null
+          ) : supportsEffort && (
             <span className="composer-model-effort" data-effort={reasoningEffort ?? undefined}
               style={{ '--effort-color': reasoningEffortColor(reasoningEffort) } as CSSProperties}>{effortLabel}</span>
           )}
           {modelAvatar ? <ChevronDown aria-hidden="true" className="composer-model-chevron" /> : null}
         </button>
         {model ? <ContextProgressBar contextUsage={contextUsage} /> : null}
-        {openMenu === 'model' && (
+        {openMenu === 'model' && modelPolicy ? (
+          <ComposerMenuSurface
+            align="end"
+            className="composer-model-menu composer-model-policy-menu w-[min(21rem,calc(100vw-2rem))] rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-1.5 text-[var(--theme-fg)] shadow-xl"
+          >
+            <ComposerModelPolicyMenu policy={modelPolicy} queueing={queueing} liveModelSwitch={liveModelSwitch}
+              onClose={() => {
+                modelTriggerRef.current?.focus({ preventScroll: true });
+                onSetOpenMenu(() => null);
+              }} />
+          </ComposerMenuSurface>
+        ) : null}
+        {openMenu === 'model' && !modelPolicy && (
           <ComposerMenuSurface
             align="end"
             className="composer-model-menu w-[min(19rem,calc(100vw-2rem))] rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-1.5 text-[var(--theme-fg)] shadow-xl"

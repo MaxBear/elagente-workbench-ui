@@ -28,6 +28,7 @@ import {
   mockThreads,
 } from './mockData';
 import { builtinFrontendPlugins } from '@remote-codex/thread-ui/builtin-plugins';
+import { usePlaygroundModelPolicy } from './modelPolicyFixture';
 
 const mockShellSession = {
   id: 'shell-playground-1',
@@ -217,6 +218,7 @@ function createLargeWorkspaceAdapter(): ThreadWorkspaceAdapter {
 export function PlaygroundApp() {
   const playgroundParams = new URLSearchParams(window.location.search);
   const largeWorkspace = playgroundParams.has('largeWorkspace');
+  const modelPolicy = usePlaygroundModelPolicy(playgroundParams);
   const [playgroundThemeMode, setPlaygroundThemeMode] = useState<ThemeMode>(
     () => {
       const queryTheme = playgroundParams.get('theme');
@@ -410,6 +412,7 @@ export function PlaygroundApp() {
             collaborationMode: mockDetail.thread.collaborationMode,
             canInterrupt: true,
             onInterrupt: adapter.interrupt,
+            modelPolicy,
             followTail,
             onToggleFollow: () => {
               setFollowTail(true);

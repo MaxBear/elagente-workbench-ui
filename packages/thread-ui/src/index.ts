@@ -53,6 +53,15 @@ export {
   type ThreadComposerProps,
   type ComposerSendShortcut,
 } from './components/ThreadComposer';
+export type {
+  ComposerModelPolicyProps,
+  ModelPolicyDisplay,
+  ModelPolicyGroupDto,
+  ModelPolicyPresetDto,
+  ModelPolicySelectionDto,
+  ModelPolicyUpdateSelection,
+  ModelPolicyViewDto,
+} from './components/composer/modelPolicy';
 export { TokenUsageCost, type TokenUsageCostProps } from './components/timeline/TokenUsageCost';
 export {
   ThreadCards,

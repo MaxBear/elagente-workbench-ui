@@ -82,6 +82,16 @@ export function useWorkspaceExplorerController({
     }),
     [detail.thread.id, detail.thread.workspaceId, detail.workspace.id],
   );
+  // Show hidden files: a browser preference, offered only by hosts that can list them.
+  const hiddenFilesAvailable = workspaceAdapter?.hiddenFiles === true;
+  const [showHiddenPreference, setShowHiddenPreference] = useState(() => {
+    try { return localStorage.getItem(SHOW_HIDDEN_KEY) === 'true'; } catch { return false; }
+  });
+  const showHidden = hiddenFilesAvailable && showHiddenPreference;
+  const listIdentity = useMemo(
+    () => (showHidden ? { ...workspaceIdentity, showHidden: true } : workspaceIdentity),
+    [showHidden, workspaceIdentity],
+  );
   const capabilityAdapter = workspaceAdapter as
     | WorkspaceExplorerAdapter
     | null
@@ -258,7 +268,7 @@ export function useWorkspaceExplorerController({
       setWorkspaceError(null);
       try {
         const refreshedTree = workspaceTreeNodeToGraphNode(
-          await workspaceAdapter.listTree({ ...workspaceIdentity, path: '' }),
+          await workspaceAdapter.listTree({ ...listIdentity, path: '' }),
         );
         if (
           workspaceGenerationRef.current !== workspaceGeneration ||
@@ -289,7 +299,7 @@ export function useWorkspaceExplorerController({
               continue;
             }
             const refreshedNode = workspaceTreeNodeToGraphNode(
-              await workspaceAdapter.listTree({ ...workspaceIdentity, path }),
+              await workspaceAdapter.listTree({ ...listIdentity, path }),
             );
             if (
               workspaceGenerationRef.current !== workspaceGeneration ||
@@ -343,7 +353,7 @@ export function useWorkspaceExplorerController({
         }
       }
     },
-    [workspaceAdapter, workspaceIdentity],
+    [listIdentity, workspaceAdapter, workspaceIdentity],
   );
 
   const loadDirectoryChildren = useCallback(
@@ -374,7 +384,7 @@ export function useWorkspaceExplorerController({
       });
       try {
         const loadedNode = workspaceTreeNodeToGraphNode(
-          await workspaceAdapter.listTree({ ...workspaceIdentity, path }),
+          await workspaceAdapter.listTree({ ...listIdentity, path }),
         );
         if (
           workspaceGenerationRef.current !== workspaceGeneration ||
@@ -422,7 +432,7 @@ export function useWorkspaceExplorerController({
         }
       }
     },
-    [workspaceAdapter, workspaceIdentity],
+    [listIdentity, workspaceAdapter, workspaceIdentity],
   );
 
   const focusWorkspacePath = useCallback(
@@ -486,7 +496,7 @@ export function useWorkspaceExplorerController({
           createWorkspaceExplorerModel(
             workspaceTreeNodeToGraphNode(
               await workspaceAdapter.listTree({
-                ...workspaceIdentity,
+                ...listIdentity,
                 path: '',
               }),
             ),
@@ -520,7 +530,7 @@ export function useWorkspaceExplorerController({
           }
           const loadedNode = workspaceTreeNodeToGraphNode(
             await workspaceAdapter.listTree({
-              ...workspaceIdentity,
+              ...listIdentity,
               path: ancestor,
             }),
           );
@@ -531,7 +541,7 @@ export function useWorkspaceExplorerController({
         }
         const target = findWorkspaceExplorerNodeByPath(nextModel, targetPath);
         if (target?.kind === 'directory') {
-          const loadedNode = workspaceTreeNodeToGraphNode(await workspaceAdapter.listTree({ ...workspaceIdentity, path: targetPath }));
+          const loadedNode = workspaceTreeNodeToGraphNode(await workspaceAdapter.listTree({ ...listIdentity, path: targetPath }));
           if (!isCurrent()) return;
           nextModel = mergeWorkspaceExplorerSubtree(nextModel, loadedNode);
           setExpandedPaths(current => new Set(current).add(targetPath));
@@ -562,7 +572,7 @@ export function useWorkspaceExplorerController({
         }
       }
     },
-    [detail.workspace.absPath, workspaceAdapter, workspaceIdentity],
+    [detail.workspace.absPath, listIdentity, workspaceAdapter, workspaceIdentity],
   );
 
   const focusArtifact = useCallback((artifactId: string) => {
@@ -792,8 +802,15 @@ export function useWorkspaceExplorerController({
     tree,
     workspaceError,
     workspaceIdentity,
+    showHidden: hiddenFilesAvailable ? showHidden : undefined,
+    setShowHidden: hiddenFilesAvailable ? (value: boolean) => {
+      setShowHiddenPreference(value);
+      try { localStorage.setItem(SHOW_HIDDEN_KEY, String(value)); } catch { /* Applies to this page only. */ }
+    } : undefined,
   };
 }
+
+const SHOW_HIDDEN_KEY = 'workbench.explorer.showHidden';
 
 class MissingTargetError extends Error {}
 

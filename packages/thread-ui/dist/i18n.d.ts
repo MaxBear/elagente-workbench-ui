@@ -2236,6 +2236,7 @@ declare const en: {
     readonly "files.propertiesClose": "Close";
     readonly "files.propertiesOlderDevice": "This device's Supervisor does not report file times yet; they show after it updates.";
     readonly "files.downloadZip": "Download as ZIP";
+    readonly "files.showHiddenFiles": "Show hidden files";
     readonly "devices.reasonUnmanaged": "This is a source or unmanaged executable. Run the GitHub setup command to install a managed native runtime.";
     readonly "devices.reasonHostManaged": "Host-managed updates require a native installation and a stable native launch command. Run the GitHub setup command first.";
     readonly "devices.reasonRetiredNpmWindows": "This Windows Device Manager device runs the retired npm package. Run the Windows setup command from the Devices page to move it to the native GitHub runtime.";
@@ -3450,6 +3451,47 @@ declare const en: {
     readonly "chat.attachmentRemove": "Remove";
     readonly "chat.usageUnavailable": "Usage unavailable: {{value1}}";
     readonly "chat.table": "Table";
+    readonly "chat.chooseEffort": "Choose effort";
+    readonly "chat.policyPresets": "Model preset";
+    readonly "chat.policyGroups": "Model groups";
+    readonly "chat.policyGroupsHeading": "Groups";
+    readonly "chat.policyCustom": "Custom models";
+    readonly "chat.policyCustomActive": "A custom group selection is active";
+    readonly "chat.policyCustomActiveHint": "It stays until you choose a preset. Switch Settings to groups to edit it.";
+    readonly 'chat.policySavedOverrides': {
+        readonly one: "{{count}} saved override";
+        readonly other: "{{count}} saved overrides";
+    };
+    readonly 'chat.policyOverrideCount': {
+        readonly one: "{{count}} override";
+        readonly other: "{{count}} overrides";
+    };
+    readonly "chat.policyNoOverrides": "Group defaults";
+    readonly "chat.policyOverride": "Override";
+    readonly "chat.policyDefaultTag": "Default";
+    readonly "chat.policyDefaultIn": "default {{value1}}";
+    readonly "chat.policyDefaultEffort": "default {{value1}}";
+    readonly "chat.policyAllGroups": "All groups";
+    readonly "chat.policyUseGroupDefault": "Use group default";
+    readonly 'chat.policyMembers': {
+        readonly one: "{{count}} role";
+        readonly other: "{{count}} roles";
+    };
+    readonly "chat.policySuspended": "Saved for custom: {{value1}}";
+    readonly "chat.policyResetAll": {
+        readonly one: "Reset {{count}} override";
+        readonly other: "Reset all {{count}} overrides";
+    };
+    readonly "chat.policySearch": "Search groups";
+    readonly "chat.policySearchCount": "{{value1}} of {{value2}} groups";
+    readonly "chat.policyNoMatch": "No groups match \"{{value1}}\"";
+    readonly "chat.policyClearSearch": "Clear search";
+    readonly "chat.policyLoading": "Loading model policy…";
+    readonly "chat.policyUnavailable": "Model policy unavailable";
+    readonly "chat.policySaving": "Saving…";
+    readonly "chat.policyNoModels": "No compatible models are available for this group.";
+    readonly "chat.policyDone": "Done";
+    readonly "chat.policyChip": "Models: {{value1}}";
     readonly "auth.ui.signInTitle": "Sign in";
     readonly "auth.ui.registerTitle": "Create your account";
     readonly "auth.ui.or": "or";
@@ -6232,6 +6274,7 @@ declare const zhCN: {
     "files.propertiesClose": "关闭";
     "files.propertiesOlderDevice": "这台设备的 Supervisor 还不提供文件时间，更新后可见。";
     "files.downloadZip": "下载为 ZIP";
+    "files.showHiddenFiles": "显示隐藏文件";
     "devices.reasonUnmanaged": "这是源码运行或非托管的可执行文件。运行 GitHub 安装命令，安装托管的原生运行时。";
     "devices.reasonHostManaged": "由主机管理的更新需要原生安装和稳定的原生启动命令。请先运行 GitHub 安装命令。";
     "devices.reasonRetiredNpmWindows": "这台 Windows 设备管理器设备运行的是已停用的 npm 包。请在“设备”页运行 Windows 安装命令，迁移到原生 GitHub 运行时。";
@@ -7446,6 +7489,47 @@ declare const zhCN: {
     "chat.attachmentRemove": "移除";
     "chat.usageUnavailable": "用量不可用：{{value1}}";
     "chat.table": "表格";
+    "chat.chooseEffort": "选择推理强度";
+    "chat.policyPresets": "模型预设";
+    "chat.policyGroups": "模型分组";
+    "chat.policyGroupsHeading": "分组";
+    "chat.policyCustom": "自定义模型";
+    "chat.policyCustomActive": "当前使用自定义分组选择";
+    "chat.policyCustomActiveHint": "选择一个预设前会一直保留。要编辑它，请在设置中切换到分组显示。";
+    'chat.policySavedOverrides': {
+        readonly one: "已保存 {{count}} 项覆盖";
+        readonly other: "已保存 {{count}} 项覆盖";
+    };
+    'chat.policyOverrideCount': {
+        readonly one: "{{count}} 项覆盖";
+        readonly other: "{{count}} 项覆盖";
+    };
+    "chat.policyNoOverrides": "分组默认值";
+    "chat.policyOverride": "已覆盖";
+    "chat.policyDefaultTag": "默认";
+    "chat.policyDefaultIn": "默认 {{value1}}";
+    "chat.policyDefaultEffort": "默认 {{value1}}";
+    "chat.policyAllGroups": "全部分组";
+    "chat.policyUseGroupDefault": "使用分组默认值";
+    'chat.policyMembers': {
+        readonly one: "{{count}} 个角色";
+        readonly other: "{{count}} 个角色";
+    };
+    "chat.policySuspended": "自定义中已保存：{{value1}}";
+    "chat.policyResetAll": {
+        readonly one: "重置 {{count}} 项覆盖";
+        readonly other: "重置全部 {{count}} 项覆盖";
+    };
+    "chat.policySearch": "搜索分组";
+    "chat.policySearchCount": "{{value2}} 个分组中有 {{value1}} 个";
+    "chat.policyNoMatch": "没有与“{{value1}}”匹配的分组";
+    "chat.policyClearSearch": "清除搜索";
+    "chat.policyLoading": "正在加载模型策略…";
+    "chat.policyUnavailable": "模型策略不可用";
+    "chat.policySaving": "正在保存…";
+    "chat.policyNoModels": "此分组没有可用的兼容模型。";
+    "chat.policyDone": "完成";
+    "chat.policyChip": "模型：{{value1}}";
     "auth.ui.signInTitle": "登录";
     "auth.ui.registerTitle": "创建账号";
     "auth.ui.or": "或";
@@ -10250,6 +10334,7 @@ declare const resources: {
         readonly "files.propertiesClose": "Close";
         readonly "files.propertiesOlderDevice": "This device's Supervisor does not report file times yet; they show after it updates.";
         readonly "files.downloadZip": "Download as ZIP";
+        readonly "files.showHiddenFiles": "Show hidden files";
         readonly "devices.reasonUnmanaged": "This is a source or unmanaged executable. Run the GitHub setup command to install a managed native runtime.";
         readonly "devices.reasonHostManaged": "Host-managed updates require a native installation and a stable native launch command. Run the GitHub setup command first.";
         readonly "devices.reasonRetiredNpmWindows": "This Windows Device Manager device runs the retired npm package. Run the Windows setup command from the Devices page to move it to the native GitHub runtime.";
@@ -11464,6 +11549,47 @@ declare const resources: {
         readonly "chat.attachmentRemove": "Remove";
         readonly "chat.usageUnavailable": "Usage unavailable: {{value1}}";
         readonly "chat.table": "Table";
+        readonly "chat.chooseEffort": "Choose effort";
+        readonly "chat.policyPresets": "Model preset";
+        readonly "chat.policyGroups": "Model groups";
+        readonly "chat.policyGroupsHeading": "Groups";
+        readonly "chat.policyCustom": "Custom models";
+        readonly "chat.policyCustomActive": "A custom group selection is active";
+        readonly "chat.policyCustomActiveHint": "It stays until you choose a preset. Switch Settings to groups to edit it.";
+        readonly 'chat.policySavedOverrides': {
+            readonly one: "{{count}} saved override";
+            readonly other: "{{count}} saved overrides";
+        };
+        readonly 'chat.policyOverrideCount': {
+            readonly one: "{{count}} override";
+            readonly other: "{{count}} overrides";
+        };
+        readonly "chat.policyNoOverrides": "Group defaults";
+        readonly "chat.policyOverride": "Override";
+        readonly "chat.policyDefaultTag": "Default";
+        readonly "chat.policyDefaultIn": "default {{value1}}";
+        readonly "chat.policyDefaultEffort": "default {{value1}}";
+        readonly "chat.policyAllGroups": "All groups";
+        readonly "chat.policyUseGroupDefault": "Use group default";
+        readonly 'chat.policyMembers': {
+            readonly one: "{{count}} role";
+            readonly other: "{{count}} roles";
+        };
+        readonly "chat.policySuspended": "Saved for custom: {{value1}}";
+        readonly "chat.policyResetAll": {
+            readonly one: "Reset {{count}} override";
+            readonly other: "Reset all {{count}} overrides";
+        };
+        readonly "chat.policySearch": "Search groups";
+        readonly "chat.policySearchCount": "{{value1}} of {{value2}} groups";
+        readonly "chat.policyNoMatch": "No groups match \"{{value1}}\"";
+        readonly "chat.policyClearSearch": "Clear search";
+        readonly "chat.policyLoading": "Loading model policy…";
+        readonly "chat.policyUnavailable": "Model policy unavailable";
+        readonly "chat.policySaving": "Saving…";
+        readonly "chat.policyNoModels": "No compatible models are available for this group.";
+        readonly "chat.policyDone": "Done";
+        readonly "chat.policyChip": "Models: {{value1}}";
         readonly "auth.ui.signInTitle": "Sign in";
         readonly "auth.ui.registerTitle": "Create your account";
         readonly "auth.ui.or": "or";
@@ -14245,6 +14371,7 @@ declare const resources: {
         "files.propertiesClose": "关闭";
         "files.propertiesOlderDevice": "这台设备的 Supervisor 还不提供文件时间，更新后可见。";
         "files.downloadZip": "下载为 ZIP";
+        "files.showHiddenFiles": "显示隐藏文件";
         "devices.reasonUnmanaged": "这是源码运行或非托管的可执行文件。运行 GitHub 安装命令，安装托管的原生运行时。";
         "devices.reasonHostManaged": "由主机管理的更新需要原生安装和稳定的原生启动命令。请先运行 GitHub 安装命令。";
         "devices.reasonRetiredNpmWindows": "这台 Windows 设备管理器设备运行的是已停用的 npm 包。请在“设备”页运行 Windows 安装命令，迁移到原生 GitHub 运行时。";
@@ -15459,6 +15586,47 @@ declare const resources: {
         "chat.attachmentRemove": "移除";
         "chat.usageUnavailable": "用量不可用：{{value1}}";
         "chat.table": "表格";
+        "chat.chooseEffort": "选择推理强度";
+        "chat.policyPresets": "模型预设";
+        "chat.policyGroups": "模型分组";
+        "chat.policyGroupsHeading": "分组";
+        "chat.policyCustom": "自定义模型";
+        "chat.policyCustomActive": "当前使用自定义分组选择";
+        "chat.policyCustomActiveHint": "选择一个预设前会一直保留。要编辑它，请在设置中切换到分组显示。";
+        'chat.policySavedOverrides': {
+            readonly one: "已保存 {{count}} 项覆盖";
+            readonly other: "已保存 {{count}} 项覆盖";
+        };
+        'chat.policyOverrideCount': {
+            readonly one: "{{count}} 项覆盖";
+            readonly other: "{{count}} 项覆盖";
+        };
+        "chat.policyNoOverrides": "分组默认值";
+        "chat.policyOverride": "已覆盖";
+        "chat.policyDefaultTag": "默认";
+        "chat.policyDefaultIn": "默认 {{value1}}";
+        "chat.policyDefaultEffort": "默认 {{value1}}";
+        "chat.policyAllGroups": "全部分组";
+        "chat.policyUseGroupDefault": "使用分组默认值";
+        'chat.policyMembers': {
+            readonly one: "{{count}} 个角色";
+            readonly other: "{{count}} 个角色";
+        };
+        "chat.policySuspended": "自定义中已保存：{{value1}}";
+        "chat.policyResetAll": {
+            readonly one: "重置 {{count}} 项覆盖";
+            readonly other: "重置全部 {{count}} 项覆盖";
+        };
+        "chat.policySearch": "搜索分组";
+        "chat.policySearchCount": "{{value2}} 个分组中有 {{value1}} 个";
+        "chat.policyNoMatch": "没有与“{{value1}}”匹配的分组";
+        "chat.policyClearSearch": "清除搜索";
+        "chat.policyLoading": "正在加载模型策略…";
+        "chat.policyUnavailable": "模型策略不可用";
+        "chat.policySaving": "正在保存…";
+        "chat.policyNoModels": "此分组没有可用的兼容模型。";
+        "chat.policyDone": "完成";
+        "chat.policyChip": "模型：{{value1}}";
         "auth.ui.signInTitle": "登录";
         "auth.ui.registerTitle": "创建账号";
         "auth.ui.or": "或";

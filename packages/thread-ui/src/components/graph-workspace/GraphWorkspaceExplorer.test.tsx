@@ -211,6 +211,36 @@ describe('GraphWorkspaceExplorer', () => {
     vi.restoreAllMocks();
   });
 
+  it('offers Show hidden files only when the host can list them, and relists root and open folders with showHidden', async () => {
+    const { adapter, listTree } = createAdapter();
+    await renderExplorer(adapter);
+    await vi.waitFor(() => expect(listTree).toHaveBeenCalled());
+    const more = () => host?.querySelector<HTMLButtonElement>('button[aria-label="More Explorer actions"]');
+    // Without the host capability there is no toggle, and here no other action either.
+    expect(more()).toBeNull();
+
+    act(() => root?.unmount());
+    root = createRoot(host!);
+    listTree.mockClear();
+    await renderExplorer({ ...adapter, hiddenFiles: true }, { path: 'src/index.ts', requestId: 1 });
+    await vi.waitFor(() => expect(listTree.mock.calls.some(([input]) => input.path === 'src')).toBe(true));
+    expect(listTree.mock.calls.every(([input]) => input.showHidden === undefined)).toBe(true);
+
+    listTree.mockClear();
+    act(() => more()!.click());
+    const toggle = host!.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]')!;
+    expect(toggle.textContent).toContain('Show hidden files');
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    await act(async () => toggle.click());
+    await vi.waitFor(() => {
+      expect(listTree.mock.calls.some(([input]) => input.path === '' && input.showHidden === true)).toBe(true);
+      expect(listTree.mock.calls.some(([input]) => input.path === 'src' && input.showHidden === true)).toBe(true);
+    });
+    expect(window.localStorage.getItem('workbench.explorer.showHidden')).toBe('true');
+    act(() => more()!.click());
+    expect(host!.querySelector('[role="menuitemcheckbox"]')?.getAttribute('aria-checked')).toBe('true');
+  });
+
   it('lists an external linked file under its real parent directory, not a virtual folder', async () => {
     const { adapter, listTree } = createAdapter();
     const statLinkedFile = vi.fn(async () => file('/outside/docs/notes.txt'));

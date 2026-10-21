@@ -89,6 +89,7 @@ import { useComposerPromptDomSync } from './composer/useComposerPromptDomSync';
 import { useComposerPromptSlots } from './composer/useComposerPromptSlots';
 import { useComposerSettingsActions } from './composer/useComposerSettingsActions';
 import { useComposerToolbarProps } from './composer/useComposerToolbarProps';
+import type { ComposerModelPolicyProps } from './composer/modelPolicy';
 
 export type ThreadComposerAttachmentPicker = (input: {
   kind: PromptAttachmentKindDto;
@@ -195,6 +196,8 @@ export interface ThreadComposerProps {
   onJumpToNextTurn?: () => void;
   subscriptionUsage?: AgentSubscriptionUsageDto | null;
   onUpdateSettings?: (input: UpdateThreadSettingsInput) => Promise<void> | void;
+  /** Group model policy view and actions; the model menu edits it instead of one model. */
+  modelPolicy?: ComposerModelPolicyProps | null;
   /** The model menu opened: the host may refresh the model list. */
   onModelMenuOpen?: () => void;
   onToggleView?: () => void;
@@ -296,6 +299,7 @@ export function ThreadComposer({
   onJumpToNextTurn,
   subscriptionUsage,
   onUpdateSettings,
+  modelPolicy = null,
   onModelMenuOpen,
   onToggleView,
   onShellCopy,
@@ -1134,6 +1138,7 @@ export function ThreadComposer({
     onPickPhoto: () => pickAttachment('photo', photoInputRef),
     onPickFile: () => pickAttachment('file', fileInputRef),
     onUpdateSettings: (input) => void handleUpdateSettings(input),
+    modelPolicy,
     onPasteShell: () => void pasteClipboardIntoPrompt(),
     onCopyShell: () => {
       dismissPromptFocus();

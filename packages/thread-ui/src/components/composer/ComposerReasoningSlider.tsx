@@ -9,12 +9,18 @@ export function ComposerReasoningSlider({
   effort,
   defaultEffort,
   disabled,
+  hint,
+  uncommitted = false,
   onCommit,
 }: {
   efforts: ModelOptionDto['supportedReasoningEfforts'];
   effort: ReasoningEffortDto | null | undefined;
   defaultEffort: ReasoningEffortDto | null | undefined;
   disabled: boolean;
+  /** Muted text after the heading, for example the group's default effort. */
+  hint?: string | undefined;
+  /** No effort is chosen yet: no stop is selected until the user picks one. */
+  uncommitted?: boolean;
   onCommit: (effort: ReasoningEffortDto) => void;
 }) {
   // Known levels have a semantic order; opaque ACP values retain catalog order.
@@ -28,7 +34,7 @@ export function ComposerReasoningSlider({
         (right < 0 ? effortOrder.length : right)
       );
     });
-  const selection = Math.max(
+  const selection = uncommitted ? -1 : Math.max(
     0,
     options.findIndex(
       (entry) => entry.reasoningEffort === (effort ?? defaultEffort),
@@ -44,36 +50,43 @@ export function ComposerReasoningSlider({
     setInteracting(false);
   }, [selection, effort, signature]);
   const index = Math.min(preview, options.length - 1);
-  const option = options[index];
-  if (!option) return null;
-  const color = reasoningEffortColor(option.reasoningEffort, index, options.length);
-  const label = formatReasoningEffortLabel(
-    interacting || index !== selection ? option.reasoningEffort : effort,
-  );
+  // Uncommitted: the thumb waits before the first stop until a level is picked.
+  const option = index < 0 ? null : options[index];
+  if (!options.length || (!option && !uncommitted)) return null;
+  const color = option ? reasoningEffortColor(option.reasoningEffort, index, options.length) : undefined;
+  const label = !option
+    ? translate('chat.chooseEffort')
+    : formatReasoningEffortLabel(
+        interacting || index !== selection ? option.reasoningEffort : effort,
+      );
   const choose = (next: number) => {
     const chosen = options[next];
     if (disabled || !chosen) return;
     setPreview(next);
     setInteracting(false);
-    if (chosen.reasoningEffort !== effort) onCommit(chosen.reasoningEffort);
+    if (uncommitted || chosen.reasoningEffort !== effort) onCommit(chosen.reasoningEffort);
   };
 
   return (
     <section
       className="composer-reasoning"
-      data-effort={option.reasoningEffort}
+      data-effort={option?.reasoningEffort}
       data-interacting={interacting}
-      style={{ '--effort-color': color } as CSSProperties}
+      data-uncommitted={!option || undefined}
+      style={color ? ({ '--effort-color': color } as CSSProperties) : undefined}
     >
       <div className="composer-reasoning-heading">
-        <span>{translate('chat.effort')}</span>
+        <span>
+          {translate('chat.effort')}
+          {hint ? <span className="composer-reasoning-hint"> {hint}</span> : null}
+        </span>
         <span className="composer-reasoning-value" key={label}>
           {label}
         </span>
       </div>
       <Slider.Root
         className="composer-reasoning-slider"
-        title={option.description || undefined}
+        title={option?.description || undefined}
         min={0}
         max={Math.max(1, options.length - 1)}
         step={1}

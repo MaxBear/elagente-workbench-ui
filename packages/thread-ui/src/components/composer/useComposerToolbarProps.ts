@@ -14,6 +14,7 @@ import type {
 } from '@remote-codex/shared';
 
 import type { ThreadShellControlState } from '../../types';
+import type { ComposerModelPolicyProps } from './modelPolicy';
 import {
   toolboxItemClassName,
   toolboxItemDisabled,
@@ -156,6 +157,8 @@ export interface UseComposerToolbarPropsInput {
   onPickPhoto: ComposerAttachmentMenuProps['onPickPhoto'];
   onPickFile: ComposerAttachmentMenuProps['onPickFile'];
   onUpdateSettings: (input: UpdateThreadSettingsInput) => void;
+  /** Group model policy; replaces the flat model list in the model menu. */
+  modelPolicy?: ComposerModelPolicyProps | null;
   onPasteShell: ComposerShellToolsPanelProps['onPaste'];
   onCopyShell: ComposerShellToolsPanelProps['onCopy'];
   onClearShell: ComposerShellToolsPanelProps['onClear'];
@@ -271,6 +274,7 @@ export function useComposerToolbarProps({
   onPickPhoto,
   onPickFile,
   onUpdateSettings,
+  modelPolicy = null,
   onPasteShell,
   onCopyShell,
   onClearShell,
@@ -436,6 +440,7 @@ export function useComposerToolbarProps({
         sendButtonBaseClassName,
         onSetOpenMenu,
         onUpdateSettings,
+        modelPolicy,
       };
 
   const shellToolsPanelProps: ComposerShellToolsPanelProps | null =

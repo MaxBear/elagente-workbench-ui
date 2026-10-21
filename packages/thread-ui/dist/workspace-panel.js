@@ -51,10 +51,10 @@ import {
   useTabScrollEdges,
   workspaceRelativeFocusPath,
   workspaceTreeNodeToGraphNode
-} from "./chunk-SBH43SUK.js";
+} from "./chunk-DNMWX4JU.js";
 import {
   GraphMoleculeViewer
-} from "./chunk-YCNCXUPA.js";
+} from "./chunk-TI3PTWB6.js";
 import "./chunk-5LLLXMOS.js";
 import {
   shellThemeProps,
@@ -65,7 +65,7 @@ import {
   getLocale,
   translate,
   useI18n
-} from "./chunk-OWS3YHU5.js";
+} from "./chunk-PRYBAR3V.js";
 
 // src/components/ThreadGraphWorkspacePanel.tsx
 import { memo as memo2, useEffect as useEffect12, useMemo as useMemo9, useState as useState11 } from "react";
@@ -621,6 +621,19 @@ function useWorkspaceExplorerController({
     }),
     [detail.thread.id, detail.thread.workspaceId, detail.workspace.id]
   );
+  const hiddenFilesAvailable = workspaceAdapter?.hiddenFiles === true;
+  const [showHiddenPreference, setShowHiddenPreference] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_HIDDEN_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const showHidden = hiddenFilesAvailable && showHiddenPreference;
+  const listIdentity = useMemo2(
+    () => showHidden ? { ...workspaceIdentity, showHidden: true } : workspaceIdentity,
+    [showHidden, workspaceIdentity]
+  );
   const capabilityAdapter = workspaceAdapter;
   const [capabilityState, setCapabilityState] = useState(null);
   const discoveredCapabilities = capabilityState?.adapter === capabilityAdapter && capabilityState?.threadId === workspaceIdentity.threadId ? capabilityState.capabilities : capabilityAdapter?.getCapabilities ? null : capabilityAdapter?.capabilities ?? null;
@@ -761,7 +774,7 @@ function useWorkspaceExplorerController({
       setWorkspaceError(null);
       try {
         const refreshedTree = workspaceTreeNodeToGraphNode(
-          await workspaceAdapter.listTree({ ...workspaceIdentity, path: "" })
+          await workspaceAdapter.listTree({ ...listIdentity, path: "" })
         );
         if (workspaceGenerationRef.current !== workspaceGeneration || refreshGenerationRef.current !== refreshGeneration) {
           return;
@@ -784,7 +797,7 @@ function useWorkspaceExplorerController({
               continue;
             }
             const refreshedNode = workspaceTreeNodeToGraphNode(
-              await workspaceAdapter.listTree({ ...workspaceIdentity, path })
+              await workspaceAdapter.listTree({ ...listIdentity, path })
             );
             if (workspaceGenerationRef.current !== workspaceGeneration || refreshGenerationRef.current !== refreshGeneration) {
               return;
@@ -824,7 +837,7 @@ function useWorkspaceExplorerController({
         }
       }
     },
-    [workspaceAdapter, workspaceIdentity]
+    [listIdentity, workspaceAdapter, workspaceIdentity]
   );
   const loadDirectoryChildren = useCallback2(
     async (path) => {
@@ -853,7 +866,7 @@ function useWorkspaceExplorerController({
       });
       try {
         const loadedNode = workspaceTreeNodeToGraphNode(
-          await workspaceAdapter.listTree({ ...workspaceIdentity, path })
+          await workspaceAdapter.listTree({ ...listIdentity, path })
         );
         if (workspaceGenerationRef.current !== workspaceGeneration || directoryRequestGenerationsRef.current.get(path) !== generation) {
           return;
@@ -889,7 +902,7 @@ function useWorkspaceExplorerController({
         }
       }
     },
-    [workspaceAdapter, workspaceIdentity]
+    [listIdentity, workspaceAdapter, workspaceIdentity]
   );
   const focusWorkspacePath = useCallback2(
     async (path) => {
@@ -945,7 +958,7 @@ function useWorkspaceExplorerController({
         let nextModel = adapterModelRef.current ?? createWorkspaceExplorerModel(
           workspaceTreeNodeToGraphNode(
             await workspaceAdapter.listTree({
-              ...workspaceIdentity,
+              ...listIdentity,
               path: ""
             })
           )
@@ -976,7 +989,7 @@ function useWorkspaceExplorerController({
           }
           const loadedNode = workspaceTreeNodeToGraphNode(
             await workspaceAdapter.listTree({
-              ...workspaceIdentity,
+              ...listIdentity,
               path: ancestor
             })
           );
@@ -987,7 +1000,7 @@ function useWorkspaceExplorerController({
         }
         const target = findWorkspaceExplorerNodeByPath(nextModel, targetPath);
         if (target?.kind === "directory") {
-          const loadedNode = workspaceTreeNodeToGraphNode(await workspaceAdapter.listTree({ ...workspaceIdentity, path: targetPath }));
+          const loadedNode = workspaceTreeNodeToGraphNode(await workspaceAdapter.listTree({ ...listIdentity, path: targetPath }));
           if (!isCurrent()) return;
           nextModel = mergeWorkspaceExplorerSubtree(nextModel, loadedNode);
           setExpandedPaths((current) => new Set(current).add(targetPath));
@@ -1016,7 +1029,7 @@ function useWorkspaceExplorerController({
         }
       }
     },
-    [detail.workspace.absPath, workspaceAdapter, workspaceIdentity]
+    [detail.workspace.absPath, listIdentity, workspaceAdapter, workspaceIdentity]
   );
   const focusArtifact = useCallback2((artifactId) => {
     artifactFocusRef.current = artifactId;
@@ -1211,9 +1224,18 @@ function useWorkspaceExplorerController({
     toggleDirectory,
     tree,
     workspaceError,
-    workspaceIdentity
+    workspaceIdentity,
+    showHidden: hiddenFilesAvailable ? showHidden : void 0,
+    setShowHidden: hiddenFilesAvailable ? (value) => {
+      setShowHiddenPreference(value);
+      try {
+        localStorage.setItem(SHOW_HIDDEN_KEY, String(value));
+      } catch {
+      }
+    } : void 0
   };
 }
+var SHOW_HIDDEN_KEY = "workbench.explorer.showHidden";
 var MissingTargetError = class extends Error {
 };
 function isMissingTarget(error) {
@@ -2044,7 +2066,9 @@ import {
   PanelRightOpen,
   Trash2 as Trash22,
   Upload,
-  X as X2
+  X as X2,
+  Check as Check2,
+  Eye
 } from "lucide-react";
 import {
   useCallback as useCallback4,
@@ -3183,6 +3207,8 @@ function WorkspaceExplorerPanel({
   onToggle,
   onUpload,
   onCreateFile,
+  showHidden,
+  onShowHiddenChange,
   explorerScrollTopRef,
   explorerScrollerRef,
   selectedNodeId,
@@ -3301,7 +3327,25 @@ function WorkspaceExplorerPanel({
             )
           }
         ),
-        canUpload || onDownloadWorkspace || onDownloadWorkspaceZip || onImportArchive && canImportArchive || onTrashFile || onOpenTrash || onMoveFile || onDeleteFile || onEmptyGarbage ? /* @__PURE__ */ jsx7(ExplorerMoreMenu, { triggerClassName: iconButtonClassName, children: (close) => /* @__PURE__ */ jsxs6(Fragment5, { children: [
+        canUpload || onDownloadWorkspace || onDownloadWorkspaceZip || onImportArchive && canImportArchive || onTrashFile || onOpenTrash || onMoveFile || onDeleteFile || onEmptyGarbage || onShowHiddenChange ? /* @__PURE__ */ jsx7(ExplorerMoreMenu, { triggerClassName: iconButtonClassName, children: (close) => /* @__PURE__ */ jsxs6(Fragment5, { children: [
+          onShowHiddenChange ? /* @__PURE__ */ jsxs6(
+            "button",
+            {
+              type: "button",
+              role: "menuitemcheckbox",
+              "aria-checked": Boolean(showHidden),
+              onClick: () => {
+                close();
+                onShowHiddenChange(!showHidden);
+              },
+              className: "flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm hover:bg-[var(--theme-hover)] focus-visible:bg-[var(--theme-hover)] focus-visible:outline-none",
+              children: [
+                /* @__PURE__ */ jsx7(Eye, { "data-icon": "show-hidden", className: "h-4 w-4" }),
+                /* @__PURE__ */ jsx7("span", { className: "flex-1", children: translate("files.showHiddenFiles") }),
+                showHidden ? /* @__PURE__ */ jsx7(Check2, { "aria-hidden": "true", className: "h-4 w-4" }) : null
+              ]
+            }
+          ) : null,
           canUpload ? /* @__PURE__ */ jsxs6(
             "button",
             {
@@ -3922,7 +3966,7 @@ function WorkspaceFileTabs({
 // src/components/graph-workspace/GraphWorkspacePreviewPane.tsx
 import { Fragment as Fragment6, jsx as jsx12, jsxs as jsxs10 } from "react/jsx-runtime";
 var GraphWorkspaceMonacoEditor = lazy(
-  () => import("./GraphWorkspaceMonacoEditor-LUPV6U5G.js")
+  () => import("./GraphWorkspaceMonacoEditor-UXAO6K6V.js")
 );
 var isHostFilePath = (path) => path.startsWith("/") || /^[a-z]:[\\/]/i.test(path);
 function fileSizeLabel(size) {
@@ -4021,7 +4065,7 @@ function translateReadOnly(reason) {
   const key = `files.safeReason.${reason}`;
   return Object.hasOwn(en, key) ? translate(key) : reason;
 }
-var WorkspaceDocumentDiff = lazy(() => import("./GraphWorkspaceMonacoDiff-EDX25KUH.js"));
+var WorkspaceDocumentDiff = lazy(() => import("./GraphWorkspaceMonacoDiff-FUB5FQYB.js"));
 var SMALL_TEXT_FILE_MAX_BYTES = 50 * 1024;
 var SMALL_TEXT_FILE_MAX_LINES = 1e3;
 var MARKDOWN_EXTENSIONS = /* @__PURE__ */ new Set(["md", "markdown"]);
@@ -4801,7 +4845,9 @@ function GraphWorkspaceExplorer({
     toggleDirectory,
     tree,
     workspaceError,
-    workspaceIdentity
+    workspaceIdentity,
+    showHidden,
+    setShowHidden
   } = useWorkspaceExplorerController({
     activeView,
     detail,
@@ -5224,6 +5270,7 @@ function GraphWorkspaceExplorer({
   const explorerPanel = /* @__PURE__ */ jsx14(
     WorkspaceExplorerPanel,
     {
+      ...setShowHidden ? { showHidden, onShowHiddenChange: setShowHidden } : {},
       canEmptyGarbage: Boolean(workspaceAdapter?.emptyGarbage),
       canUpload: canUploadFiles,
       pending,

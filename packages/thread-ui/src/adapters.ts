@@ -167,10 +167,14 @@ export interface ThreadWorkspaceAdapter {
   textRangeRead?: boolean;
   /** Owner-only, read-only host files explicitly opened from a thread link. */
   statLinkedFile?: (input: { threadId: string; path: string }) => Promise<ThreadWorkspaceTreeNode>;
+  /** The host lists entries its visibility rules hide when asked (`showHidden`);
+      the Explorer then offers Show hidden files. */
+  hiddenFiles?: boolean;
   listTree(input: {
     threadId: string;
     workspaceId?: string | null;
     path?: string | null;
+    showHidden?: boolean;
   }): Promise<ThreadWorkspaceTreeNode>;
   readFile(input: {
     threadId: string;
