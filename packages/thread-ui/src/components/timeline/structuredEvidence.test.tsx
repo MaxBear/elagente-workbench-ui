@@ -13,7 +13,6 @@ import { ThreadTimeline } from "../ThreadTimeline";
 import { mergeLiveTurnItems, type TimelineUsageByScope } from "./timelineItems";
 import { latestUsage, progressEvidence } from "./structuredEvidence";
 import { StructuredUsageInline } from "./StructuredUsageInline";
-import { TurnUsageInline } from "./TurnUsageInline";
 
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -177,43 +176,26 @@ describe("W5 tool evidence and usage (G10 G11 G12 G14 G17 G41 G43)", () => {
     expect(container.querySelector("[data-tool-call-id]")).toBeNull();
   });
 
-  it("keeps available reasoning distinct from final Markdown, code and math", async () => {
+  it("keeps reasoning out of the reply and renders final Markdown, code and math", async () => {
+    // Upstream shows provider reasoning only when the host enables it (AppShellNav).
     const { container } = await mount(
       turn([
-        {
-          id: "reasoning",
-          kind: "reasoning",
-          text: "**Reported reasoning**: $x^2$",
-        },
-        {
-          id: "reply",
-          kind: "agentMessage",
-          text: "# Final reply\n\n```python\nprint(2)\n```\n\n\\(E=mc^2\\)",
-        },
+        { id: "reasoning", kind: "reasoning", text: "**Reported reasoning**: $x^2$" },
+        { id: "reply", kind: "agentMessage", text: "# Final reply\n\n```python\nprint(2)\n```\n\n\\(E=mc^2\\)" },
       ]),
     );
-    expect(container.querySelector("details summary")?.textContent).toBe(
-      "Reasoning summary",
-    );
     expect(container.querySelector('[data-message-id="reasoning"]')).toBeNull();
-    expect(container.textContent).not.toContain('Reported reasoning');
-    await act(async () => {
-      const details = container.querySelector<HTMLDetailsElement>('[data-reasoning-item-id="reasoning"]')!;
-      details.open = true;
-      details.dispatchEvent(new Event('toggle'));
-    });
-    expect(container.querySelector('strong')?.textContent).toBe('Reported reasoning');
+    expect(container.textContent).not.toContain("Reported reasoning");
     expect(container.querySelector("h1")?.textContent).toBe("Final reply");
     expect(container.querySelector("code")?.textContent).toContain("print(2)");
-    expect(container.querySelectorAll(".katex").length).toBeGreaterThanOrEqual(
-      2,
-    );
+    expect(container.querySelectorAll(".katex").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("shows missing turn and room usage as unavailable", async () => {
+  it("omits the turn summary when the agent has no usage report", async () => {
     const { container } = await mount(turn([]));
-    expect(container.textContent).toContain("Room usage unavailable");
-    expect(container.textContent).toContain("Turn usage unavailable");
+    expect(container.textContent).not.toContain("Room usage unavailable");
+    expect(container.textContent).not.toContain("Turn usage unavailable");
+    expect(container.textContent).not.toContain("Cost unavailable");
     expect(container.textContent).not.toContain("0 tok");
     expect(container.textContent).not.toContain("$0");
   });
@@ -295,14 +277,14 @@ describe("W5 tool evidence and usage (G10 G11 G12 G14 G17 G41 G43)", () => {
     expect(latestUsage(values, "turn", observation.scopeId)?.tokens).toEqual({
       input: 7,
     });
-    const html = renderToStaticMarkup(<TurnUsageInline turn={turn(values)} />);
+    const html = renderToStaticMarkup(<StructuredUsageInline scope="turn" usage={latestUsage(values, "turn", observation.scopeId)} />);
     expect(html).toContain("Input tokens: 7");
     expect(html).not.toContain("900");
-    expect(html).toContain("Cache read tokens: unavailable");
-    expect(html).toContain("Total tokens: unavailable");
+    expect(html).not.toContain("Cache read tokens: unavailable");
+    expect(html).not.toContain("Total tokens: unavailable");
   });
 
-  it("shows reported zero while retaining missing cache, reasoning and cost fields as unavailable", () => {
+  it("shows reported zero while omitting missing cache, reasoning and cost fields", () => {
     const html = renderToStaticMarkup(
       <StructuredUsageInline
         scope="turn"
@@ -310,23 +292,20 @@ describe("W5 tool evidence and usage (G10 G11 G12 G14 G17 G41 G43)", () => {
       />,
     );
     expect(html).toContain("Input tokens: 0");
-    expect(html).toContain("Output tokens: unavailable");
-    expect(html).toContain("Cache write tokens: unavailable");
-    expect(html).toContain("Reasoning tokens: unavailable");
-    expect(html).toContain("Cost: unavailable");
+    expect(html).not.toContain("Output tokens: unavailable");
+    expect(html).not.toContain("Cache write tokens: unavailable");
+    expect(html).not.toContain("Reasoning tokens: unavailable");
+    expect(html).not.toContain("Cost: unavailable");
   });
 
-  it("retains available partial legacy counts without fabricating omitted fields", () => {
-    const partial = turn([]);
-    partial.tokenUsage = {
-      total: { inputTokens: 5 },
-      last: {},
-      modelContextWindow: null,
-    } as unknown as ThreadTurnDto["tokenUsage"];
-    const html = renderToStaticMarkup(<TurnUsageInline turn={partial} />);
-    expect(html).toContain("Input tokens: 5");
-    expect(html).toContain("Cache read tokens: unavailable");
-    expect(html).not.toContain("Input tokens: 0");
+  it("omits a valid unavailable usage report when it contains no values", () => {
+    const html = renderToStaticMarkup(
+      <StructuredUsageInline
+        scope="room"
+        usage={EXTENSION_FIXTURES.grafico.unavailableUsage}
+      />,
+    );
+    expect(html).toBe("");
   });
 
   it("renders invalid usage as an explicit error, never a zero report", () => {

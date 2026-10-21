@@ -114,50 +114,16 @@ describe('ThreadWorkspaceLayout', () => {
     vi.restoreAllMocks();
   });
 
-  it('defaults desktop thread entry to inspectable chat and workspace', () => {
+  it('defaults desktop thread entry to chat with workspace collapsed', () => {
     const element = renderLayout();
 
     expect(element.querySelector('[data-testid="chat-content"]')).toBeTruthy();
     expect(
       element.querySelector('[data-testid="workspace-content"]'),
-    ).toBeTruthy();
+    ).toBeNull();
     expect(
-      element.querySelector('[aria-label="Resize workspace"]'),
+      element.querySelector('[aria-label="Expand workspace"]'),
     ).toBeTruthy();
-  });
-
-  it('keeps host navigation in the sidebar and supplies its collapsed state', () => {
-    const element = render(
-      <ThreadWorkspaceLayout threads={[]} navigationTitle="ElAgente"
-        renderNavigationHeader={({collapsed}) => <nav aria-label="Agents">{collapsed ? 'G' : 'Grafico'}</nav>}>
-        <div>Chat</div>
-      </ThreadWorkspaceLayout>,
-    );
-    expect(element.querySelector('.thread-topbar-row [aria-label="Agents"]')).toBeNull();
-    expect(element.querySelector('[aria-label="Agents"]')?.textContent).toBe('Grafico');
-    flushSync(() => element.querySelector<HTMLButtonElement>('[aria-label="Collapse rooms"]')!.click());
-    expect(element.querySelector('[aria-label="Agents"]')?.textContent).toBe('G');
-  });
-
-  it('lets host navigation close the mobile drawer', () => {
-    mockViewport(true);
-    const selectAgent = vi.fn();
-    const element = render(
-      <ThreadWorkspaceLayout threads={[]} renderNavigationHeader={({closeNavigation}) => (
-        <button onClick={() => {selectAgent(); closeNavigation();}}>Choose Grafico</button>
-      )}><div>Chat</div></ThreadWorkspaceLayout>,
-    );
-    const open = element.querySelector<HTMLButtonElement>('[aria-label="Open rooms"]')!;
-    expect(element.querySelector('aside')?.hasAttribute('inert')).toBe(true);
-    open.focus();
-    flushSync(() => open.click());
-    expect(element.querySelector('aside')?.hasAttribute('inert')).toBe(false);
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('Close rooms');
-    const agent = Array.from(element.querySelectorAll('button')).find(button => button.textContent === 'Choose Grafico')!;
-    flushSync(() => agent.click());
-    expect(selectAgent).toHaveBeenCalledOnce();
-    expect(open.getAttribute('aria-expanded')).toBe('false');
-    expect(document.activeElement).toBe(open);
   });
 
   it('reveals the desktop workspace when a file focus request arrives', async () => {
@@ -181,7 +147,6 @@ describe('ThreadWorkspaceLayout', () => {
       </ThreadWorkspaceLayout>
     );
     const element = render(layout());
-    flushSync(() => element.querySelector<HTMLButtonElement>('[aria-label="Collapse workspace"]')!.click());
 
     expect(
       element.querySelector('[data-testid="workspace-content"]'),
@@ -384,5 +349,44 @@ describe('ThreadWorkspaceLayout', () => {
     expect(element.querySelector('.thread-shell-frame')?.className).toContain(
       'is-rail-hidden',
     );
+  });
+});
+
+
+describe('host-restricted navigation', () => {
+  it.each([false, true])('allows creation and hides home and settings while retaining child navigation (mobile=%s)', mobile => {
+    mockViewport(mobile);
+    Element.prototype.scrollIntoView = vi.fn();
+    const host = render(<ThreadWorkspaceLayout threads={[]} status={null}
+      restrictedNavigation
+      workspaceReturnHref="/workspaces" settingsSections={[{ id: 'global', label: 'Management', content: <p>Settings</p> }]}
+      getNewThreadHref={() => '/threads/new'}
+      workbench={{ threads: [{ key: 'local:child', title: 'Child', subtitle: 'Child thread', status: 'idle', href: '/threads/child', favorite: false }],
+        currentKey: 'local:child', activeView: 'chat', terminalEnabled: false, onViewChange: () => {}, onSearch: () => {}, workspacePath: '/project', favorite: false,
+        onToggleFavorite: () => {}, onNavigate: () => {}, notifications: [], unreadCount: 0, onReadNotifications: () => {} }}>
+      <p>Child conversation</p>
+    </ThreadWorkspaceLayout>);
+    expect(host.querySelector('a[href="/workspaces"]')).toBeNull();
+    expect(host.querySelector('button[title="New Chat"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="settings-dialog"]')).toBeNull();
+    expect(host.querySelector('button[aria-label="Open settings"]')).toBeNull();
+    expect(host.querySelector('a[href="/threads/child"]')).not.toBeNull();
+    expect(host.textContent).toContain('Child conversation');
+  });
+
+  it.each([false, true])('keeps the host-scoped settings under restricted navigation (mobile=%s)', (mobile) => {
+    mockViewport(mobile);
+    Element.prototype.scrollIntoView = vi.fn();
+    const host = render(<ThreadWorkspaceLayout threads={[]} status={null}
+      restrictedNavigation scopedSettings
+      workspaceReturnHref="/workspaces" settingsSections={[{ id: 'preferences', label: 'Preferences', content: <p>Theme</p> }]}
+      getNewThreadHref={() => '/threads/new'}
+      workbench={{ threads: [{ key: 'local:child', title: 'Child', subtitle: 'Child thread', status: 'idle', href: '/threads/child', favorite: false }],
+        currentKey: 'local:child', activeView: 'chat', terminalEnabled: false, onViewChange: () => {}, onSearch: () => {}, workspacePath: '/project', favorite: false,
+        onToggleFavorite: () => {}, onNavigate: () => {}, notifications: [], unreadCount: 0, onReadNotifications: () => {} }}>
+      <p>Child conversation</p>
+    </ThreadWorkspaceLayout>);
+    expect(host.querySelector('a[href="/workspaces"]')).toBeNull();
+    expect(host.querySelector('button[aria-label="Open settings"]')).not.toBeNull();
   });
 });

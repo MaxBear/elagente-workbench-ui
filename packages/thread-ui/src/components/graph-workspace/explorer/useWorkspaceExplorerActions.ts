@@ -1,9 +1,8 @@
+import { copyText } from '../../shell/terminalClipboard';
+import { translate, useI18n } from '../../../i18n';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 
-import {
-  workspaceDisplayPath,
-  relativeWorkspacePath,
-} from '../../workspacePaths';
+import { normalizeFileSystemPath, relativeWorkspacePath } from '../../workspacePaths';
 import type { WorkspaceTreeNode } from '../workspaceTree';
 import type { WorkspaceExplorerIdentity } from './useWorkspaceExplorerPersistence';
 import type {
@@ -41,6 +40,7 @@ export function useWorkspaceExplorerActions({
   focusFile: (path: string) => Promise<void>;
   workspaceRootPath: string;
 }) {
+  useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const archiveInputRef = useRef<HTMLInputElement | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -239,14 +239,19 @@ export function useWorkspaceExplorerActions({
     );
   }
 
-  async function copyPath(node: WorkspaceTreeNode) {
-    await run(async () => {
-      if (!node.path || !navigator.clipboard)
-        throw new Error('Clipboard access is unavailable.');
-      await navigator.clipboard.writeText(
-        workspaceDisplayPath(node.path, workspaceRootPath) ?? node.path,
-      );
-    }, 'File path copied.');
+  /** Copies a node's path (upstream); an immutable artifact copies its ID. Resolves
+      whether it was copied, for the menu's feedback. */
+  async function copyPath(node: WorkspaceTreeNode, kind: 'relative' | 'absolute' = 'relative') {
+    onError(null);
+    if (node.kind === 'artifact' || node.kind === 'live-artifact') {
+      if (!node.artifact?.id) { onError('Artifact ID is unavailable.'); return false; }
+      return copyText(node.artifact.id);
+    }
+    if (!node.path) return false;
+    const relative = relativeWorkspacePath(node.path, workspaceRootPath);
+    if (kind === 'relative' && relative === null) { onError(translate("files.thisFileIsOutsideTheWorkspaceCopy")); return false; }
+    const path = kind === 'relative' ? relative! : relative === null ? normalizeFileSystemPath(node.path) : `${normalizeFileSystemPath(workspaceRootPath).replace(/\/+$/, '')}/${relative}`;
+    return copyText(path);
   }
 
   const mutableFile =

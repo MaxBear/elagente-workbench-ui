@@ -41,6 +41,7 @@ export interface UseComposerDraftResult {
   isDraftControlled: boolean;
   updateDraft: (updater: DraftUpdater, syncMode?: DraftSyncMode) => void;
   flushControlledDraftToHost: (nextDraft?: ComposerDraft) => void;
+  captureSubmission: (snapshot: ComposerDraft) => { complete: () => void; cancel: () => void };
 }
 
 function toComposerDraft(
@@ -65,6 +66,7 @@ export function useComposerDraft({
   });
   const [localControlledDraft, setLocalControlledDraft] =
     useState<ComposerDraft>(() => toComposerDraft(draftPrompt, draftAttachments));
+  const submittedClearRef = useRef<{ signature: string } | null>(null);
   const draftSyncTimerRef = useRef<number | null>(null);
   const latestLocalDraftRef = useRef<ComposerDraft>(localControlledDraft);
   const lastSentDraftSignatureRef = useRef(draftSignature(localControlledDraft));
@@ -96,6 +98,21 @@ export function useComposerDraft({
     }
 
     lastRenderedControlledPropsSignatureRef.current = hostSignature;
+    // Some hosts clear their controlled draft when an HTTP send is accepted.
+    // That acknowledgement belongs to the submitted snapshot, not text/File
+    // objects added while the request was in flight.
+    if (!hostDraft.prompt && hostDraft.attachments.length === 0 && submittedClearRef.current) {
+      const submitted = submittedClearRef.current;
+      submittedClearRef.current = null;
+      const local = latestLocalDraftRef.current;
+      const localSignature = draftSignature(local);
+      if ((local.prompt || local.attachments.length > 0) && localSignature !== submitted.signature) {
+        lastSentDraftSignatureRef.current = localSignature;
+        pendingHostEchoesRef.current.add(localSignature);
+        onDraftChange?.(() => ({ prompt: local.prompt, attachments: local.attachments as PromptAttachmentUpload[] }));
+        return;
+      }
+    }
     // Host acknowledgements may arrive after the next dictation/typing update.
     // They acknowledge persistence; they must not roll back newer local text.
     if (pendingHostEchoesRef.current.delete(hostSignature)) return;
@@ -107,7 +124,7 @@ export function useComposerDraft({
       draftSyncTimerRef.current = null;
     }
     setLocalControlledDraft(hostDraft);
-  }, [draftAttachments, draftPrompt, isDraftControlled]);
+  }, [draftAttachments, draftPrompt, isDraftControlled, onDraftChange]);
 
   const sendDraftToHost = useCallback((nextDraft: ComposerDraft) => {
     if (!isDraftControlled || !onDraftChange) {
@@ -185,6 +202,16 @@ export function useComposerDraft({
     setInternalDraft((current) => updater(current));
   }, [isDraftControlled, syncControlledDraftToHost]);
 
+  const captureSubmission = useCallback((snapshot: ComposerDraft) => {
+    const token = { signature: draftSignature(snapshot) };
+    submittedClearRef.current = token;
+    return {
+      complete: () => updateDraft(current => draftSignature(current) === token.signature
+        ? { prompt: '', attachments: [] } : current),
+      cancel: () => { if (submittedClearRef.current === token) submittedClearRef.current = null; },
+    };
+  }, [updateDraft]);
+
   const currentDraft = isDraftControlled ? localControlledDraft : internalDraft;
 
   return {
@@ -193,5 +220,6 @@ export function useComposerDraft({
     isDraftControlled,
     updateDraft,
     flushControlledDraftToHost,
+    captureSubmission,
   };
 }

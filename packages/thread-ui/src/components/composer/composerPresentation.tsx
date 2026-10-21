@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import type {
   AgentHookDto,
   AgentHookEventNameDto,
@@ -30,7 +31,7 @@ export const HOOK_EVENT_OPTIONS: Array<{
     matcherHint: 'startup|resume',
   },
   { value: 'userPromptSubmit', label: 'UserPromptSubmit', matcherHint: '' },
-  { value: 'stop', label: 'Stop', matcherHint: '' },
+  { value: 'stop', get label() { return translate("chat.stop"); }, matcherHint: '' },
   { value: 'preCompact', label: 'PreCompact', matcherHint: '' },
   { value: 'postCompact', label: 'PostCompact', matcherHint: '' },
 ];
@@ -45,6 +46,7 @@ export function buildComposerControlState({
   settingsBusy,
   supportedEffortCount,
   fastMode,
+  sendShortcut = 'ctrlEnter',
 }: {
   goalComposeMode: boolean;
   goalBusy: boolean;
@@ -55,24 +57,29 @@ export function buildComposerControlState({
   settingsBusy: boolean;
   supportedEffortCount: number;
   fastMode: boolean;
+  sendShortcut?: 'ctrlEnter' | 'enter';
 }) {
   const promptPlaceholder = goalComposeMode
-    ? 'Describe the goal the backend should continue working toward...'
+    ? translate("chat.describeTheGoalTheBackendShouldContinue")
     : (disabledPlaceholder ??
       (isShellView
-        ? 'Send shell input to the attached terminal...'
-        : ''));
+        ? translate("chat.sendShellInputToTheAttachedTerminal")
+        : translate("chat.typeMessage")));
+  // Keyboards only: how to send, from the current shortcut setting.
+  const promptPlaceholderHint = goalComposeMode || disabledPlaceholder || isShellView
+    ? ''
+    : translate(sendShortcut === 'enter' ? "chat.enterToSend" : "chat.ctrlEnterToSend");
   const sendButtonLabel = goalComposeMode
     ? goalBusy
-      ? 'Setting...'
-      : 'Set goal'
+      ? translate("chat.setting")
+      : translate("chat.setGoal")
     : !threadConnected && busy
-      ? 'Connecting...'
+      ? translate("chat.connecting")
       : !threadConnected
-        ? 'Send'
+        ? translate("chat.send")
         : busy && !isShellView
-          ? 'Sending...'
-          : 'Send';
+          ? translate("chat.sending")
+          : translate("chat.send");
   const sendButtonClassName = !threadConnected
     ? 'ui-action-danger'
     : goalComposeMode
@@ -82,14 +89,15 @@ export function buildComposerControlState({
   const effortControlsDisabled =
     modelControlsDisabled || supportedEffortCount === 0;
   const effortControlTitle = fastMode
-    ? 'Fast mode is on. Turn it off from the slash toolbox to edit reasoning.'
+    ? translate("chat.fastModeIsOnTurnItOff_a6fd43")
     : supportedEffortCount === 0
-      ? 'The selected model does not expose adjustable reasoning effort.'
-      : 'Select reasoning effort';
+      ? translate("chat.theSelectedModelDoesNotExposeAdjustable")
+      : translate("chat.selectReasoningEffort");
 
   return {
     promptPlaceholder,
-    interruptLabel: isShellView ? 'Send Ctrl-C' : 'Stop Current Turn',
+    promptPlaceholderHint,
+    interruptLabel: isShellView ? translate("chat.sendCtrlC") : translate("chat.stopCurrentTurn"),
     sendButtonLabel,
     sendButtonClassName,
     modelControlsDisabled,
@@ -185,6 +193,7 @@ export function buildComposerClassNames({
 }
 
 export function TerminalIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg
       aria-hidden="true"
@@ -201,6 +210,7 @@ export function TerminalIcon() {
 }
 
 export function PlusIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg
       aria-hidden="true"
@@ -215,6 +225,7 @@ export function PlusIcon() {
 }
 
 export function SlashIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg
       aria-hidden="true"
@@ -232,6 +243,7 @@ export function SlashIcon() {
 }
 
 export function ChatIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg
       aria-hidden="true"
@@ -247,6 +259,7 @@ export function ChatIcon() {
 }
 
 export function WrenchScrewdriverIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg
       aria-hidden="true"
@@ -265,6 +278,7 @@ export function WrenchScrewdriverIcon() {
 }
 
 export function ClipboardIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg
       aria-hidden="true"
@@ -285,29 +299,29 @@ export function authStatusLabel(
 ) {
   switch (value) {
     case 'bearerToken':
-      return 'Token';
+      return translate("chat.token");
     case 'oAuth':
       return 'OAuth';
     case 'notLoggedIn':
-      return 'Login';
+      return translate("chat.login");
     case 'unsupported':
-      return 'Public';
+      return translate("chat.public");
     default:
-      return 'Unknown';
+      return translate("chat.unknown");
   }
 }
 
 export function skillScopeLabel(value: ThreadSkillsDto['skills'][number]['scope']) {
   switch (value) {
     case 'repo':
-      return 'Repo';
+      return translate("chat.repo");
     case 'system':
-      return 'System';
+      return translate("chat.system");
     case 'admin':
-      return 'Admin';
+      return translate("chat.admin");
     case 'user':
     default:
-      return 'User';
+      return translate("chat.user");
   }
 }
 
@@ -320,12 +334,12 @@ export function hookEventLabel(value: AgentHookEventNameDto) {
 export function hookSourceLabel(value: ThreadHooksDto['hooks'][number]['source']) {
   switch (value) {
     case 'cloudRequirements':
-      return 'Cloud';
+      return translate("chat.cloud");
     case 'legacyManagedConfigFile':
     case 'legacyManagedConfigMdm':
-      return 'Managed';
+      return translate("chat.managed");
     case 'sessionFlags':
-      return 'Session';
+      return translate("chat.session");
     default:
       return value[0]?.toUpperCase() + value.slice(1);
   }
@@ -334,13 +348,13 @@ export function hookSourceLabel(value: ThreadHooksDto['hooks'][number]['source']
 export function hookTrustLabel(value: ThreadHooksDto['hooks'][number]['trustStatus']) {
   switch (value) {
     case 'managed':
-      return 'Managed';
+      return translate("chat.managed");
     case 'modified':
-      return 'Modified';
+      return translate("chat.modified");
     case 'trusted':
-      return 'Trusted';
+      return translate("chat.trusted");
     case 'untrusted':
-      return 'Review';
+      return translate("chat.review");
   }
 }
 
@@ -361,7 +375,7 @@ export function hookEventJsonKey(value: AgentHookEventNameDto) {
     case 'userPromptSubmit':
       return 'UserPromptSubmit';
     case 'stop':
-      return 'Stop';
+      return translate("chat.stop");
   }
 }
 
@@ -402,13 +416,13 @@ export function editableHookTarget(
 export function goalStatusLabel(value: ThreadGoalStatusDto) {
   switch (value) {
     case 'active':
-      return 'Active';
+      return translate("chat.active");
     case 'paused':
-      return 'Paused';
+      return translate("chat.paused");
     case 'budgetLimited':
-      return 'Budget';
+      return translate("chat.budget");
     case 'complete':
-      return 'Complete';
+      return translate("chat.complete");
     default:
       return value;
   }
@@ -419,6 +433,7 @@ export function ContextProgressBar({
 }: {
   contextUsage: ThreadContextUsageDto | null | undefined;
 }) {
+  const { locale: i18nLocale } = useI18n();
   const availability = contextUsage?.availability ?? 'unavailable';
   const percent = clampPercent(contextUsage?.remainingPercent);
 
@@ -454,6 +469,7 @@ export function ToolPill({
   label: string;
   tone?: 'stone' | 'rose' | 'sky';
 }) {
+  const { locale: i18nLocale } = useI18n();
   const toneClassName =
     tone === 'rose'
       ? 'border-rose-300/35 bg-rose-300/14 text-rose-50'

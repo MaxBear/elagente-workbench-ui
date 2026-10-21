@@ -1,3 +1,6 @@
+import { createWorkspacePathResolver } from './components/workspacePathLinks';
+import { ThreadLoadingIndicator } from './components/ThreadLoadingIndicator';
+import { translate, useI18n } from './i18n';
 import {
   useMemo,
   useRef,
@@ -17,7 +20,7 @@ import type {
   ThreadHistoryItemDto,
   ThreadDto,
 } from "@remote-codex/shared";
-import type { ThreadDetailUiAdapter } from "./adapters";
+import type { ThreadDetailUiAdapter, ThreadImageAssetVariant } from "./adapters";
 import type { ThemeMode } from "./app-shell/AppShellNavContext";
 import {
   createDefaultPluginContextValue,
@@ -97,14 +100,14 @@ function formatTopbarTokenCount(value: number | undefined) {
 
 function formatTopbarUsageSummary(usage: GraphChatThreadUsageSummary | null) {
   if (!usage || usage.turns <= 0) {
-    return "waiting for agent usage";
+    return translate("workbench.waitingForAgentUsage");
   }
   const baseTokenParts = `in ${formatTopbarTokenCount(usage.input)} / out ${formatTopbarTokenCount(
     usage.output,
   )} / cache read ${formatTopbarTokenCount(usage.cache)}`;
   const tokenParts =
     usage.cacheWrite > 0
-      ? `${baseTokenParts} / cache write ${formatTopbarTokenCount(usage.cacheWrite)}`
+      ? translate("workbench.cacheWrite", { value1: baseTokenParts, value2: formatTopbarTokenCount(usage.cacheWrite) })
       : baseTokenParts;
   return usage.pricedTurns > 0
     ? `${tokenParts} / cost ${formatCompactUsd(usage.priceUsd)}`
@@ -170,13 +173,16 @@ export interface ThreadDetailSurfaceProps {
   mobileHeaderAction?: ReactNode;
   appMenuButton?: ReactNode;
   appNavigationMenu?: ReactNode;
-  navigationTitle?: string;
   renderNavigationHeader?: (input: { collapsed: boolean; closeNavigation: () => void }) => ReactNode;
   workspaceReturnHref?: string;
+  restrictedNavigation?: boolean;
+  /** See ThreadWorkspaceLayout `scopedSettings`. */
+  scopedSettings?: boolean;
   onWorkspaceReturn?: () => void;
   threadActionsButton?: ReactNode;
   surfaceActions?: ReactNode;
   workbench?: MatterWorkbenchOptions;
+  deviceMonitor?: ReactNode;
   floatingPanel?: ReactNode;
   workspaceContent?: ReactNode;
   workspaceTitle?: string;
@@ -253,13 +259,15 @@ export function ThreadDetailSurface({
   mobileHeaderAction,
   appMenuButton,
   appNavigationMenu,
-  navigationTitle,
   renderNavigationHeader,
   workspaceReturnHref,
+  restrictedNavigation,
+  scopedSettings,
   onWorkspaceReturn,
   threadActionsButton,
   surfaceActions,
   workbench,
+  deviceMonitor,
   floatingPanel,
   workspaceContent,
   workspaceTitle,
@@ -298,6 +306,7 @@ export function ThreadDetailSurface({
   loadingContent,
   emptyContent,
 }: ThreadDetailSurfaceProps) {
+  const { locale } = useI18n();
   const detail = useMemo(
     () => (rawDetail ? sanitizeThreadDetailHistory(rawDetail) : null),
     [rawDetail],
@@ -317,8 +326,14 @@ export function ThreadDetailSurface({
     () => ({
       ...(getImageAssetUrl
         ? {
-            getImageAssetUrl: (input: { threadId: string; path: string }) =>
-              getImageAssetUrl(input.path),
+            getImageAssetUrl: (input: {
+              threadId: string;
+              path: string;
+              variant?: ThreadImageAssetVariant;
+            }) =>
+              input.variant
+                ? getImageAssetUrl(input.path, input.variant)
+                : getImageAssetUrl(input.path),
           }
         : {}),
       resolveHref: (href: string) => {
@@ -329,7 +344,10 @@ export function ThreadDetailSurface({
         return adapter.workspace.getRawFileUrl({threadId: detail.thread.id, workspaceId: detail.workspace.id, path: relative ?? path});
       },
       workspaceRootPath: detail?.workspace.absPath,
+      ...(detail && adapter.workspace ? { resolveWorkspacePath: createWorkspacePathResolver(adapter.workspace, { threadId: detail.thread.id, workspaceId: detail.workspace.id }, detail.workspace.absPath) } : {}),
       onOpenLinkedThread: openThread,
+      ...(adapter.getThreadHref ? { getThreadHref: adapter.getThreadHref } : {}),
+      ...(adapter.describeThread ? { describeThread: adapter.describeThread } : {}),
       ...(openWorkspaceFile ? { onOpenWorkspaceFile: openWorkspaceFile } : {}),
       ...(loadHistoryItemDetail
         ? { onLoadHistoryItemDetail: loadHistoryItemDetail }
@@ -342,6 +360,8 @@ export function ThreadDetailSurface({
       detail?.workspace.id,
       detail?.thread.id,
       adapter.workspace,
+      adapter.getThreadHref,
+      adapter.describeThread,
       cancelPendingSteer,
       getImageAssetUrl,
       loadHistoryItemDetail,
@@ -359,7 +379,7 @@ export function ThreadDetailSurface({
   );
   const topbarUsageLabel = useMemo(
     () => formatTopbarUsageSummary(threadUsageSummary),
-    [threadUsageSummary],
+    [threadUsageSummary, locale],
   );
   const transcriptItemCount = useMemo(
     () =>
@@ -401,8 +421,13 @@ export function ThreadDetailSurface({
       />
     ) : null);
 
-  const pendingContent = loadingContent ?? <div role="status" className="thread-loading-state">Loading conversation…</div>;
-  const defaultContent = loading && !shownDetail ? pendingContent : shownDetail ? (
+  // Switching to a conversation that is still loading keeps the last one's frame
+  // mounted (composer, layout) with the loading state in the transcript's place,
+  // rather than replacing the whole panel and flashing it back.
+  const pendingContent = loadingContent ?? <ThreadLoadingIndicator />;
+  const defaultContent = loading && !shownDetail ? (
+    pendingContent
+  ) : shownDetail ? (
     <div className={className}>
       {!pending && floatingPanel ? (
         <div className="fixed right-3 top-20 z-50 lg:absolute lg:right-4 lg:top-16">
@@ -419,7 +444,7 @@ export function ThreadDetailSurface({
       {!pending && shownDetail.workspacePathStatus === "missing" &&
         (workspaceMissingContent ?? (
           <div className="shrink-0 border-b border-rose-500/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-100 sm:px-6">
-            <p className="font-medium text-rose-50">Workspace path missing</p>
+            <p className="font-medium text-rose-50">{translate("workbench.workspacePathMissing")}</p>
             <p className="mt-1 break-words text-rose-100/90">
               {shownDetail.workspace.absPath}
             </p>
@@ -432,7 +457,7 @@ export function ThreadDetailSurface({
       >
         <GraphChatThreadChatPanel
           detail={shownDetail}
-          {...(pending ? {timelinePending: pendingContent} : {})}
+          {...(pending ? { timelinePending: pendingContent } : {})}
           adapter={adapter}
           timelineAdapter={timelineAdapter}
           TimelineComponent={TimelineComponent}
@@ -475,12 +500,9 @@ export function ThreadDetailSurface({
               <div className="flex min-h-0 flex-1 items-center justify-center p-4 sm:p-6">
                 <div className="thread-empty-surface max-w-md rounded-[1.6rem] border px-6 py-8 text-center">
                   <p className="text-base font-medium text-[var(--theme-fg)]">
-                    Terminal plugin disabled
-                  </p>
+                    {translate("workbench.terminalPluginDisabled")}</p>
                   <p className="mt-3 text-sm leading-6 text-[var(--theme-fg-muted)]">
-                    Enable the Terminal plugin in Settings to use the shell
-                    panel.
-                  </p>
+                    {translate("workbench.enableTheTerminalPluginInSettingsTo")}</p>
                 </div>
               </div>
             ))
@@ -489,11 +511,9 @@ export function ThreadDetailSurface({
               <div className="flex min-h-0 flex-1 items-center justify-center p-4 sm:p-6">
                 <div className="thread-empty-surface max-w-md rounded-[1.6rem] border px-6 py-8 text-center">
                   <p className="text-base font-medium text-[var(--theme-fg)]">
-                    Thread disconnected
-                  </p>
+                    {translate("workbench.threadDisconnected")}</p>
                   <p className="mt-3 text-sm leading-6 text-[var(--theme-fg-soft)]">
-                    Reconnect this thread before creating or attaching a shell.
-                  </p>
+                    {translate("workbench.reconnectThisThreadBeforeCreatingOrAttaching")}</p>
                 </div>
               </div>
             ))
@@ -504,13 +524,13 @@ export function ThreadDetailSurface({
   ) : (
     (emptyContent ?? (
       <div className="flex flex-1 items-center justify-center px-6 py-12 text-center text-[var(--theme-fg-muted)]">
-        Select a thread to inspect.
-      </div>
+        {translate("workbench.selectAThreadToInspect")}</div>
     ))
   );
 
   const surface = (
     <ThreadWorkspaceLayout
+      deviceMonitor={deviceMonitor}
       {...(workbench ? { workbench } : {})}
       threads={threads}
       status={status}
@@ -518,9 +538,10 @@ export function ThreadDetailSurface({
       error={loading ? null : error}
       viewportConstrained
       currentThreadId={currentThreadId ?? detail?.thread.id}
-      currentThreadLabel={pending && !sameThread ? undefined : detail?.thread.title}
-      currentWorkspaceId={pending && !sameThread ? null : currentWorkspaceId !== undefined ? currentWorkspaceId : detail?.thread.workspaceId}
-      currentWorkspaceLabel={pending && !sameThread ? null : currentWorkspaceLabel ?? detail?.workspace.label}
+      // While a thread loads, its title from the list rather than "New thread".
+      currentThreadLabel={detail?.thread.title ?? threads.find(thread => thread.id === (currentThreadId ?? detail?.thread.id))?.title ?? undefined}
+      currentWorkspaceId={currentWorkspaceId ?? detail?.thread.workspaceId}
+      currentWorkspaceLabel={currentWorkspaceLabel ?? detail?.workspace.label}
       harnessLabel={composerProps?.agentLabel}
       sessionLabel={detail?.thread.providerSessionId ?? detail?.thread.id}
       usageLabel={topbarUsageLabel}
@@ -537,9 +558,10 @@ export function ThreadDetailSurface({
       themeMode={shellThemeMode}
       appMenuButton={appMenuButton}
       appNavigationMenu={appNavigationMenu}
-      {...(navigationTitle ? { navigationTitle } : {})}
       {...(renderNavigationHeader ? { renderNavigationHeader } : {})}
       workspaceReturnHref={workspaceReturnHref}
+      restrictedNavigation={restrictedNavigation}
+      {...(scopedSettings ? { scopedSettings } : {})}
       {...(onWorkspaceReturn ? { onWorkspaceReturn } : {})}
       showMobileAppMenu={Boolean(appMenuButton)}
       showMobileThreadNavToggle={presentation !== "embedded-single-thread"}
@@ -547,7 +569,7 @@ export function ThreadDetailSurface({
       hideRoomsRail={presentation === "embedded-single-thread"}
       onOpenThread={adapter.openThread}
       workspaceContent={resolvedWorkspaceContent}
-      workspaceTitle={workspaceTitle ?? "Workspace"}
+      workspaceTitle={workspaceTitle ?? translate("workbench.workspace")}
       workspaceActions={workspaceActions}
       {...(workspaceFocusPathRequest
         ? { workspaceRevealRequestKey: workspaceFocusPathRequest.requestId }

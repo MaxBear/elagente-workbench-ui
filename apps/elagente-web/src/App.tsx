@@ -197,7 +197,7 @@ export function App() {
           adapter={adapter} capabilities={capabilities} currentThreadId={threadId || undefined} currentWorkspaceId={null}
           currentWorkspaceLabel="ElAgente" workspaceFocusPathRequest={focusFile}
           shellEffectiveTheme={effectiveTheme} shellThemeMode={themeMode} onShellThemeModeChange={changeThemeMode} timelineProps={{autoCollapseCompletedTurns: true}}
-          navigationTitle="ElAgente" onNewThreadTitle={createThread}
+          onNewThreadTitle={createThread}
           renderNavigationHeader={({collapsed, closeNavigation}) => <nav className={`agent-navigation${collapsed ? ' is-collapsed' : ''}`} aria-label="Agents">
             {!collapsed && <p className="agent-navigation-label">Agents</p>}
             {agents.map(agent => <button key={agent.id} type="button" className="agent-navigation-item" title={agent.name} aria-label={`Switch to ${agent.name}`} aria-pressed={agentId === agent.id}

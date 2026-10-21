@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import {
   useCallback,
   useEffect,
@@ -16,12 +17,13 @@ import type {
   ThreadDetailUiAdapter,
   ThreadTimelineAdapter,
 } from '../../adapters';
-import { useWorkbenchPreferences } from '../workbenchPreferences';
 import { ThreadComposer, type ThreadComposerProps } from '../ThreadComposer';
 import {
   ThreadTimeline,
   type ThreadTimelineProps,
 } from '../ThreadTimeline';
+import { TranscriptAgentProvider, transcriptAgentFor } from './TranscriptAgent';
+import { ThreadRelationBar } from './ThreadRelationBar';
 
 export interface GraphChatThreadUsageSummary {
   input: number;
@@ -49,6 +51,8 @@ interface GraphChatThreadChatPanelProps {
   floatingDesktopComposer?: boolean;
   floatingMobileComposerBottomOffset?: number;
   composerHostRef?: RefObject<HTMLDivElement | null>;
+  /** While another conversation loads: shown in the transcript's place, so the
+      panel and its composer stay mounted (no flash, the draft keeps its focus). */
   timelinePending?: ReactNode;
 }
 
@@ -68,13 +72,17 @@ export function GraphChatThreadChatPanel({
   composerHostRef,
   timelinePending,
 }: GraphChatThreadChatPanelProps) {
-  const preferences = useWorkbenchPreferences();
+  useI18n();
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [mobileComposerHeight, setMobileComposerHeight] = useState(0);
   const [mobileComposerOverlap, setMobileComposerOverlap] = useState(0);
   const [mobileKeyboardInset, setMobileKeyboardInset] = useState(0);
   const [mobilePromptFocused, setMobilePromptFocused] = useState(false);
   const internalComposerHostRef = useRef<HTMLDivElement | null>(null);
+  const panelRootRef = useRef<HTMLDivElement | null>(null);
+  // Space between this chat and the window bottom (a terminal panel below it).
+  // The keyboard covers that space first; only the rest overlaps this chat.
+  const [panelBottomGap, setPanelBottomGap] = useState(0);
   const timelineTailVisibilityChange = timelineProps?.onTailVisibilityChange;
   const [tailVisible, setTailVisible] = useState(true);
   const [previousAvailable, setPreviousAvailable] = useState(false);
@@ -250,15 +258,23 @@ export function GraphChatThreadChatPanel({
 
   useLayoutEffect(() => {
     const node = internalComposerHostRef.current;
-    if (!node || !isMobileViewport) {
+    if (!node || (!isMobileViewport && !floatingDesktopComposer)) {
       setMobileComposerOverlap(0);
       return;
     }
 
     const updateOverlap = () => {
       const rect = node.getBoundingClientRect();
+      const root = panelRootRef.current;
+      // The navigation capsule sits above the host, outside its layout height.
+      const navigation = node.querySelector('.thread-jump-latest-cluster');
+      const top = navigation ? Math.min(rect.top, navigation.getBoundingClientRect().top) : rect.top;
+      const bottom = useFloatingMobileComposer || !root
+        ? window.innerHeight
+        : Math.min(window.innerHeight, root.getBoundingClientRect().bottom);
+      setPanelBottomGap(Math.max(0, Math.round(window.innerHeight - bottom)));
       setMobileComposerOverlap(
-        Math.max(0, Math.ceil(window.innerHeight - rect.top)),
+        Math.max(0, Math.ceil(bottom - top)),
       );
     };
 
@@ -271,6 +287,9 @@ export function GraphChatThreadChatPanel({
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver(updateOverlap);
       observer.observe(node);
+      const navigation = node.querySelector('.thread-jump-latest-cluster');
+      if (navigation) observer.observe(navigation);
+      if (panelRootRef.current) observer.observe(panelRootRef.current);
     }
 
     return () => {
@@ -281,10 +300,12 @@ export function GraphChatThreadChatPanel({
     };
   }, [
     isMobileViewport,
+    floatingDesktopComposer,
     mobileKeyboardInset,
     mobilePromptFocused,
     composerProps,
     hasPendingRequests,
+    useFloatingMobileComposer,
   ]);
 
   useEffect(() => {
@@ -333,18 +354,23 @@ export function GraphChatThreadChatPanel({
     [composerHostRef],
   );
 
+  // A workbench pane switch briefly changes focus while the IME is still
+  // visible. Both panes must keep avoiding that viewport, including the strip.
   const mobileComposerBottomOffset =
-    isMobileViewport && mobilePromptFocused
-      ? Math.max(0, mobileKeyboardInset - floatingMobileComposerBottomOffset)
+    isMobileViewport && (mobilePromptFocused || floatingDesktopComposer)
+      ? Math.max(0, mobileKeyboardInset - (useFloatingMobileComposer ? floatingMobileComposerBottomOffset : 0) - panelBottomGap)
       : 0;
-  const effectiveMobileComposerHeight = Math.max(mobileComposerHeight, 144);
+  // Above a bottom panel the chat is short; reserve the composer's real height.
+  const effectiveMobileComposerHeight = panelBottomGap > 0
+    ? mobileComposerHeight
+    : Math.max(mobileComposerHeight, 144);
   const effectiveMobileComposerOverlap = Math.max(
     mobileComposerOverlap,
     effectiveMobileComposerHeight + mobileComposerBottomOffset,
   );
   const chatScrollBottomSpacer = isMobileViewport
     ? effectiveMobileComposerOverlap + 12
-    : floatingDesktopComposer ? mobileComposerHeight + 32 : 0;
+    : floatingDesktopComposer ? mobileComposerOverlap + 12 : 0;
   const panelStyle: CSSProperties | undefined =
     chatScrollBottomSpacer > 0
       ? ({
@@ -362,6 +388,11 @@ export function GraphChatThreadChatPanel({
             'max(env(safe-area-inset-bottom), var(--android-safe-area-bottom, 0px))',
         }
       : undefined;
+  const transcriptAgent = useMemo(
+    () => transcriptAgentFor(detail.thread),
+    [detail.thread],
+  );
+  const parentThreadId = detail.thread.parentThreadId;
   const timelineElement = useMemo(() => {
     const threadRunning =
       detail.thread.status === 'running' || detail.thread.activeTurnId !== null;
@@ -378,7 +409,6 @@ export function GraphChatThreadChatPanel({
         liveOutput={liveOutput}
         className="thread-timeline-surface min-h-0 flex-1"
         {...timelineProps}
-        autoCollapseCompletedTurns={preferences.autoCollapseWork}
         scrollRequestKey={timelineProps?.scrollRequestKey ?? latestRequest}
         previousTurnScrollRequestKey={timelineProps?.previousTurnScrollRequestKey ?? previousRequest}
         nextTurnScrollRequestKey={timelineProps?.nextTurnScrollRequestKey ?? nextRequest}
@@ -392,7 +422,6 @@ export function GraphChatThreadChatPanel({
       />
     );
   }, [
-    preferences.autoCollapseWork,
     TimelineComponent,
     adapter.openThread,
     detail.pendingRequests,
@@ -411,18 +440,37 @@ export function GraphChatThreadChatPanel({
 
   return (
     <div
+      ref={panelRootRef}
       data-testid="chat-panel"
       className="thread-graph-chat-panel relative flex h-full min-h-0 flex-col"
       style={panelStyle}
     >
+      {/* A sub-thread names the thread that started it, pinned above its conversation. */}
+      {!timelinePending && parentThreadId && adapter.describeThread ? (
+        <ThreadRelationBar
+          parentThreadId={parentThreadId}
+          parent={adapter.describeThread(parentThreadId)}
+          currentWorkspaceId={detail.thread.workspaceId}
+          href={adapter.getThreadHref?.(parentThreadId)}
+          onOpen={adapter.openThread}
+        />
+      ) : null}
       {!timelinePending && beforeTimelineContent}
-      <div className="thread-timeline-frame" hidden={Boolean(timelinePending)} inert={Boolean(timelinePending)}>{timelineElement}</div>
-      {timelinePending && <div className="thread-timeline-pending">{timelinePending}</div>}
-      <div className="thread-chat-usage-footer hidden shrink-0 items-center px-4 py-1 text-[10px] leading-4 sm:flex" hidden={Boolean(timelinePending)}>
+      {/* ElAgente: the same thread's timeline stays mounted (hidden) while it reloads,
+          so molecular viewers keep their camera and frames instead of remounting. */}
+      <div className="thread-timeline-frame" hidden={Boolean(timelinePending)} inert={Boolean(timelinePending)}>
+        <TranscriptAgentProvider agent={transcriptAgent}>
+          {timelineElement}
+        </TranscriptAgentProvider>
+      </div>
+      {timelinePending ? (
+        <div className="thread-timeline-surface thread-timeline-pending flex min-h-0 flex-1 flex-col">{timelinePending}</div>
+      ) : null}
+      <div className={`thread-chat-usage-footer hidden shrink-0 items-center px-4 py-1 text-[10px] leading-4 ${timelinePending ? '' : 'sm:flex'}`}>
         <span className="min-w-0">
-          {detail.turns.length} turn{detail.turns.length !== 1 ? 's' : ''}
+          {detail.turns.length} {translate("chat.turn_b09c73")}{detail.turns.length !== 1 ? translate("chat.s") : ''}
           <span className="mx-1 text-[var(--theme-border-contrast)]">|</span>
-          {transcriptItemCount} item{transcriptItemCount !== 1 ? 's' : ''}
+          {transcriptItemCount} {translate("chat.item")}{transcriptItemCount !== 1 ? translate("chat.s") : ''}
         </span>
       </div>
       {resolvedComposerProps ? (

@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import type { KeyboardEvent } from 'react';
 
 export function ComposerShellPromptInput({
@@ -27,10 +28,11 @@ export function ComposerShellPromptInput({
   onPromptKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onInterrupt?: () => Promise<void> | void;
 }) {
+  useI18n();
   return (
     <div className={`${promptRegionClassName} relative`}>
       <textarea
-        aria-label="Prompt"
+        aria-label={translate("chat.prompt")}
         disabled={false}
         value={prompt}
         onChange={(event) => onPromptChange(event.target.value)}
@@ -58,7 +60,7 @@ export function ComposerShellPromptInput({
       </button>
       <button
         type="submit"
-        aria-label="Send Shell Input"
+        aria-label={translate("chat.sendShellInput")}
         onMouseDown={(event) => {
           event.preventDefault();
         }}

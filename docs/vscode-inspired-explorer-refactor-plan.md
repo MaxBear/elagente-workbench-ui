@@ -120,7 +120,7 @@ Checkpoint validation:
 
 The workspace explorer should be improved by adopting the interaction model and
 internal separation used by the open-source VS Code web workbench, while keeping
-the current Remote Codex React surface, adapter contract, plugin previews, and
+the current Pockymoe React surface, adapter contract, plugin previews, and
 mobile behavior.
 
 The implementation should not import the VS Code workbench or its Explorer view
@@ -208,7 +208,7 @@ The following are explicitly outside the first milestone:
 - Embedding the full Code - OSS workbench.
 - Replacing non-text artifact, image, PDF, Markdown preview, or molecule
   renderers with Monaco Editor.
-- Running VS Code extensions in Remote Codex.
+- Running VS Code extensions in Pockymoe.
 - Recreating the VS Code command palette or activity bar.
 - Git status decorations, source-control commands, or diagnostics badges.
 - Multi-root workspaces.
@@ -286,7 +286,7 @@ These should be represented by small local interfaces and React components.
 VS Code's tree virtualization cannot be reused without its internal list stack.
 Use `@tanstack/react-virtual` for the flattened visible row list once the model
 split is complete. It is headless, MIT licensed, and allows the existing markup
-and styling to remain under Remote Codex control.
+and styling to remain under Pockymoe control.
 
 Implementation constraints:
 
@@ -411,7 +411,7 @@ Keep these existing files:
 - `GraphWorkspaceExplorer.tsx`: composition root for Explorer, Viewer, upload,
   preview loading, panel layout, and adapter integration.
 - `GraphWorkspacePreviewPane.tsx`: Viewer implementation.
-- `workspaceTree.ts`: Remote Codex domain projection for live nodes, artifacts,
+- `workspaceTree.ts`: Pockymoe domain projection for live nodes, artifacts,
   thread events, and fallback trees. Generic workspace tree mutation helpers
   should move to the Explorer model modules.
 

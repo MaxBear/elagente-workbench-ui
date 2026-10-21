@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../../i18n';
 import { useMemo } from 'react';
 
 const STORAGE_PREFIX = 'remote-codex:graphchat:workspace:expanded:';
@@ -97,6 +98,7 @@ export function writeWorkspaceExplorerState(
 export function useWorkspaceExplorerPersistence(
   identity: WorkspaceExplorerIdentity,
 ) {
+  useI18n();
   return useMemo(
     () => ({
       key: storageKey(identity),

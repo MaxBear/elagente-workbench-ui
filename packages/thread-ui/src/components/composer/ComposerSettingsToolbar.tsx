@@ -1,4 +1,4 @@
-import { ComposerMenuSurface } from './ComposerMenuSurface';
+import { translate, useI18n } from '../../i18n';
 import type {
   ModelOptionDto,
   ReasoningEffortDto,
@@ -6,75 +6,64 @@ import type {
   ThreadContextUsageDto,
   UpdateThreadSettingsInput,
 } from '@remote-codex/shared';
-import { Check, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { InputGroupButton } from '../graph-ui/InputGroup';
 import type { SettingsMenu } from './types';
-import { formatReasoningEffortLabel } from './composerUtils';
+import { formatContextTokenKilocount, formatReasoningEffortLabel, reasoningEffortColor } from './composerUtils';
 import { ContextProgressBar } from './composerPresentation';
+import { ComposerMenuSurface } from './ComposerMenuSurface';
+import { Check, ChevronDown, Send, Target } from 'lucide-react';
+import { useThemeFeature } from '../themeHooks';
+import { ComposerReasoningSlider } from './ComposerReasoningSlider';
 
-const sandboxOptions: Array<{
-  mode: SandboxModeDto;
-  label: string;
-}> = [
-  { mode: 'read-only', label: 'Read only' },
-  { mode: 'workspace-write', label: 'Workspace write' },
-  { mode: 'danger-full-access', label: 'Danger' },
-];
-
-function formatSandboxModeLabel(mode: SandboxModeDto | null | undefined) {
+/** Send, but later: an up arrow with a small clock. */
+function SendLaterIcon() {
   return (
-    sandboxOptions.find(
-      (entry) => entry.mode === (mode ?? 'danger-full-access'),
-    )?.label ?? 'Danger'
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="composer-send-later h-[18px] w-[18px] fill-none stroke-current" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 19V5" />
+      <path d="m4 10 5-5 5 5" />
+      <circle cx="17.5" cy="16.5" r="4.5" />
+      <path d="M17.5 14.5v2l1.3 1" />
+    </svg>
   );
-}
-
-function formatSandboxModeCompactLabel(
-  mode: SandboxModeDto | null | undefined,
-) {
-  switch (mode) {
-    case 'read-only':
-      return 'RO';
-    case 'workspace-write':
-      return 'WW';
-    case 'danger-full-access':
-      return 'Full';
-    default:
-      return 'Full';
-  }
 }
 
 export function ComposerSettingsToolbar({
   openMenu,
   model,
+  agent,
+  queueing = false,
+  liveModelSwitch = false,
   modelOptions,
   modelContextTitle,
   contextUsage,
   reasoningEffort,
   supportedEfforts,
-  sandboxMode,
-  sandboxModeAvailable,
+  modelControlsDisabled,
+  effortControlsDisabled,
   settingsBusy,
   goalComposeMode,
   goalBusy,
   activeView,
   disabled,
-  fastMode,
+  promptEmpty = false,
   sendButtonLabel,
   sendButtonClassName,
-  modelControlsDisabled,
-  effortControlsDisabled,
-  effortControlTitle,
-  inlineToggleClassName,
-  menuItemClassName,
   sendButtonBaseClassName,
+  beforeSend,
   onSetOpenMenu,
   onUpdateSettings,
 }: {
+  beforeSend?: ReactNode;
   openMenu: SettingsMenu;
   model: string | null | undefined;
+  agent?: string | undefined;
+  /** A turn is running, so sending adds the prompt to its queue. */
+  queueing?: boolean;
+  /** A model or effort chosen while a turn runs applies from its next model
+      call; otherwise from the next turn. */
+  liveModelSwitch?: boolean;
   modelOptions: ModelOptionDto[];
   modelContextTitle: string;
   contextUsage: ThreadContextUsageDto | null | undefined;
@@ -87,6 +76,8 @@ export function ComposerSettingsToolbar({
   goalBusy: boolean;
   activeView: 'chat' | 'shell';
   disabled: boolean;
+  /** No text or attachment to send yet. */
+  promptEmpty?: boolean;
   fastMode: boolean;
   sendButtonLabel: string;
   sendButtonClassName: string;
@@ -99,230 +90,163 @@ export function ComposerSettingsToolbar({
   onSetOpenMenu: (updater: (current: SettingsMenu) => SettingsMenu) => void;
   onUpdateSettings: (input: UpdateThreadSettingsInput) => void;
 }) {
-  const [settingsSection, setSettingsSection] = useState<
-    'model' | 'effort' | null
-  >(null);
-  const selectedModelLabel = (
+  useI18n();
+  // Theme flags: the harness avatar and a chevron on the model chip, and a
+  // paper plane for sending now. Every theme shows the same three intents.
+  const modelAvatar = useThemeFeature('composer.modelAvatar');
+  const intentIcons = useThemeFeature('composer.intentIcons');
+  // A turn is running: sending now adds the prompt to run after it.
+  const sendLater = queueing && activeView === 'chat' && !goalComposeMode;
+  const sendIntentLabel = goalComposeMode
+    ? translate('chat.setGoal')
+    : sendLater
+      ? translate('chat.sendAfterTurn')
+      : translate('chat.sendPrompt');
+  // Nothing to send yet: the button looks off but stays focusable and says why.
+  const sendEmpty = promptEmpty && !goalBusy && !(activeView === 'chat' && disabled);
+  const selectedModelLabel =
     modelOptions.find((entry) => entry.model === model)?.displayName ||
     model ||
-    'Select model'
-  ).replace(/\s+\([^)]+\)\s*$/, '');
+    translate('chat.selectModel');
+  const supportsEffort = supportedEfforts.length > 0;
+  const effortLabel = formatReasoningEffortLabel(reasoningEffort);
+  // ElAgente: the context row and its title text show only when the host reports a
+  // usable context reading; otherwise they are omitted, never "— / —" or "unavailable".
+  const hasContext = contextUsage?.availability === 'available' && (
+    (contextUsage.tokensInContextWindow != null && Number.isFinite(contextUsage.tokensInContextWindow)) ||
+    (contextUsage.modelContextWindow != null && Number.isFinite(contextUsage.modelContextWindow) && contextUsage.modelContextWindow > 0));
 
   return (
     <>
-      <div className="relative min-w-0">
-        <InputGroupButton
+      <div className="composer-model-control relative min-w-0">
+        <button
           type="button"
-          variant="ghost"
-          size="xs"
           data-composer-menu-trigger="true"
+          aria-label={
+            supportsEffort
+              ? translate('chat.modelAndEffort', {
+                  value1: selectedModelLabel,
+                  value2: effortLabel,
+                })
+              : selectedModelLabel
+          }
           aria-haspopup="menu"
           aria-expanded={openMenu === 'model'}
-          aria-label={`Model and effort: ${selectedModelLabel}, ${formatReasoningEffortLabel(reasoningEffort)}`}
-          disabled={modelControlsDisabled || modelOptions.length === 0}
-          onClick={() => {
-            setSettingsSection(null);
-            onSetOpenMenu((current) => (current === 'model' ? null : 'model'));
-          }}
-          title={
-            fastMode
-              ? `Fast mode is on. Turn it off from the slash toolbox to edit model. ${modelContextTitle}`
-              : modelContextTitle
+          disabled={
+            modelControlsDisabled || settingsBusy || modelOptions.length === 0
           }
-          className={`${inlineToggleClassName} relative min-w-0 max-w-[10rem] overflow-hidden rounded-full px-2.5 text-left text-stone-300 disabled:cursor-not-allowed disabled:text-stone-600 sm:max-w-[14rem]`}
+          onClick={() =>
+            onSetOpenMenu((current) => (current === 'model' ? null : 'model'))
+          }
+          data-testid="composer-model-label"
+          title={`${selectedModelLabel}${supportsEffort ? ` · ${effortLabel}` : ''}${hasContext ? `\n${modelContextTitle}` : ''}`}
+          className="composer-model-label flex flex-col items-center justify-center whitespace-nowrap px-1 text-xs text-stone-400"
         >
-          <span className="relative z-[1] block min-w-0 truncate whitespace-nowrap">
-            {selectedModelLabel} · {formatReasoningEffortLabel(reasoningEffort)}
-          </span>
-        </InputGroupButton>
+          {modelAvatar && agent ? (
+            <span className="matter-thread-avatar composer-model-avatar" data-agent={agent} aria-hidden="true" />
+          ) : null}
+          <span className="composer-model-name">{selectedModelLabel}</span>
+          {supportsEffort && (
+            <span className="composer-model-effort" data-effort={reasoningEffort ?? undefined}
+              style={{ '--effort-color': reasoningEffortColor(reasoningEffort) } as CSSProperties}>{effortLabel}</span>
+          )}
+          {modelAvatar ? <ChevronDown aria-hidden="true" className="composer-model-chevron" /> : null}
+        </button>
         {model ? <ContextProgressBar contextUsage={contextUsage} /> : null}
         {openMenu === 'model' && (
           <ComposerMenuSurface
             align="end"
-            className="w-[13.5rem] rounded-xl border border-stone-700 bg-stone-900 p-1.5 shadow-2xl shadow-stone-950/40"
+            className="composer-model-menu w-[min(19rem,calc(100vw-2rem))] rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-1.5 text-[var(--theme-fg)] shadow-xl"
           >
-            <button
-              type="button"
-              onClick={() => setSettingsSection('model')}
-              className={`${menuItemClassName} flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-stone-300`}
-            >
-              <span>Model</span>
-              <span className="flex min-w-0 items-center gap-1 text-stone-500">
-                <span className="max-w-[7rem] truncate">
-                  {selectedModelLabel}
+            <p className="composer-model-menu-heading flex items-baseline justify-between gap-3 px-2 py-1 text-xs text-[var(--theme-fg-muted)]">
+              <span>{translate('chat.model')}</span>
+              {/* While a turn runs, say when a change takes effect. */}
+              {queueing ? (
+                <span className="composer-model-menu-note text-[11px]">
+                  {translate(liveModelSwitch ? 'chat.modelSwitchNextCall' : 'chat.modelSwitchNextTurn')}
                 </span>
-                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+              ) : null}
+            </p>
+            {modelOptions.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={entry.model === model}
+                disabled={modelControlsDisabled || settingsBusy}
+                onClick={() =>
+                  onUpdateSettings({
+                    model: entry.model,
+                    reasoningEffort: entry.defaultReasoningEffort ?? null,
+                  })
+                }
+                className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-[var(--theme-hover)] disabled:cursor-not-allowed"
+              >
+                <span>{entry.displayName}</span>
+                {entry.model === model && (
+                  <Check size={14} className="shrink-0" />
+                )}
+              </button>
+            ))}
+            {supportedEfforts.length > 0 && (
+              <ComposerReasoningSlider
+                key={model}
+                efforts={supportedEfforts}
+                effort={reasoningEffort}
+                defaultEffort={
+                  modelOptions.find((entry) => entry.model === model)
+                    ?.defaultReasoningEffort
+                }
+                disabled={effortControlsDisabled || settingsBusy}
+                onCommit={(next) => onUpdateSettings({ reasoningEffort: next })}
+              />
+            )}
+            {hasContext ? <div className="composer-context-summary" title={modelContextTitle}>
+              <span>{translate('chat.context')}</span>
+              <span className="composer-context-value">
+                {contextUsage?.availability === 'available' && contextUsage.tokensInContextWindow != null && Number.isFinite(contextUsage.tokensInContextWindow)
+                  ? formatContextTokenKilocount(Math.max(0, contextUsage.tokensInContextWindow)).toUpperCase() : '—'}
+                <span className="composer-context-separator"> / </span>
+                {contextUsage?.modelContextWindow != null && Number.isFinite(contextUsage.modelContextWindow) && contextUsage.modelContextWindow > 0
+                  ? formatContextTokenKilocount(contextUsage.modelContextWindow).toUpperCase() : '—'}
               </span>
-            </button>
-            <button
-              type="button"
-              disabled={effortControlsDisabled}
-              title={effortControlTitle}
-              onClick={() => setSettingsSection('effort')}
-              className={`${menuItemClassName} flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-stone-300 disabled:cursor-not-allowed disabled:text-stone-600`}
-            >
-              <span>Effort</span>
-              <span className="flex items-center gap-1 text-stone-500">
-                {formatReasoningEffortLabel(reasoningEffort)}
-                <ChevronRight className="h-3.5 w-3.5" />
-              </span>
-            </button>
-
-            {settingsSection === 'model' ? (
-              <div className="mt-1 w-full overflow-hidden border-t border-stone-700 bg-stone-900 p-1.5">
-                <p className="px-3 py-1.5 text-xs text-stone-500">Model</p>
-                <div className="max-h-72 overflow-auto">
-                  {modelOptions.map((entry) => {
-                    const selected = entry.model === model;
-                    return (
-                      <button
-                        key={entry.id}
-                        type="button"
-                        onClick={() => {
-                          const nextEffort =
-                            reasoningEffort &&
-                            entry.supportedReasoningEfforts.some(
-                              (effort) =>
-                                effort.reasoningEffort === reasoningEffort,
-                            )
-                              ? reasoningEffort
-                              : entry.defaultReasoningEffort;
-                          onUpdateSettings({
-                            model: entry.model,
-                            reasoningEffort: nextEffort,
-                          });
-                          onSetOpenMenu(() => null);
-                        }}
-                        className={`${menuItemClassName} flex w-full items-center justify-between rounded-lg px-3 py-2 text-left ${
-                          selected ? 'ui-status-warning' : 'text-stone-300'
-                        }`}
-                      >
-                        <span className="truncate text-sm font-medium">
-                          {entry.displayName || entry.model}
-                        </span>
-                        {selected ? (
-                          <Check className="h-3.5 w-3.5 shrink-0" />
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
-
-            {settingsSection === 'effort' ? (
-              <div className="mt-1 w-full overflow-hidden border-t border-stone-700 bg-stone-900 p-1.5">
-                <p className="px-3 py-1.5 text-xs text-stone-500">Effort</p>
-                {supportedEfforts.map((entry) => {
-                  const selected = entry.reasoningEffort === reasoningEffort;
-                  return (
-                    <button
-                      key={entry.reasoningEffort}
-                      type="button"
-                      onClick={() => {
-                        onUpdateSettings({
-                          reasoningEffort: entry.reasoningEffort,
-                        });
-                        onSetOpenMenu(() => null);
-                      }}
-                      className={`${menuItemClassName} flex w-full items-center justify-between rounded-lg px-3 py-2 text-left ${
-                        selected ? 'ui-status-warning' : 'text-stone-300'
-                      }`}
-                    >
-                      <span className="text-sm font-medium">
-                        {formatReasoningEffortLabel(entry.reasoningEffort)}
-                      </span>
-                      {selected ? <Check className="h-3.5 w-3.5" /> : null}
-                    </button>
-                  );
-                })}
-                {supportedEfforts.some(
-                  (entry) => entry.reasoningEffort === 'ultra',
-                ) ? (
-                  <p className="px-3 pb-1 pt-2 text-xs leading-4 text-stone-500">
-                    Higher effort can consume usage limits faster.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-            <div className="mt-1 border-t border-[var(--theme-border)] px-3 py-2 text-xs leading-5 text-[var(--theme-fg-muted)]" aria-label="Context usage">
-              {modelContextTitle}
-            </div>
+            </div> : null}
           </ComposerMenuSurface>
         )}
       </div>
 
-      {sandboxModeAvailable && (
-        <div className="relative">
-          <InputGroupButton
-            type="button"
-            variant="ghost"
-            size="xs"
-            data-composer-menu-trigger="true"
-            aria-haspopup="menu"
-            aria-expanded={openMenu === 'sandbox'}
-            aria-label={`Sandbox: ${formatSandboxModeLabel(sandboxMode)}`}
-            disabled={settingsBusy}
-            onClick={() =>
-              onSetOpenMenu((current) =>
-                current === 'sandbox' ? null : 'sandbox',
-              )
-            }
-            title={`Sandbox: ${formatSandboxModeLabel(sandboxMode)}`}
-            className={`${inlineToggleClassName} rounded-full px-2.5 text-stone-300 disabled:cursor-not-allowed disabled:text-stone-700`}
-          >
-            {formatSandboxModeCompactLabel(sandboxMode)}
-          </InputGroupButton>
-          {openMenu === 'sandbox' && (
-            <ComposerMenuSurface
-              align="end"
-              className="w-max min-w-[9rem] rounded-2xl border border-stone-700 bg-stone-900 shadow-2xl shadow-stone-950/40"
-            >
-              <div className="max-h-72 overflow-auto p-2">
-                {sandboxOptions.map((entry) => (
-                  <button
-                    key={entry.mode}
-                    type="button"
-                    onClick={() =>
-                      onUpdateSettings({
-                        sandboxMode: entry.mode,
-                      })
-                    }
-                    className={`block w-full rounded-xl px-3 py-2 text-left transition ${
-                      entry.mode === (sandboxMode ?? 'danger-full-access')
-                        ? 'ui-status-warning'
-                        : `${menuItemClassName} text-stone-300`
-                    }`}
-                  >
-                    <p className="text-sm font-medium">{entry.label}</p>
-                  </button>
-                ))}
-              </div>
-            </ComposerMenuSurface>
-          )}
-        </div>
-      )}
-
+      {beforeSend}
       <InputGroupButton
         type="submit"
         variant="default"
         size="icon-xs"
-        aria-label={goalComposeMode ? 'Set goal' : 'Send Prompt'}
-        title={sendButtonLabel}
+        data-send-intent={goalComposeMode ? 'goal' : sendLater ? 'queue' : 'send'}
+        data-empty={sendEmpty ? 'true' : undefined}
+        aria-label={sendIntentLabel}
+        aria-disabled={sendEmpty || undefined}
+        title={sendEmpty ? translate('chat.typeToSend') : sendLater || goalComposeMode ? sendIntentLabel : sendButtonLabel}
         disabled={goalBusy || (activeView === 'chat' ? disabled : false)}
         className={`${sendButtonBaseClassName} h-9 w-9 rounded-full text-sm font-medium disabled:cursor-not-allowed sm:h-8 sm:w-8 ${sendButtonClassName}`}
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          className="h-4 w-4 fill-none stroke-current"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M8 13V3" />
-          <path d="m4 7 4-4 4 4" />
-        </svg>
+        {goalComposeMode ? (
+          <Target aria-hidden="true" className="h-[18px] w-[18px]" strokeWidth={2.2} />
+        ) : sendLater ? (
+          <SendLaterIcon />
+        ) : intentIcons ? (
+          <Send aria-hidden="true" className="composer-send-plane h-[17px] w-[17px]" strokeWidth={2.2} />
+        ) : (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            className="h-4 w-4 fill-none stroke-current"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M8 13V3" />
+            <path d="m4 7 4-4 4 4" />
+          </svg>
+        )}
       </InputGroupButton>
     </>
   );

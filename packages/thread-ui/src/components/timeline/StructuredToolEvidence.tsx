@@ -1,4 +1,4 @@
-import { type RefObject } from "react";
+import { createContext, type RefObject } from "react";
 import type { ThreadHistoryItemDto } from "@remote-codex/shared";
 import type { ThreadTimelineAdapter } from "../../adapters";
 import { GraphChatMarkdownAwareBody } from "../graph-chat/GraphChatMessageBody";
@@ -9,6 +9,9 @@ import {
 } from "./structuredEvidence";
 import type { TimelineTurn } from "./timelineItems";
 import { StructuredUsageInline } from "./StructuredUsageInline";
+
+/** The status of the turn a structured evidence row belongs to. */
+export const TurnEvidenceStatusContext = createContext<TimelineTurn["status"] | undefined>(undefined);
 
 const labels = {
   queued: "Queued",
@@ -75,19 +78,16 @@ export function StructuredToolEvidence({
             <time dateTime={progress.completedAt}>{progress.completedAt}</time>
           </div>
         ) : null}
-        <section aria-label="Tool arguments">
+        {/* Only what the Agent reported; an omitted part has no placeholder. */}
+        {progress.arguments !== undefined ? <section aria-label="Tool arguments">
           <h4>Arguments</h4>
           <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs">
-            {progress.arguments === undefined
-              ? "Arguments unavailable"
-              : JSON.stringify(progress.arguments, null, 2)}
+            {JSON.stringify(progress.arguments, null, 2)}
           </pre>
-        </section>
-        <section aria-label="Tool result summary">
+        </section> : null}
+        {progress.resultSummary !== undefined ? <section aria-label="Tool result summary">
           <h4>Result summary</h4>
-          {progress.resultSummary === undefined ? (
-            <p>Result unavailable</p>
-          ) : (
+          {(
             <GraphChatMarkdownAwareBody
               text={progress.resultSummary}
               scrollRootRef={scrollRootRef}
@@ -99,13 +99,13 @@ export function StructuredToolEvidence({
               resolveHref={adapter?.resolveHref}
             />
           )}
-        </section>
-        <section aria-label="Tool log summary">
+        </section> : null}
+        {progress.logSummary != null ? <section aria-label="Tool log summary">
           <h4>Log summary</h4>
           <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs">
-            {progress.logSummary ?? "Logs unavailable"}
+            {progress.logSummary}
           </pre>
-        </section>
+        </section> : null}
         {progress.artifactIds?.length ? (
           <div className="break-words text-xs">
             Full artifacts: {progress.artifactIds.join(", ")}

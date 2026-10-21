@@ -110,6 +110,8 @@ export interface AgentProviderCapabilitiesDto {
     sandboxMode: boolean;
     performanceMode: boolean;
     goals: boolean;
+    /** A model or effort changed during a turn applies from its next model call; otherwise from the next turn. */
+    liveModelSwitch?: boolean;
   };
   management: {
     models: boolean;
@@ -370,9 +372,44 @@ export interface ThreadDto {
   lastTurnStartedAt: string | null;
   lastTurnCompletedAt: string | null;
   contextUsage?: ThreadContextUsageDto;
+  /** Immediate creator. Absent when a person started this thread. */
+  parentThreadId?: string | null;
+  /** Top-level ancestor; every thread in one delegation chain shares it. */
+  rootThreadId?: string | null;
+}
+
+export interface ThreadPeerWorkDto {
+  taskTurnId: string;
+  messages: Array<{
+    id: string;
+    fromThreadId?: string | null;
+    fromDeviceId?: string | null;
+    name?: string | null;
+    kind: 'question' | 'result';
+    subject?: string | null;
+    text?: string | null;
+    createdAt?: string | null;
+  }>;
+}
+
+/** Who sent a prompt when it was not the device owner, as the device recorded it. */
+export interface MessageSenderDto {
+  /** The sender's relay account ID. */
+  userId: string;
+  /** The account name the owner shared with, when the device knows it. */
+  name?: string | null;
 }
 
 export interface ThreadHistoryItemDto {
+  /** Set when storage cleanup removed this command's output or this edit's diff. */
+  outputPrunedAt?: string | null;
+  outputPrunedBytes?: number | null;
+  /** Set when storage cleanup shortened or removed this command's text. */
+  textPruned?: 'truncated' | 'removed' | null;
+  polishedReply?: PolishedReplyDto | null;
+  peerWork?: ThreadPeerWorkDto | null;
+  /** Set on prompts that someone other than the device owner sent. */
+  sender?: MessageSenderDto | null;
   id: string;
   kind:
     | 'userMessage'
@@ -398,6 +435,15 @@ export interface ThreadHistoryItemDto {
   sequence?: number | null;
   transcriptOrder?: number | null;
   sourceTurnId?: string | null;
+  origin?: string | null;
+  /** A harness notice's level (`origin: 'sessionNotice'`). */
+  severity?: 'info' | 'warning' | 'error' | null;
+  taskStatus?: string | null;
+  taskId?: string | null;
+  waitingStartedAt?: string | null;
+  awakenedAt?: string | null;
+  backgroundTaskCount?: number | null;
+  responsePhase?: 'commentary' | 'final' | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   status?: string | null;
@@ -420,6 +466,15 @@ export interface ThreadHistoryItemDto {
   extension?: import('./extensions.mjs').ExtensionEnvelope<unknown>;
   progress?: import('./extensions.mjs').StructuredProgress;
   usage?: import('./extensions.mjs').StructuredUsage;
+}
+
+export interface PolishedReplyDto {
+  text: string;
+  preset: string;
+  language: string;
+  model: string;
+  sourceHash: string;
+  createdAt: string;
 }
 
 export interface ThreadHistoryItemDetailDto {
@@ -478,6 +533,7 @@ export interface PluginMcpServerDto {
 }
 
 export interface PluginCapabilitiesDto {
+  actions?: string[];
   artifactTypes: PluginArtifactTypeDto[];
   timelineRenderers: string[];
   threadPanels: PluginThreadPanelDto[];
@@ -505,10 +561,17 @@ export interface PluginManifestDto {
 export interface PluginDto extends PluginManifestDto {
   enabled: boolean;
   source?: 'builtin' | 'imported' | null;
+  available?: boolean;
+  unavailableReasonCode?: string | null;
+  unavailableReason?: string | null;
+  /** Whether a conversation that follows the device has it on (absent from older Supervisors). */
+  defaultEnabled?: boolean;
 }
 
 export interface UpdatePluginInput {
-  enabled: boolean;
+  enabled?: boolean;
+  /** Whether conversations that follow the device have the plugin on. */
+  defaultEnabled?: boolean;
 }
 
 export interface ImportPluginInput {
@@ -522,6 +585,8 @@ export interface ThreadTurnTokenBreakdownDto {
   inputTokens: number;
   cachedInputTokens: number;
   cacheWriteInputTokens?: number;
+  /** One-hour subset of cacheWriteInputTokens. */
+  cacheWriteOneHourInputTokens?: number;
   outputTokens: number;
   reasoningOutputTokens: number;
 }
@@ -530,6 +595,45 @@ export interface ThreadTurnTokenUsageDto {
   total: ThreadTurnTokenBreakdownDto;
   last: ThreadTurnTokenBreakdownDto;
   modelContextWindow: number | null;
+  /** The models the turn's own agent called, in order; consecutive calls to
+      one model form a run, so a switch mid-turn shows as a second run. */
+  models?: { model: string; calls: number }[];
+  generationSpeed?: {
+    outputTokens: number;
+    llmTimeMs: number;
+    averageTokensPerSecond: number | null;
+    recentTokensPerSecond: number | null;
+    windowSeconds: number;
+    active: boolean;
+    state: 'llm' | 'tool';
+    measurement: 'usageIntervals';
+    outputTimeMs?: number;
+    averageOutputTokensPerSecond?: number | null;
+    latestOutputTokensPerSecond?: number | null;
+    latestOutputTimeMs?: number;
+    latestOutputMeasuredAt?: string | null;
+    /** How the split below was measured. Snapshots without it timed every
+        request, bursts included, and are not shown. */
+    splitMethod?: 'streamedRequests';
+    /** Model requests that produced output in the turn, streamed or not. */
+    llmRequests?: number;
+    /** Per model request that visibly streamed: the average wait for its first
+        output, including queueing, prefill and thinking that does not stream. */
+    firstTokenMs?: number | null;
+    firstTokenRequests?: number;
+    /** Requests whose reply arrived in one piece, left out of the split. */
+    burstRequests?: number;
+    /** Uncached input prefilled before the first output, and the cached rest. */
+    prefillTokens?: number;
+    prefillCachedTokens?: number;
+    prefillTokensPerSecond?: number | null;
+    /** Each request's own answer tokens (reasoning left out), over the time its
+        answer streamed. */
+    decodeTokens?: number;
+    decodeMs?: number;
+    decodeTokensPerSecond?: number | null;
+    updatedAt: string;
+  } | null;
 }
 
 export type ThreadTurnPricingTierDto = 'standard' | 'fast';
@@ -558,7 +662,42 @@ export interface ThreadTurnDto {
   priceEstimate?: ThreadTurnPriceEstimateDto | null;
   hasDeferredItems?: boolean | null;
   deferredItemCount?: number | null;
+  /** Operation counts of a summarized turn; present only with deferred items. */
+  activity?: ThreadTurnActivityDto | null;
   items: ThreadHistoryItemDto[];
+}
+
+export interface ThreadTurnActivityDto {
+  commands?: number;
+  fileChanges?: number;
+  changedFiles?: number;
+  addedLines?: number;
+  removedLines?: number;
+  reads?: number;
+  searches?: number;
+  tools?: number;
+  agents?: number;
+  reasoning?: number;
+  failed?: number;
+  /** Distinct changed paths. */
+  fileCount?: number;
+  /** Up to forty changed files, with the latest edit's item id. */
+  files?: ThreadTurnChangedFileDto[];
+  /** The same counts per stretch of operations, keyed by the conversation item after it. */
+  segments?: ThreadTurnActivitySegmentDto[];
+}
+
+export type ThreadTurnActivitySegmentDto = Omit<ThreadTurnActivityDto, 'files' | 'segments' | 'fileCount'> & {
+  before: string | null;
+  startedAt?: string;
+  endedAt?: string;
+};
+
+export interface ThreadTurnChangedFileDto {
+  path: string;
+  itemId: string;
+  addedLines?: number;
+  removedLines?: number;
 }
 
 export interface ThreadActionQuestionOptionDto {
@@ -787,6 +926,18 @@ export interface ThreadPendingSteerDto {
   prompt: string;
   delivery: "steer" | "continuation";
   createdAt: string;
+  /** Set when someone other than the device owner sent it. */
+  sender?: MessageSenderDto | null;
+}
+
+export interface ThreadSubagentDto {
+  id: string;
+  name: string | null;
+  status: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  parentToolCallId: string | null;
+  isBackground?: boolean;
 }
 
 export interface ThreadLiveItemsDto {
@@ -803,6 +954,7 @@ export interface ThreadDetailDto {
   totalTurnCount?: number;
   pendingRequests: ThreadActionRequestDto[];
   pendingSteers: ThreadPendingSteerDto[];
+  activeSubagents?: ThreadSubagentDto[];
   answeredRequestNotes?: ThreadAnsweredRequestNoteDto[];
   activityNotes?: ThreadActivityNoteDto[];
   goal?: ThreadGoalDto | null;
@@ -998,6 +1150,10 @@ export interface ThreadEventPayloadMap {
   };
   'thread.context.updated': {
     contextUsage: ThreadContextUsageDto;
+  };
+  'thread.subagents.updated': {
+    turnId: string;
+    activeSubagents: ThreadSubagentDto[];
   };
   'thread.goal.updated': {
     turnId?: string | null;

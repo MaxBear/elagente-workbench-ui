@@ -1,10 +1,14 @@
+import { translate, useI18n } from '../i18n';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import type { ImportPluginInput } from '@remote-codex/shared';
 import { usePlugins } from '../plugins/usePlugins';
+import { confirmAsync } from '../components/menu/confirmAsync';
 import { type ThemeMode, useAppShellNav } from './AppShellNavContext';
+import { PhoneHandChoice } from './PhoneHandChoice';
 
 function MenuIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4 fill-current">
       <path d="M2 3.25h12v1.5H2Zm0 4h12v1.5H2Zm0 4h12v1.5H2Z" />
@@ -13,6 +17,7 @@ function MenuIcon() {
 }
 
 function CloseIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4 fill-current">
       <path d="M3.22 2.47 8 7.25l4.78-4.78 1.06 1.06L9.06 8.31l4.78 4.78-1.06 1.06L8 9.37l-4.78 4.78-1.06-1.06 4.78-4.78-4.78-4.78 1.06-1.06Z" />
@@ -35,18 +40,18 @@ const themeOptions: Array<{
 }> = [
   {
     value: 'light',
-    label: 'Light',
-    description: 'Always use the bright theme.',
+    get label() { return translate("files.light"); },
+    get description() { return translate("files.alwaysUseTheBrightTheme"); },
   },
   {
     value: 'dark',
-    label: 'Dark',
-    description: 'Always use the dark theme.',
+    get label() { return translate("files.dark"); },
+    get description() { return translate("files.alwaysUseTheDarkTheme"); },
   },
   {
     value: 'system',
-    label: 'System',
-    description: 'Follow the operating system appearance.',
+    get label() { return translate("files.system"); },
+    get description() { return translate("files.followTheOperatingSystemAppearance"); },
   },
 ];
 
@@ -63,6 +68,7 @@ export interface AppShellNavigationMenuProps {
 }
 
 export function AppShellMenuButton({ className = '' }: { className?: string }) {
+  const { locale: i18nLocale } = useI18n();
   const shellNav = useAppShellNav();
 
   if (!shellNav) {
@@ -72,7 +78,7 @@ export function AppShellMenuButton({ className = '' }: { className?: string }) {
   return (
     <button
       type="button"
-      aria-label={shellNav.navOpen ? 'Close Navigation' : 'Open Navigation'}
+      aria-label={shellNav.navOpen ? translate("files.closeNavigation") : translate("files.openNavigation")}
       aria-expanded={shellNav.navOpen}
       aria-controls="app-shell-navigation-menu"
       onClick={shellNav.toggleNav}
@@ -86,9 +92,10 @@ export function AppShellMenuButton({ className = '' }: { className?: string }) {
 export function AppShellNavigationMenu({
   className = '',
   currentPath = '',
-  items = [{ label: 'Workspaces', href: '/workspaces' }],
+  items = [{ label: translate("files.workspaces"), href: '/workspaces' }],
   onNavigate,
 }: AppShellNavigationMenuProps) {
+  const { locale: i18nLocale } = useI18n();
   const shellNav = useAppShellNav();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -141,11 +148,10 @@ export function AppShellNavigationMenu({
     >
       <div>
         <p className="text-base font-semibold tracking-wide text-[var(--theme-accent-strong)]">
-          Remote Codex
+          Pockymoe
         </p>
         <p className="mt-1 text-xs uppercase tracking-[0.24em] text-[var(--theme-fg-muted)]">
-          Navigation
-        </p>
+          {translate("files.navigation")}</p>
       </div>
       <nav className="mt-4 flex flex-col gap-1.5 text-sm">
         {items.map((item) => {
@@ -173,8 +179,7 @@ export function AppShellNavigationMenu({
           onClick={shellNav.openSettings}
           className={menuItemClassName()}
         >
-          Settings
-        </button>
+          {translate("files.settings")}</button>
       </nav>
     </div>
   );
@@ -198,6 +203,7 @@ export function AppShellSettingsDialog({
   extraContent,
   importPluginInput = defaultImportPluginInput,
 }: AppShellSettingsDialogProps = {}) {
+  const { locale: i18nLocale } = useI18n();
   const shellNav = useAppShellNav();
   const plugins = usePlugins();
   const [pluginImportDraft, setPluginImportDraft] = useState('');
@@ -250,20 +256,20 @@ export function AppShellSettingsDialog({
       setPluginImportDraft('');
       setPluginImportState({
         busy: false,
-        message: 'Plugin imported.',
+        message: translate("files.pluginImported"),
         error: null,
       });
     } catch (error) {
       setPluginImportState({
         busy: false,
         message: null,
-        error: error instanceof Error ? error.message : 'Unable to import plugin.',
+        error: error instanceof Error ? error.message : translate("files.unableToImportPlugin"),
       });
     }
   }
 
   async function handleUninstallPlugin(pluginId: string, pluginName: string) {
-    const confirmed = window.confirm(`Uninstall ${pluginName}?`);
+    const confirmed = await confirmAsync({ title: translate('workbench.uninstallPluginTitle', { value1: pluginName }), description: translate('workbench.uninstallPluginBody'), confirmLabel: translate('workbench.uninstallPlugin') });
     if (!confirmed) {
       return;
     }
@@ -274,7 +280,7 @@ export function AppShellSettingsDialog({
       setPluginImportState({
         busy: false,
         message: null,
-        error: error instanceof Error ? error.message : 'Unable to uninstall plugin.',
+        error: error instanceof Error ? error.message : translate("files.unableToUninstallPlugin"),
       });
     }
   }
@@ -287,32 +293,29 @@ export function AppShellSettingsDialog({
     <div className="fixed inset-0 z-[70] flex items-start justify-center p-4 pt-[max(env(safe-area-inset-top),1rem)] sm:items-center">
       <button
         type="button"
-        aria-label="Close Settings"
+        aria-label={translate("files.closeSettings")}
         onClick={shellNav.closeSettings}
         className="ui-overlay-scrim absolute inset-0 backdrop-blur-sm"
       />
       <section
         role="dialog"
         aria-modal="true"
-        aria-label="Settings"
+        aria-label={translate("files.settings")}
         className="relative z-10 flex max-h-[calc(100vh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[1.8rem] border border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-2xl shadow-black/20"
       >
         <div className="shrink-0 p-5 pb-0">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-[var(--theme-fg-muted)]">
-                Settings
-              </p>
+                {translate("files.settings")}</p>
               <h2 className="mt-2 text-xl font-semibold text-[var(--theme-fg)]">
-                Settings
-              </h2>
+                {translate("files.settings")}</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--theme-fg-soft)]">
-                Manage appearance and thread UI plugins.
-              </p>
+                {translate("files.manageAppearanceAndThreadUIPlugins")}</p>
             </div>
             <button
               type="button"
-              aria-label="Close Settings"
+              aria-label={translate("files.closeSettings")}
               onClick={shellNav.closeSettings}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--theme-border-strong)] bg-[var(--theme-surface-strong)] text-[var(--theme-fg)] transition hover:border-[var(--theme-border-contrast)] hover:bg-[var(--theme-hover)]"
             >
@@ -325,9 +328,9 @@ export function AppShellSettingsDialog({
             <div className="rounded-[1.1rem] border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-[var(--theme-fg)]">Appearance</p>
+                  <p className="text-sm font-medium text-[var(--theme-fg)]">{translate("files.appearance")}</p>
                   <p className="mt-1 text-xs leading-5 text-[var(--theme-fg-muted)]">
-                    Choose light, dark, or follow the system setting. Active: {effectiveTheme}.
+                    {translate("files.chooseLightDarkOrFollowTheSystem")} {effectiveTheme}.
                   </p>
                 </div>
               </div>
@@ -351,8 +354,7 @@ export function AppShellSettingsDialog({
                         </span>
                         {active ? (
                           <span className="rounded-full border border-[var(--theme-accent-border)] bg-[var(--theme-accent-soft)] px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[var(--theme-accent-strong)]">
-                            Active
-                          </span>
+                            {translate("files.active")}</span>
                         ) : null}
                       </div>
                       <p className="mt-1 text-xs leading-5 text-[var(--theme-fg-muted)]">
@@ -364,16 +366,34 @@ export function AppShellSettingsDialog({
               </div>
             </div>
 
+            {shellNav?.setPhoneDock ? (
+              <div className="rounded-[1.1rem] border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[var(--theme-fg)]">{translate("workbench.phoneDockSetting")}</p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--theme-fg-muted)]">{translate("workbench.phoneDockSettingHint")}</p>
+                  </div>
+                  <label className="inline-flex min-h-10 shrink-0 items-center gap-2 text-xs font-medium text-[var(--theme-fg-soft)]">
+                    <input type="checkbox" checked={shellNav.phoneDock ?? true}
+                      onChange={(event) => shellNav.setPhoneDock?.(event.currentTarget.checked)}
+                      className="h-4 w-4 accent-[var(--theme-accent-solid)]" />
+                    <span>{translate("workbench.phoneDockSettingToggle")}</span>
+                  </label>
+                </div>
+                {shellNav.setPhoneHand && (shellNav.phoneDock ?? true) ? (
+                  <PhoneHandChoice hand={shellNav.phoneHand ?? 'right'} onChange={shellNav.setPhoneHand} />
+                ) : null}
+              </div>
+            ) : null}
+
             {shellNav?.setAutoCollapseCompletedTurns ? (
               <div className="rounded-[1.1rem] border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-3">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-[var(--theme-fg)]">
-                      Thread timeline
-                    </p>
+                      {translate("files.threadTimeline")}</p>
                     <p className="mt-1 text-xs leading-5 text-[var(--theme-fg-muted)]">
-                      Collapse completed turns into prompt, elapsed work, and final reply.
-                    </p>
+                      {translate("files.collapseCompletedTurnsIntoPromptElapsedWork")}</p>
                   </div>
                   <label className="inline-flex min-h-10 shrink-0 items-center gap-2 text-xs font-medium text-[var(--theme-fg-soft)]">
                     <input
@@ -386,7 +406,7 @@ export function AppShellSettingsDialog({
                       }
                       className="h-4 w-4 accent-[var(--theme-accent-solid)]"
                     />
-                    <span>Auto collapse</span>
+                    <span>{translate("files.autoCollapse")}</span>
                   </label>
                 </div>
               </div>
@@ -395,10 +415,9 @@ export function AppShellSettingsDialog({
             <div className="rounded-[1.1rem] border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-[var(--theme-fg)]">Plugins</p>
+                  <p className="text-sm font-medium text-[var(--theme-fg)]">{translate("files.plugins")}</p>
                   <p className="mt-1 text-xs leading-5 text-[var(--theme-fg-muted)]">
-                    Enable renderers and thread extensions loaded by this UI.
-                  </p>
+                    {translate("files.enableRenderersAndThreadExtensionsLoadedBy")}</p>
                 </div>
                 <button
                   type="button"
@@ -406,7 +425,7 @@ export function AppShellSettingsDialog({
                   disabled={plugins.loading}
                   className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface-strong)] px-3 py-1.5 text-xs font-medium text-[var(--theme-fg)] transition hover:bg-[var(--theme-hover)] disabled:cursor-not-allowed disabled:text-[var(--theme-fg-muted)]"
                 >
-                  {plugins.loading ? 'Loading...' : 'Refresh'}
+                  {plugins.loading ? translate("files.loading") : translate("files.refresh")}
                 </button>
               </div>
               <div className="mt-3 grid gap-2">
@@ -426,10 +445,10 @@ export function AppShellSettingsDialog({
                         {[
                           ...plugin.capabilities.artifactTypes.map((type) => type.type),
                           ...plugin.capabilities.threadPanels.map((panel) => panel.kind ?? panel.id),
-                        ].join(', ') || 'utility'}
+                        ].join(', ') || translate("files.utility")}
                       </span>
                       <span className="mt-1 block text-[10px] uppercase tracking-[0.16em] text-[var(--theme-fg-muted)]">
-                        {plugin.source === 'imported' ? 'Imported manifest' : 'Built-in module'}
+                        {plugin.source === 'imported' ? translate("files.importedManifest") : translate("files.builtInModule")}
                       </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-2">
@@ -439,11 +458,10 @@ export function AppShellSettingsDialog({
                           onClick={() => void handleUninstallPlugin(plugin.id, plugin.name)}
                           className="rounded-full border border-[var(--theme-border)] bg-[var(--theme-surface)] px-3 py-1.5 text-xs font-medium text-[var(--theme-fg)] transition hover:bg-[var(--theme-hover)]"
                         >
-                          Uninstall
-                        </button>
+                          {translate("files.uninstall")}</button>
                       ) : null}
                       <label className="sr-only" htmlFor={`plugin-toggle-${plugin.id}`}>
-                        Toggle {plugin.name}
+                        {translate("files.toggle")} {plugin.name}
                       </label>
                       <input
                         id={`plugin-toggle-${plugin.id}`}
@@ -459,14 +477,12 @@ export function AppShellSettingsDialog({
                 ))}
                 {plugins.plugins.length === 0 && (
                   <p className="rounded-[1rem] border border-[var(--theme-border)] bg-[var(--theme-surface-strong)] px-3 py-3 text-xs text-[var(--theme-fg-muted)]">
-                    No plugins are registered.
-                  </p>
+                    {translate("files.noPluginsAreRegistered")}</p>
                 )}
               </div>
               <div className="mt-3 border-t border-[var(--theme-border)] pt-3">
                 <label className="block text-xs font-medium text-[var(--theme-fg)]">
-                  Import plugin
-                </label>
+                  {translate("files.importPlugin")}</label>
                 <textarea
                   value={pluginImportDraft}
                   onChange={(event) => {
@@ -475,22 +491,20 @@ export function AppShellSettingsDialog({
                       setPluginImportState({ busy: false, message: null, error: null });
                     }
                   }}
-                  placeholder='Paste plugin.json or manifest URL'
+                  placeholder={translate("files.pastePluginJsonOrManifestURL")}
                   rows={4}
                   className="mt-2 min-h-28 w-full resize-y rounded-[0.9rem] border border-[var(--theme-border)] bg-[var(--theme-surface-strong)] px-3 py-2 font-mono text-xs leading-5 text-[var(--theme-fg)] outline-none transition placeholder:text-[var(--theme-fg-muted)] focus:border-[var(--theme-accent-border)]"
                 />
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="max-w-[42rem] text-xs leading-5 text-[var(--theme-fg-muted)]">
-                    Imports register manifest-declared artifact types. Rendering code still needs a
-                    trusted built-in frontend module.
-                  </p>
+                    {translate("files.importsRegisterManifestDeclaredArtifactTypesRendering")}</p>
                   <button
                     type="button"
                     onClick={() => void handleImportPlugin()}
                     disabled={!pluginImportDraft.trim() || pluginImportState.busy}
                     className="rounded-full border border-[var(--theme-accent-border)] bg-[var(--theme-accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--theme-accent-strong)] transition hover:bg-[var(--theme-hover)] disabled:cursor-not-allowed disabled:border-[var(--theme-border)] disabled:bg-[var(--theme-muted)] disabled:text-[var(--theme-fg-muted)]"
                   >
-                    {pluginImportState.busy ? 'Importing...' : 'Import'}
+                    {pluginImportState.busy ? translate("files.importing") : translate("files.import")}
                   </button>
                 </div>
                 {pluginImportState.error && (

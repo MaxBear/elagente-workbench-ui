@@ -56,7 +56,7 @@
 }
 
 .thread-ui-shell .thread-graph-editor-tabs {
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 .thread-ui-shell .thread-graph-editor-tab {
@@ -167,13 +167,24 @@
   container-type: inline-size;
 }
 
+/* Host directories of links outside the workspace: keep the path tail visible. */
+.thread-ui-shell .workspace-linked-directory-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  color: var(--theme-fg-soft);
+}
+.thread-ui-shell .workspace-linked-directory-label > bdi { direction: ltr; unicode-bidi: isolate; }
+
 .thread-ui-shell .thread-graph-tree-row:hover {
   --thread-graph-tree-row-background: var(--theme-hover);
   background: var(--theme-hover);
   color: var(--theme-fg);
 }
 
-.thread-ui-shell .thread-graph-tree-row:focus-within {
+.thread-ui-shell .thread-graph-tree-row:is(:focus-visible, :has(:focus-visible)) {
   --thread-graph-tree-row-background: var(--theme-hover);
   background: var(--theme-hover);
   color: var(--theme-fg);
@@ -202,7 +213,7 @@
   color: var(--theme-fg);
 }
 
-.thread-ui-shell .thread-graph-tree-row.is-focused {
+.thread-ui-shell .thread-graph-tree-row.is-focused:focus-visible {
   outline: 1px solid
     color-mix(in oklch, var(--theme-accent-solid) 68%, transparent);
   outline-offset: -1px;
@@ -226,12 +237,15 @@
 }
 
 .thread-ui-shell .thread-graph-tree-action {
+  width: 22px;
+  height: 22px;
+  background: color-mix(in srgb, var(--theme-panel) 55%, transparent);
   color: var(--theme-fg-muted);
 }
 
 .thread-ui-shell .thread-graph-tree-actions {
-  z-index: 1;
-  background: var(--thread-graph-tree-row-background);
+  margin-right: 3px;
+  background: transparent;
   opacity: 0;
   pointer-events: none;
   transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -239,7 +253,7 @@
 
 .thread-ui-shell .thread-graph-tree-row:hover .thread-graph-tree-actions,
 .thread-ui-shell
-  .thread-graph-tree-row:focus-within
+  .thread-graph-tree-row:is(:focus-visible, :has(:focus-visible))
   .thread-graph-tree-actions {
   opacity: 1;
   pointer-events: auto;
@@ -248,6 +262,12 @@
 .thread-ui-shell .thread-graph-tree-action:hover {
   background: var(--theme-surface-strong);
   color: var(--theme-fg);
+}
+
+.workspace-node-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border-radius: 4px; text-align: left; }
+.workspace-node-menu button:hover, .workspace-node-menu button:focus-visible { background: var(--theme-hover); }
+@media (hover: none) {
+  .thread-ui-shell .thread-graph-tree-actions { opacity: 1; pointer-events: auto; }
 }
 
 .thread-ui-shell .thread-graph-explorer-filter-mode button {
@@ -819,6 +839,7 @@
   height: auto;
   object-fit: contain;
 }
+
 
 .thread-graph-image-lightbox {
   position: fixed;
@@ -1786,7 +1807,6 @@
 .thread-ui-shell .thread-scroll-container {
   background: var(--theme-surface);
   color: var(--theme-fg);
-  scrollbar-color: var(--theme-border-strong) transparent;
 }
 
 .thread-ui-shell .thread-scroll-container > div > .divide-y {
@@ -2214,9 +2234,12 @@
   margin-top: 0.25rem;
 }
 
+/* A wide table scrolls sideways instead of squeezing short columns into one
+   character per line on phones. */
 .thread-ui-shell .thread-graph-markdown :where(table) {
   display: block;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
 }
@@ -2225,9 +2248,14 @@
   /* Preserve scientific numbers and labels; the table already scrolls. */
   overflow-wrap: normal;
   word-break: normal;
+  min-width: 4em;
   border: 1px solid var(--theme-border);
   padding: 0.4rem 0.55rem;
   text-align: left;
+}
+
+.thread-ui-shell .thread-graph-markdown :where(th) {
+  white-space: nowrap;
 }
 
 .thread-ui-shell .thread-graph-markdown :where(th) {
@@ -2236,6 +2264,14 @@
 }
 
 .thread-ui-shell .thread-graph-code-block {
+  /* Laid out here, not by host utility classes: every host gets the same block. */
+  position: relative;
+  margin: 12px 0;
+  border: 1px solid;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
   border-color: rgb(226 232 240);
   background: rgb(248 250 252);
   color: rgb(31 41 55);
@@ -2256,7 +2292,20 @@
   color: inherit;
 }
 
+.thread-ui-shell .thread-graph-code-scroll { overflow-x: auto; padding: 10px 12px; }
+.thread-ui-shell .thread-graph-code-scroll pre { white-space: pre; }
+/* Copy floats over the code's top-right corner on a translucent chip; it takes
+   no room of its own. */
 .thread-ui-shell .thread-graph-code-copy {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   background: rgb(255 255 255 / 0.72);
   color: rgb(51 65 85);
   box-shadow: 0 4px 12px rgb(15 23 42 / 0.08);
@@ -2387,27 +2436,7 @@
     font-size: 0.625rem;
   }
 
-  .thread-ui-shell
-    :where(.thread-graph-message-status, .thread-graph-tool-badge)
-    .thread-graph-status-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
 
-  .thread-ui-shell
-    :where(.thread-graph-message-status, .thread-graph-tool-badge) {
-    min-width: 1.45rem;
-    justify-content: center;
-    padding-left: 0.25rem !important;
-    padding-right: 0.25rem !important;
-  }
 }
 
 @media (min-width: 640px) {
@@ -2500,8 +2529,17 @@
 }
 
 .thread-ui-shell .thread-graph-message-leading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 0.6rem;
 }
+
+.thread-message-presentation { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 2px; border: 1px solid var(--theme-border); border-radius: 8px; font-size: 12px; }
+.thread-message-presentation button { min-height: 28px; padding: 3px 9px; border-radius: 5px; color: var(--theme-fg-muted); }
+.thread-message-presentation button[aria-pressed='true'] { background: var(--theme-panel); color: var(--theme-accent-strong); }
+.thread-message-presentation button:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: 1px; }
 
 .thread-ui-shell .thread-graph-message-copy {
   height: 1.75rem;
@@ -2567,7 +2605,7 @@
     .thread-graph-message-bubble.is-assistant:hover
     .thread-graph-message-time-popover,
   .thread-ui-shell
-    .thread-graph-message-bubble.is-assistant:focus-within
+    .thread-graph-message-bubble.is-assistant:is(:focus-visible, :has(:focus-visible))
     .thread-graph-message-time-popover {
     opacity: 1;
     transform: translateY(0);
@@ -3047,47 +3085,354 @@
 .thread-ui-shell .thread-graph-message-time-row { margin: 0; line-height: 10px; }
 .thread-ui-shell .thread-graph-message-time-row.is-user { text-align: right; }
 .thread-ui-shell .thread-graph-message-time-row .thread-graph-message-time { font-size: 10px; line-height: 10px; color: var(--theme-fg-muted); opacity: .65; }
+/* A message's time and copy float at its bottom right when it is hovered or tapped,
+   never moving the text. A fade of the message's own surface behind them keeps
+   them readable over the text they cover. */
 .thread-ui-shell .thread-graph-message-bubble .thread-graph-message-copy-desktop {
-  display: flex; position: absolute; left: auto; right: 0; bottom: 0; z-index: 10;
+  display: flex; align-items: center; position: absolute; left: auto; right: 0; bottom: 0; z-index: 10;
+  padding-left: 26px;
+  background: linear-gradient(to right, transparent, var(--message-surface, var(--theme-bg)) 22px);
   opacity: 0; pointer-events: none; transition: opacity 140ms ease;
 }
-/* The code target must sit above the reply-copy control when a reply ends in code. */
+.thread-ui-shell .thread-graph-message-bubble .thread-graph-message-copy-desktop > * { opacity: 0.7; transition: opacity 120ms ease; }
+.thread-ui-shell .thread-graph-message-bubble .thread-graph-message-copy-desktop > :is(:hover, :focus-visible) { opacity: 1; }
+/* ElAgente (G01): the code copy target sits above the reply-copy control when a reply ends in code. */
 .thread-ui-shell .thread-graph-code-copy { opacity: 0; pointer-events: none; z-index: 11; transition: opacity 140ms ease; }
-.thread-ui-shell .thread-graph-message-bubble[data-touch-actions="true"] .thread-graph-message-copy-desktop,
-.thread-ui-shell .thread-graph-code-block[data-touch-actions="true"] .thread-graph-code-copy {
-  opacity: .6; pointer-events: auto;
-}
+.thread-ui-shell .thread-graph-message-bubble[data-touch-actions="true"] .thread-graph-message-copy-desktop { opacity: 1; pointer-events: auto; }
+.thread-ui-shell .thread-graph-code-block[data-touch-actions="true"] .thread-graph-code-copy { opacity: .6; pointer-events: auto; }
+/* Keyboard access also works on devices whose primary pointer is touch. */
+.thread-ui-shell .thread-graph-message-bubble:has(:focus-visible) .thread-graph-message-copy-desktop { opacity: 1; pointer-events: auto; }
+.thread-ui-shell .thread-graph-code-block:has(:focus-visible) .thread-graph-code-copy { opacity: .6; pointer-events: auto; }
 @media (hover: hover) and (pointer: fine) {
-  /* A pointer click can hit-test before moving the mouse to trigger :hover. */
-  .thread-ui-shell .thread-graph-code-copy { pointer-events: auto; }
-  .thread-ui-shell .thread-graph-message-bubble:hover .thread-graph-message-copy-desktop,
-  .thread-ui-shell .thread-graph-message-bubble:focus-within .thread-graph-message-copy-desktop,
-  .thread-ui-shell .thread-graph-code-block:hover .thread-graph-code-copy,
-  .thread-ui-shell .thread-graph-code-block:focus-within .thread-graph-code-copy { opacity: .6; pointer-events: auto; }
+  .thread-ui-shell .thread-graph-message-bubble:hover .thread-graph-message-copy-desktop { opacity: 1; pointer-events: auto; }
+  .thread-ui-shell .thread-graph-code-block:hover .thread-graph-code-copy { opacity: .6; pointer-events: auto; }
+}
+/* Without hover the copy chip stays, faint, over the corner; it is fully drawn
+   while pressed or after a tap on the block. */
+@media (hover: none) {
+  .thread-ui-shell .thread-graph-code-copy { opacity: .45; pointer-events: auto; }
+  .thread-ui-shell .thread-graph-code-copy:active { opacity: 1; }
+}
+/* With room left of a prompt's bubble, its time and copy sit there, level with
+   its last line, covering nothing. */
+.thread-ui-shell .thread-graph-message-bubble.is-user[data-actions-beside] .thread-graph-message-copy-desktop {
+  right: 100%; padding: 0 6px 0 0; background: none;
+}
+/* The failure mark stays above the actions, so it can always be pressed. */
+.thread-ui-shell .thread-graph-message-bubble .thread-graph-message-failure { position: relative; z-index: 11; }
+/* The surface the fade blends into: the prompt bubble's own color, else the page. */
+.thread-ui-shell .thread-graph-message-bubble.is-user { --message-surface: oklch(0.925 0.004 255); }
+.thread-ui-shell.thread-ui-theme-dark .thread-graph-message-bubble.is-user,
+.thread-ui-shell[data-theme-effective="dark"] .thread-graph-message-bubble.is-user,
+.thread-ui-shell.dark .thread-graph-message-bubble.is-user { --message-surface: oklch(0.265 0.005 255); }
+
+/* A prompt's failure mark sits after its text: beside a short line, else under its right end. */
+.thread-ui-shell .thread-graph-message-bubble.is-user {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: flex-end; column-gap: 8px;
+}
+.thread-ui-shell .thread-graph-message-bubble.is-user > .thread-graph-message-content { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+
+/* A failed turn's prompt carries a red mark; tapping it shows the error under the prompt. */
+.thread-ui-shell .thread-graph-message-failure {
+  display: inline-flex; flex: none; align-items: center; justify-content: center;
+  width: 1.25rem; height: 1.25rem; padding: 0; border: 0; border-radius: 999px; background: none;
+  color: var(--theme-danger, #e5484d);
+}
+.thread-ui-shell .thread-graph-message-failure svg { width: 17px; height: 17px; }
+.thread-ui-shell .thread-graph-message-failure:focus-visible { outline: 2px solid var(--theme-danger, #e5484d); outline-offset: 1px; }
+.thread-ui-shell .thread-graph-message-failure-detail {
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--theme-danger, #e5484d) 32%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--theme-danger, #e5484d) 7%, transparent);
+  color: var(--theme-fg);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+}
+.thread-ui-shell .thread-graph-message-failure-detail strong { display: block; color: var(--theme-danger, #e5484d); font-size: 12px; font-weight: 600; }
+.thread-ui-shell .thread-graph-message-failure-detail p { margin: 2px 0 0; overflow-wrap: anywhere; }
+.thread-ui-shell .thread-graph-message-failure-detail pre {
+  max-height: 9rem; margin: 6px 0 0; overflow: auto;
+  color: var(--theme-fg-muted); font-size: 11px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 
 .thread-ui-shell .thread-graph-message-time-row + .thread-graph-message-bubble.is-assistant { padding-top: 0; }
 
-.thread-workspace-link-menu { position:fixed; z-index:120; min-width:180px; padding:4px; border:1px solid #49473e; border-radius:9px; background:#25241e; color:#e9e7df; box-shadow:0 8px 24px #0005; font-size:13px; }
-.thread-workspace-link-menu button { display:block; width:100%; border-radius:5px; padding:7px 10px; text-align:left; }
-.thread-workspace-link-menu button:hover,.thread-workspace-link-menu button:focus-visible { background:#3b392e; outline:none; }
+/* A prompt someone other than the device owner sent: an initial on the bubble's corner. */
+.thread-ui-shell .thread-graph-message-sender {
+  position: absolute; top: -7px; left: -7px; z-index: 2;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0;
+  border: 1.5px solid var(--theme-bg, #fff); border-radius: 999px;
+  background: oklch(0.6 0.12 var(--sender-hue, 250)); color: #fff;
+  font-size: 10px; font-weight: 600; line-height: 1; cursor: pointer;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+  transition: transform 120ms ease;
+}
+.thread-ui-shell .thread-graph-message-sender:hover { transform: scale(1.08); }
+.thread-ui-shell .thread-graph-message-sender:focus-visible { outline: 2px solid var(--theme-accent-ring, oklch(0.6 0.12 var(--sender-hue, 250))); outline-offset: 1px; }
+.thread-message-sender-card {
+  position: fixed; z-index: 130; box-sizing: border-box; min-width: 150px;
+  padding: 8px 10px; border: 1px solid var(--theme-border, #d4d4d4); border-radius: 10px;
+  background: var(--theme-panel, #fff); color: var(--theme-fg, #222);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.16); font-size: 12.5px; line-height: 1.4;
+  animation: thread-message-sender-in 120ms ease-out;
+}
+.thread-message-sender-card-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.thread-message-sender-card-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.thread-message-sender-avatar {
+  display: inline-flex; flex: none; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 999px;
+  background: oklch(0.6 0.12 var(--sender-hue, 250)); color: #fff; font-size: 11px; font-weight: 600;
+}
+.thread-message-sender-card p { margin: 4px 0 0; color: var(--theme-fg-muted, #666); font-size: 11.5px; }
+.thread-message-sender-card code {
+  display: block; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--theme-fg-muted, #666); font-size: 10.5px;
+}
+@keyframes thread-message-sender-in { from { opacity: 0; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) {
+  .thread-message-sender-card { animation: none; }
+  .thread-ui-shell .thread-graph-message-sender { transition: none; }
+}
+
+/* A file link's menu wears the theme like the other menus. */
+.thread-workspace-link-menu { position:fixed; z-index:120; min-width:180px; padding:4px; border:1px solid var(--theme-border-strong); border-radius:9px; background:var(--theme-panel); color:var(--theme-fg); box-shadow:0 8px 24px rgb(0 0 0 / 22%); font-size:13px; }
+.thread-workspace-link-menu button { display:flex; align-items:center; gap:8px; width:100%; min-height:36px; border-radius:6px; padding:0 10px; text-align:left; }
+.thread-workspace-link-menu button svg { width:14px; height:14px; flex:none; }
+.thread-workspace-link-menu button:hover,.thread-workspace-link-menu button:focus-visible { background:var(--theme-hover); outline:none; }
+.thread-workspace-link-menu [data-copy-state='copied'] svg { color:var(--theme-accent-solid); }
+.thread-workspace-link-menu [data-copy-state='failed'] { color:var(--theme-danger, #e5484d); }
+/* A long press opens the app's own menu, not the system's link callout. */
+[data-file-link] { -webkit-touch-callout: none; }
 html[data-theme-effective="light"] .thread-workspace-link-menu { background:#f3f5f5; color:#24292c; border-color:#c8cecd; }
 html[data-theme-effective="light"] .thread-workspace-link-menu button:hover,html[data-theme-effective="light"] .thread-workspace-link-menu button:focus-visible { background:#e0e6e5; }
 @keyframes thread-operation-sheen { from { background-position:150% 0; } to { background-position:-150% 0; } }
+/* Quiet, single-line disclosures. Text never competes with a boxed icon or a full date. */
+.thread-ui-shell .thread-graph-history-group.is-compact-group {
+  min-width: 0;
+  width: 100%;
+  min-height: 0;
+  padding: 2px 0;
+}
+.thread-ui-shell .is-compact-group > .thread-graph-history-group-card { width: 100%; }
+.thread-ui-shell .is-compact-group > .thread-graph-history-group-card > .thread-graph-history-group-toggle {
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 32px;
+  padding: 2px 0;
+}
+.thread-ui-shell .is-compact-group .thread-graph-history-group-inline-icon {
+  display: inline-flex;
+  flex: 0 0 14px;
+  align-items: center;
+  color: var(--theme-fg-muted);
+}
+.thread-ui-shell .is-compact-group .thread-graph-history-group-inline-icon svg { width: 14px; height: 14px; }
+.thread-ui-shell .is-compact-group .thread-graph-history-group-summary {
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.thread-ui-shell .is-compact-group .thread-graph-history-group-summary > span {
+  white-space: nowrap;
+  font-size: 11px;
+}
+.thread-ui-shell .is-compact-group .thread-graph-history-group-stats {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+.thread-ui-shell .is-compact-group .thread-graph-history-group-stats .thread-graph-history-delta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.thread-ui-shell .is-compact-group .thread-graph-history-group-time {
+  min-width: 0;
+  max-width: 8rem;
+  margin-left: auto;
+  flex: 0 1 auto;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.thread-ui-shell .is-compact-group .thread-graph-history-group-time > .thread-graph-relative-time {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0;
+  background: transparent;
+}
+.thread-ui-shell .is-compact-group.is-plain-group > .thread-graph-history-group-card > .thread-graph-history-group-toggle { gap: 8px; }
+.thread-ui-shell .is-compact-group.is-plain-group > .thread-graph-history-group-card > button > .thread-graph-history-group-summary > span {
+  color: var(--theme-fg-muted);
+  font-size: 12px;
+}
+.thread-ui-shell .is-plain-group > .thread-graph-history-group-card > button > .thread-graph-history-group-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 0;
+  font-size: 11px;
+}
+.thread-ui-shell .is-plain-group > .thread-graph-history-group-card > button > .thread-graph-history-group-time::before { content: '·'; opacity: .55; }
+.thread-ui-shell .is-compact-group > .thread-graph-history-group-card > .thread-graph-history-group-list {
+  margin: 2px 0 0 6px;
+  padding: 0 0 0 8px;
+  border-top: 0;
+  border-left: 1px solid var(--theme-border);
+}
+/* A step batch owns its nested tools and subgroups. Keep this level visibly
+   indented and avoid utility spacing between the compact child rows. */
+.thread-ui-shell .thread-graph-history-group-activity > .thread-graph-history-group-card > .thread-graph-history-group-list {
+  margin: 0 0 2px 6px;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--theme-border-strong);
+}
+.thread-ui-shell .thread-graph-history-group-activity > .thread-graph-history-group-card > .thread-graph-history-group-list > * {
+  margin-block: 0;
+}
+.matter-step-file-summary { display: flex; flex: 1; min-width: 0; align-items: center; gap: 6px; }
+.matter-command-step > .thread-graph-relative-time { max-width: 6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
 .is-running-batch .thread-graph-history-group-verb,.is-running-batch .thread-graph-history-group-description { background-image:linear-gradient(105deg,var(--theme-fg-muted) 35%,var(--theme-fg) 50%,var(--theme-fg-muted) 65%); background-size:250% 100%; background-clip:text; -webkit-background-clip:text; color:transparent; animation:thread-operation-sheen 2.4s linear infinite; }
 @media(prefers-reduced-motion:reduce) { .is-running-batch .thread-graph-history-group-verb,.is-running-batch .thread-graph-history-group-description { animation:none; color:var(--theme-fg); background:none; } }
 
-/* Reserve row action space so file labels remain clickable in narrow panes. */
-.thread-ui-shell .thread-graph-tree-actions {
-  position: static;
-  flex-shrink: 0;
-  align-self: stretch;
+.thread-ui-shell .thread-graph-turn-footer { flex-wrap: nowrap; gap: 8px; }
+.thread-ui-shell .thread-graph-turn-footer-runtime { flex: 1 1 0; flex-wrap: nowrap; align-items: center; gap: 6px; }
+.thread-ui-shell .thread-graph-turn-footer-runtime > :first-child { flex-shrink: 0; }
+.thread-ui-shell .thread-graph-turn-footer .thread-turn-usage { flex: 1; flex-wrap: nowrap; gap: 6px; }
+.thread-ui-shell .thread-graph-turn-footer .thread-turn-usage-model { display: flex; flex: 1 1 auto; white-space: nowrap; overflow: hidden; }
+.thread-ui-shell .thread-graph-turn-footer .thread-turn-usage-model-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.thread-ui-shell .thread-graph-turn-footer .thread-turn-usage-effort { flex-shrink: 0; }
+.thread-ui-shell .thread-graph-turn-footer-meta { flex: none; }
+@media (max-width: 639px) {
+  .thread-ui-shell .thread-graph-turn-footer .thread-turn-usage { font-size: .625rem; }
 }
-@media (hover: none) {
-  .thread-ui-shell .thread-graph-tree-actions { opacity: 1; pointer-events: auto; }
+
+/* Narrow trees keep a single menu instead of sacrificing the filename. */
+@container (max-width: 280px) {
+  .thread-ui-shell .workspace-node-quick-action { display: none; }
 }
-/* Narrow split panes keep labels readable; expanded Explorer reveals row actions. */
-.thread-ui-shell .thread-graph-workspace-explorer-pane { container-type: inline-size; }
-@container (max-width: 200px) {
-  .thread-graph-tree-actions { display: none; }
+@media (max-width: 639px) {
+  .thread-ui-shell .thread-graph-explorer-header { min-height: 48px; padding: 0 6px; }
+  .thread-ui-shell .thread-graph-explorer-icon-button,
+  .thread-ui-shell .thread-graph-explorer-collapse-button { width: 36px; height: 44px; }
+  .thread-ui-shell .thread-graph-tree-row { min-height: 44px; }
+  .thread-ui-shell .thread-graph-tree-actions { opacity: 1; }
+  .thread-ui-shell .thread-graph-tree-action { width: 32px; height: 36px; }
+  .thread-ui-shell .workspace-node-quick-action { display: none; }
+  .workspace-node-menu button { min-height: 44px; height: auto; white-space: normal; }
+  .thread-ui-shell .thread-graph-editor-tab { height: 44px; }
+  .thread-ui-shell .thread-graph-editor-tab-close { width: 32px; height: 40px; }
+  .thread-ui-shell .thread-graph-editor-tabs-action { height: 44px; }
+  .thread-ui-shell .thread-graph-editor-toolbar-button { width: 32px; height: 44px; }
+  .thread-ui-shell .thread-graph-workspace-tree-scroll { overscroll-behavior: contain; touch-action: pan-y; }
 }
+
+/* Task notifications share the quiet typography of intermediate steps. */
+.thread-ui-shell .thread-graph-event-generic .thread-graph-history-event-title,
+.thread-ui-shell .thread-graph-history-event-note,
+.thread-ui-shell .thread-graph-task-notice {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.thread-ui-shell .thread-graph-history-event-note {
+  color: var(--theme-fg-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.thread-ui-shell .thread-graph-task-notice { min-width: 0; padding: 2px 0; }
+.thread-ui-shell .thread-graph-task-notice-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.thread-ui-shell .thread-graph-task-notice-toggle {
+  display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;
+  min-height: 32px; border: 0; border-radius: 4px; background: transparent;
+  padding: 0; color: var(--theme-fg-muted); font: inherit; text-align: left;
+  cursor: pointer;
+}
+.thread-ui-shell .thread-graph-task-notice-toggle:hover { color: var(--theme-fg); }
+.thread-ui-shell .thread-graph-task-notice-toggle:focus-visible { outline: 1px solid var(--theme-border-contrast); outline-offset: 3px; }
+.thread-ui-shell .thread-graph-task-notice-icon { width: 12px; height: 12px; flex-shrink: 0; opacity: .8; }
+.thread-ui-shell .thread-graph-task-notice-label { flex-shrink: 0; }
+.thread-ui-shell .thread-graph-task-notice-preview { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-ui-shell .thread-graph-task-notice-preview::before { content: '·'; margin-right: 8px; opacity: .55; }
+.thread-ui-shell .thread-graph-task-notice-chevron { width: 12px; height: 12px; flex-shrink: 0; transition: transform 140ms ease; }
+.thread-ui-shell .thread-graph-task-notice-chevron.is-open { transform: rotate(90deg); }
+.thread-ui-shell .thread-graph-task-notice-time { flex: 0 0 auto; color: var(--theme-fg-muted); font-size: 11px; }
+.thread-ui-shell .thread-graph-task-notice-detail {
+  margin: 2px 0 8px 6px; padding: 4px 0 4px 10px; border-left: 1px solid var(--theme-border);
+  color: var(--theme-fg-soft); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.thread-ui-shell .thread-graph-task-notice-detail time { display: block; margin-top: 4px; color: var(--theme-fg-muted); font-size: 11px; }
+.thread-ui-shell .thread-graph-task-notice.is-failed .thread-graph-task-notice-label { color: var(--theme-danger, #ef6a75); }
+@media (max-width: 639px) { .thread-ui-shell .thread-graph-task-notice-toggle { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .thread-ui-shell .thread-graph-task-notice-chevron { transition: none; } }
+
+.workspace-image-preview { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; }
+.workspace-image-viewport { display: flex; flex: 1; min-height: 0; align-items: center; justify-content: center; padding: 20px; overflow: hidden; touch-action: none; }
+.workspace-image-viewport img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; cursor: grab; will-change: transform; }
+.workspace-image-viewport img.is-dragging { cursor: grabbing; }
+.workspace-image-controls { position: absolute; z-index: 1; left: 50%; top: 8px; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--theme-border); border-radius: 999px; background: color-mix(in srgb, var(--theme-panel) 78%, transparent); backdrop-filter: blur(12px); }
+.workspace-image-controls button { display: flex; align-items: center; justify-content: center; height: 28px; min-width: 28px; padding: 0 6px; border-radius: 999px; color: var(--theme-fg-soft); font-size: 10px; font-variant-numeric: tabular-nums; }
+.workspace-image-controls button:hover { background: var(--theme-hover); }
+.workspace-image-controls button:disabled { opacity: .35; }
+
+/* GitHub-style README layout, including inline badges and small heading icons. */
+.thread-ui-shell :is(.thread-graph-markdown-preview, .thread-graph-message-markdown) [align="center"] { text-align: center; }
+.thread-ui-shell :is(.thread-graph-markdown-preview, .thread-graph-message-markdown) [align="right"] { text-align: right; }
+.thread-ui-shell :is(.thread-graph-markdown-preview, .thread-graph-message-markdown) [align="left"] { text-align: left; }
+.thread-ui-shell :is(.thread-graph-markdown-preview, .thread-graph-message-markdown) :is([align], h1, h2, h3) .thread-graph-zoomable-image-trigger {
+  display: inline-flex;
+  vertical-align: middle;
+  margin: .15rem .2rem;
+}
+.thread-ui-shell :is(.thread-graph-markdown-preview, .thread-graph-message-markdown) :is([align], h1, h2, h3) img {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+  height: auto;
+  margin: .15rem .2rem;
+  border: 0;
+  background: transparent;
+}
+.thread-ui-shell :is(.thread-graph-markdown-preview, .thread-graph-message-markdown) details {
+  border: 1px solid var(--theme-border);
+  border-radius: .5rem;
+  padding: .6rem .8rem;
+  margin-block: .8rem;
+}
+.thread-ui-shell :is(.thread-graph-markdown-preview, .thread-graph-message-markdown) summary { cursor: pointer; font-weight: 500; }
+
+/* A harness warning or error notice keeps the generic frame but colors its icon. */
+.thread-ui-shell .thread-graph-session-notice.is-warning .thread-graph-history-event-icon { color: #d0921d; }
+.thread-ui-shell .thread-graph-session-notice.is-error .thread-graph-history-event-icon { color: var(--theme-danger, #e5484d); }
+.thread-ui-shell .thread-graph-message-bubble.is-user:has(> .thread-graph-message-failure):not([data-actions-beside]) .thread-graph-message-copy-desktop { right: 28px; }
+
+/* Words a search landed on, until the reader next presses, types or scrolls. */
+::highlight(thread-search-hit) {
+  background-color: color-mix(in srgb, #f5c542 55%, transparent);
+  color: inherit;
+}
+
+/* An ended turn with nothing recorded opens to say so, and why. */
+.thread-ui-shell .thread-graph-turn-empty-note {
+  margin: 0 0 4px 24px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--theme-border-strong);
+  color: var(--theme-fg-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.thread-ui-shell .thread-graph-turn-empty-reason { margin-top: 2px; color: var(--theme-fg-soft); }

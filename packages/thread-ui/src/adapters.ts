@@ -11,11 +11,42 @@ import type {
 import type { ReactNode } from 'react';
 import type { SendPromptInput } from './types';
 
+/**
+ * `thumbnail` asks for a small preview for inline chips. Supervisors without
+ * the variant answer with the original, so callers must not rely on its size.
+ */
+export type ThreadImageAssetVariant = 'thumbnail';
+
+/**
+ * What a page knows of another thread on its device, for naming it where it is
+ * linked (a task's sender, a sub-thread's parent). `workspaceLabel` may be absent
+ * while it is unknown.
+ */
+export interface ThreadLinkInfo {
+  title: string;
+  workspaceId?: string | null;
+  workspaceLabel?: string | null;
+}
+/**
+ * Looks up a thread of this device: its info, `null` when it is gone or the
+ * reader cannot open it, `undefined` while the page does not know yet.
+ */
+export type DescribeThread = (threadId: string) => ThreadLinkInfo | null | undefined;
+
 export interface ThreadTimelineAdapter {
+  resolveWorkspacePath?: (path: string) => Promise<boolean>;
   workspaceRootPath?: string | undefined;
-  getImageAssetUrl?: (input: { threadId: string; path: string }) => string;
+  getImageAssetUrl?: (input: {
+    threadId: string;
+    path: string;
+    variant?: ThreadImageAssetVariant;
+  }) => string;
   resolveHref?: (href: string) => string;
   onOpenLinkedThread?: (threadId: string) => void;
+  /** An address for a thread on this device, so links to it can open in a new tab. */
+  getThreadHref?: (threadId: string) => string;
+  /** Names linked threads by their titles instead of short IDs. */
+  describeThread?: DescribeThread;
   onOpenWorkspaceFile?: (input: { path: string; line?: number }) => void;
   cancelPendingSteer?: (
     threadId: string,
@@ -45,6 +76,14 @@ export interface ThreadWorkspaceTreeNode {
   path: string;
   kind: 'file' | 'directory';
   size?: number;
+  /** RFC 3339 times and permissions, for the explorer's Properties (newer devices). */
+  modifiedAt?: string;
+  createdAt?: string;
+  accessedAt?: string;
+  /** Unix permission bits such as "rw-r--r--". */
+  mode?: string;
+  readonly?: boolean;
+  symlink?: boolean;
   hasChildren?: boolean;
   childrenLoaded?: boolean;
   truncated?: boolean;
@@ -120,6 +159,12 @@ export interface ThreadWorkspaceAdapter {
   emptyTrash?: (input: {threadId: string; workspaceId?: string | null; expectedRevision: string; operationId?: string}) => Promise<void> | void;
   deleteFile?: (input: {threadId: string; workspaceId?: string | null; path: string}) => Promise<void> | void;
   moveFile?: (input: {threadId: string; workspaceId?: string | null; path: string; destination: string}) => Promise<void> | void;
+  /** Opaque owner/device source identity; must change when either changes. */
+  resourceScopeKey?: string;
+  readDocument?: (input: { threadId: string; workspaceId?: string | null; path: string; signal?: AbortSignal }) => Promise<WorkspaceDocumentSnapshot>;
+  saveDocument?: (input: WorkspaceDocumentSaveInput & { threadId: string; workspaceId?: string | null }) => Promise<WorkspaceSaveReceipt>;
+  getSaveOperation?: (input: { threadId: string; workspaceId?: string | null; operationId: string }) => Promise<WorkspaceSaveReceipt>;
+  textRangeRead?: boolean;
   /** Owner-only, read-only host files explicitly opened from a thread link. */
   statLinkedFile?: (input: { threadId: string; path: string }) => Promise<ThreadWorkspaceTreeNode>;
   listTree(input: {
@@ -139,8 +184,17 @@ export interface ThreadWorkspaceAdapter {
     workspaceId?: string | null;
     path: string;
   }) => string;
-  /** Authenticated bytes supplied by the host. No host filesystem access is implied. */
-  readRawFile?: (input: {threadId: string; workspaceId?: string | null; path: string; signal?: AbortSignal}) => Promise<Blob>;
+  /**
+   * File bytes through the authenticated (on a relay: encrypted) API. Previews
+   * that the browser would otherwise navigate to, such as PDF frames, use this:
+   * a frame or new tab on another origin bypasses the Web origin's transport.
+   */
+  readRawFile?: (input: {
+    threadId: string;
+    workspaceId?: string | null;
+    path: string;
+    signal?: AbortSignal;
+  }) => Promise<Blob>;
   uploadFile?: (input: {
     threadId: string;
     workspaceId?: string | null;
@@ -166,6 +220,10 @@ export interface ThreadWorkspaceAdapter {
     kind: 'file' | 'directory';
     format?: ThreadWorkspaceArchiveFormat;
   }) => Promise<void> | void;
+  renameNode?: (input: { threadId: string; workspaceId?: string | null; fromPath: string; toPath: string }) => Promise<void>;
+  /** Creates an empty file exclusively; an existing path must never be overwritten. */
+  createFile?: (input: { threadId: string; workspaceId?: string | null; path: string }) => Promise<{ path: string }>;
+  deleteNode?: (input: { threadId: string; workspaceId?: string | null; path: string }) => Promise<void>;
   listGarbage?: (input: {
     threadId: string;
     workspaceId?: string | null;
@@ -200,6 +258,11 @@ export interface ThreadShellAdapter {
 export interface ThreadDetailUiAdapter {
   openThread(threadId: string): void;
   getThreadHref?: (threadId: string) => string;
+  /**
+   * Names linked threads by their titles. With it, a sub-thread (one with a
+   * `parentThreadId`) shows a bar above its conversation that leads to its parent.
+   */
+  describeThread?: DescribeThread;
   getNewThreadHref?: (workspaceId?: string | null) => string;
   renderNewThreadDialogContent?: (input: {
     close: () => void;
@@ -226,8 +289,27 @@ export interface ThreadDetailUiAdapter {
   loadTurnDetail?: (
     turnId: string,
   ) => Promise<ThreadTurnDto> | ThreadTurnDto;
-  getImageAssetUrl?: (path: string) => string;
+  getImageAssetUrl?: (path: string, variant?: ThreadImageAssetVariant) => string;
   openWorkspaceFile?: (input: { path: string; line?: number }) => void;
   workspace?: ThreadWorkspaceAdapter | null;
   shell?: ThreadShellAdapter | null;
+}
+
+/** Safe small-file editing is an explicit capability, never a legacy PUT option. */
+export interface WorkspaceDocumentSnapshot {
+  path: string; name: string; language: string; workspaceRevision: string;
+  fileIdentity: string; contentHash: string | null; content: string | null;
+  size: number; encoding: string; bom: boolean; eol: string;
+  readOnlyReason: string | null; truncated: boolean;
+}
+export interface WorkspaceDocumentSaveInput {
+  path: string; workspaceRevision: string; fileIdentity: string;
+  expectedHash: string; content: string; draftRevision: number; operationId: string; operationCreatedAt: number;
+}
+export interface WorkspaceSaveReceipt {
+  status: 'pending' | 'saved' | 'conflict' | 'failedBeforeWrite' | 'uncertain';
+  operationId: string; draftRevision: number; path: string;
+  contentHash?: string; fileIdentity?: string; size?: number;
+  workspaceRevision?: string; encoding?: string; bom?: boolean; eol?: string;
+  snapshot?: WorkspaceDocumentSnapshot; code?: string; message?: string;
 }

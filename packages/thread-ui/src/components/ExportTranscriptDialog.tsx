@@ -1,6 +1,9 @@
+import { getLocale } from '../i18n';
+import { translate, useI18n } from '../i18n';
 import { Users, Link2, FileCode, Pencil } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useModalFocus } from './menu/useModalFocus';
 
 import type {
   ExportThreadTranscriptInput,
@@ -29,6 +32,7 @@ export interface CreateThreadShareInput {
 }
 
 export interface ThreadShareSummary {
+  trustContent?: ReactNode;
   scope?: 'thread' | 'device';
   id: string;
   targetUsername: string;
@@ -66,7 +70,7 @@ export interface ThreadActionsDialogProps {
 
 function formatTurnTime(value: string | null) {
   if (!value) {
-    return 'No time';
+    return translate("sharing.noTime");
   }
 
   const date = new Date(value);
@@ -74,7 +78,7 @@ function formatTurnTime(value: string | null) {
     return value;
   }
 
-  return date.toLocaleTimeString([], {
+  return date.toLocaleTimeString(getLocale(), {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -96,15 +100,15 @@ function statusLabel(status: ThreadExportTurnOptionDto['status']) {
 function turnSelectionLabel(mode: TurnSelectionMode) {
   switch (mode) {
     case 'latest-3':
-      return 'Latest 3';
+      return translate("sharing.latest3");
     case 'latest-10':
-      return 'Latest 10';
+      return translate("sharing.latest10");
     case 'latest-20':
-      return 'Latest 20';
+      return translate("sharing.latest20");
     case 'all-loaded':
-      return 'All loaded';
+      return translate("sharing.allLoaded");
     case 'custom':
-      return 'Custom';
+      return translate("sharing.custom");
   }
 }
 
@@ -122,18 +126,18 @@ function latestLimit(mode: TurnSelectionMode) {
 }
 
 function shareThreadAccessLabel(access: RelayThreadAccess | undefined) {
-  return access === 'read' ? 'View only' : 'Collaborator';
+  return access === 'read' ? translate("sharing.viewOnly") : translate("sharing.collaborator");
 }
 
 function shareWorkspaceAccessLabel(access: RelayWorkspaceAccess | undefined) {
   switch (access) {
     case 'write':
-      return 'Workspace write';
+      return translate("sharing.workspaceWrite");
     case 'read':
-      return 'Workspace read';
+      return translate("sharing.workspaceRead");
     case 'none':
     default:
-      return 'No workspace';
+      return translate("sharing.noWorkspace");
   }
 }
 
@@ -143,7 +147,7 @@ export function ThreadActionsDialog({
   busy = false,
   turnsState,
   shareAvailable = false,
-  shareUnavailableMessage = 'Relay sharing will be enabled after the relay permission model is connected.',
+  shareUnavailableMessage = translate("sharing.relaySharingWillBeEnabledAfterThe"),
   shareState,
   initialMode = 'html',
   onCancel,
@@ -154,6 +158,7 @@ export function ThreadActionsDialog({
   deviceShareAvailable = false,
   linkContent, onUpdateShare,
 }: ThreadActionsDialogProps) {
+  useI18n();
   const turns = useMemo(() => turnsState.data?.turns ?? [], [turnsState.data?.turns]);
   const [actionMode, setActionMode] = useState<ThreadActionMode>(initialMode);
   const [turnSelection, setTurnSelection] = useState<TurnSelectionMode>('latest-10');
@@ -195,20 +200,9 @@ export function ThreadActionsDialog({
     }
   }, [open, turns]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !busy) {
-        onCancel();
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [busy, onCancel, open]);
+  const windowRef = useRef<HTMLDivElement>(null);
+  // Focus moves into the window and stays there; Esc closes it unless busy.
+  useModalFocus(windowRef, open, busy ? undefined : onCancel);
 
   useEffect(() => {
     if (!open) {
@@ -313,13 +307,13 @@ export function ThreadActionsDialog({
   }
 
   const actionTabs: Array<{ mode: ThreadActionMode; label: string }> = [
-    { mode: 'share', label: 'People' },
-    ...(linkContent ? [{mode: 'link' as const, label: 'Share as link'}] : []),
+    { mode: 'share', label: translate("sharing.people") },
+    ...(linkContent ? [{mode: 'link' as const, label: translate("sharing.shareAsLink")}] : []),
     { mode: 'html', label: 'HTML' },
   ];
   const matter = appearance === 'matter';
-  const title = actionMode === 'link' ? 'Share read-only link' : actionMode === 'share' ? 'Sharing permissions' : 'Download HTML';
-  const description = actionMode === 'link' ? 'Choose what to share and whether it stays up to date.' : actionMode === 'share' ? 'Choose who can view or collaborate on this thread.' : 'Save a readable copy of your conversation.';
+  const title = actionMode === 'link' ? translate("sharing.shareReadOnlyLink") : actionMode === 'share' ? translate("sharing.sharingPermissions") : translate("sharing.downloadHTML");
+  const description = actionMode === 'link' ? translate("sharing.chooseWhatToShareAndWhetherIt") : actionMode === 'share' ? translate("sharing.chooseWhoCanViewOrCollaborateOn") : translate("sharing.saveAReadableCopyOfYourConversation");
 
   return createPortal(
     <div
@@ -328,27 +322,28 @@ export function ThreadActionsDialog({
     >
       <button
         type="button"
-        aria-label="Close thread actions"
+        aria-label={translate("sharing.closeThreadActions")}
         onClick={onCancel}
         disabled={busy}
         className="thread-export-dialog-backdrop absolute inset-0 backdrop-blur-sm disabled:cursor-not-allowed"
       />
       <div
+        ref={windowRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Thread actions"
+        aria-label={translate("sharing.threadActions")}
         className="thread-export-dialog-panel relative z-[1] flex max-h-[min(48rem,calc(100vh-1rem))] w-full max-w-2xl flex-col rounded-t-[1.6rem] border shadow-2xl sm:rounded-[1.6rem]"
       >
         <div className="thread-export-dialog-header flex items-start justify-between gap-3 border-b px-5 py-4">
           <div className="min-w-0">
-            <p className="thread-export-dialog-title text-sm font-semibold">{matter ? title : 'Share & export'}</p>
+            <p className="thread-export-dialog-title text-sm font-semibold">{matter ? title : translate("sharing.shareExport")}</p>
             <p className="thread-export-dialog-subtitle mt-1 text-xs">
-              {matter ? description : 'Manage access or save a copy.'}
+              {matter ? description : translate("sharing.manageAccessOrSaveACopy")}
             </p>
           </div>
           <button
             type="button"
-            aria-label="Close dialog"
+            aria-label={translate("sharing.closeDialog")}
             onClick={onCancel}
             disabled={busy}
             className="thread-export-dialog-icon-button inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60"
@@ -383,7 +378,7 @@ export function ThreadActionsDialog({
             <form id="thread-actions-share-form" className="mt-4 space-y-4" onSubmit={handleShare}>
               <div className="thread-export-dialog-box rounded-2xl border">
                 <div className="thread-export-dialog-box-header flex items-center justify-between border-b px-3 py-2.5">
-                  <p className="thread-export-dialog-strong text-sm font-medium">People with access</p>
+                  <p className="thread-export-dialog-strong text-sm font-medium">{translate("sharing.peopleWithAccess")}</p>
                   <span className="thread-export-dialog-status-pill rounded-full border px-2 py-0.5 text-[10px]">
                     {shareState?.shares.length ?? 0}
                   </span>
@@ -399,11 +394,12 @@ export function ThreadActionsDialog({
                             {share.targetUsername}
                           </p>
                           <p className="thread-export-dialog-subtitle mt-0.5 text-xs">
-                            {share.scope === 'device' ? 'Whole device · ' : ''}{share.label ? `${share.label} · ` : ''}
+                            {share.scope === 'device' ? translate("sharing.wholeDevice") : ''}{share.label ? `${share.label} · ` : ''}
                             {shareThreadAccessLabel(share.threadAccess)} / {shareWorkspaceAccessLabel(share.workspaceAccess)}
                           </p>
+                          {share.trustContent}
                         </div>
-                        {onUpdateShare && <button type="button" aria-label={`Edit permissions for ${share.targetUsername}`} className="thread-export-dialog-secondary-button ml-auto flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs" disabled={busy} onClick={() => {setEditingShare(share.id);setShareDevice(share.scope === 'device');setTargetIdentifier(share.targetUsername);setThreadAccess(share.threadAccess ?? 'read');setWorkspaceAccess(share.workspaceAccess ?? 'none');setShareLabel(share.label ?? '');}}><Pencil size={13}/>Edit</button>}
+                        {onUpdateShare && <button type="button" aria-label={translate("sharing.editPermissionsFor", { value1: share.targetUsername })} className="thread-export-dialog-secondary-button ml-auto flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs" disabled={busy} onClick={() => {setEditingShare(share.id);setShareDevice(share.scope === 'device');setTargetIdentifier(share.targetUsername);setThreadAccess(share.threadAccess ?? 'read');setWorkspaceAccess(share.workspaceAccess ?? 'none');setShareLabel(share.label ?? '');}}><Pencil size={13}/>{translate("sharing.edit")}</button>}
                         {onRevokeShare ? (
                           <button
                             type="button"
@@ -411,16 +407,14 @@ export function ThreadActionsDialog({
                             disabled={busy}
                             onClick={() => void onRevokeShare(share.id)}
                           >
-                            Revoke
-                          </button>
+                            {translate("sharing.revoke")}</button>
                         ) : null}
                       </div>
                     ))}
                   </div>
                 ) : (
                   <p className="thread-export-dialog-subtitle px-3 py-3 text-sm">
-                    No active shares for this thread.
-                  </p>
+                    {translate("sharing.noActiveSharesForThisThread")}</p>
                 )}
               </div>
 
@@ -432,29 +426,29 @@ export function ThreadActionsDialog({
               {shareAvailable && deviceShareAvailable ? (
                 <label className="matter-share-scope">
                   <input type="checkbox" checked={shareDevice} disabled={busy || Boolean(editingShare)} onChange={event => setShareDevice(event.target.checked)} />
-                  <span><strong>Share whole device</strong><small>{shareDevice ? 'Applies to all threads on this device, with the permissions below.' : 'Off: only this conversation is shared.'}</small></span>
+                  <span><strong>{translate("sharing.shareWholeDevice")}</strong><small>{shareDevice ? translate("sharing.appliesToAllThreadsOnThisDevice") : translate("sharing.offOnlyThisConversationIsShared")}</small></span>
                 </label>
               ) : null}
 
               <label className="thread-export-dialog-body-text block text-sm">
-                {editingShare ? 'Edit member permissions' : 'Invite someone'}
+                {editingShare ? translate("sharing.editMemberPermissions") : translate("sharing.inviteSomeone")}
                 <input
                   className="thread-export-dialog-box mt-2 w-full rounded-xl border bg-transparent px-3 py-2 outline-none"
                   disabled={!shareAvailable || busy}
                   onChange={(event) => setTargetIdentifier(event.target.value)}
                   readOnly={Boolean(editingShare)}
-                  placeholder="username or email"
+                  placeholder={translate("sharing.usernameOrEmail")}
                   value={targetIdentifier}
                 />
               </label>
 
-              {editingShare && <button type="button" className="thread-export-dialog-muted-action text-xs" onClick={() => {setEditingShare(null);setTargetIdentifier('');setThreadAccess('read');setWorkspaceAccess('none');setShareLabel('');}}>Cancel editing</button>}
+              {editingShare && <button type="button" className="thread-export-dialog-muted-action text-xs" onClick={() => {setEditingShare(null);setTargetIdentifier('');setThreadAccess('read');setWorkspaceAccess('none');setShareLabel('');}}>{translate("sharing.cancelEditing")}</button>}
               <fieldset className="thread-export-dialog-box rounded-2xl border p-3">
-                <legend className="thread-export-dialog-subtitle px-1 text-xs">Thread access</legend>
+                <legend className="thread-export-dialog-subtitle px-1 text-xs">{translate("sharing.threadAccess")}</legend>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   {[
-                    ['read', 'View only'],
-                    ['control', 'Collaborator'],
+                    ['read', translate("sharing.viewOnly")],
+                    ['control', translate("sharing.collaborator")],
                   ].map(([value, label]) => (
                     <label key={value} className="thread-export-dialog-turn-row flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm">
                       <input
@@ -470,12 +464,12 @@ export function ThreadActionsDialog({
               </fieldset>
 
               <fieldset className="thread-export-dialog-box rounded-2xl border p-3">
-                <legend className="thread-export-dialog-subtitle px-1 text-xs">Workspace</legend>
+                <legend className="thread-export-dialog-subtitle px-1 text-xs">{translate("sharing.workspace")}</legend>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
                   {[
-                    ['none', 'No access'],
-                    ['read', 'Read files'],
-                    ['write', 'Read and edit'],
+                    [translate("sharing.none"), translate("sharing.noAccess")],
+                    ['read', translate("sharing.readFiles")],
+                    ['write', translate("sharing.readAndEdit")],
                   ].map(([value, label]) => (
                     <label key={value} className="thread-export-dialog-turn-row flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm">
                       <input
@@ -491,12 +485,11 @@ export function ThreadActionsDialog({
               </fieldset>
 
               <label className="thread-export-dialog-body-text block text-sm">
-                Label
-                <input
+                {translate("sharing.label")}<input
                   className="thread-export-dialog-box mt-2 w-full rounded-xl border bg-transparent px-3 py-2 outline-none"
                   disabled={!shareAvailable || busy}
                   onChange={(event) => setShareLabel(event.target.value)}
-                  placeholder="optional"
+                  placeholder={translate("sharing.optional")}
                   value={shareLabel}
                 />
               </label>
@@ -505,8 +498,7 @@ export function ThreadActionsDialog({
           ) : (
             <>
               <label className="thread-export-dialog-body-text mt-4 block text-sm">
-                Turns
-                <select
+                {translate("sharing.turns_3037e1")}<select
                   className="thread-export-dialog-box mt-2 w-full rounded-xl border bg-transparent px-3 py-2 outline-none"
                   value={turnSelection}
                   onChange={(event) => setTurnSelection(event.target.value as TurnSelectionMode)}
@@ -523,7 +515,7 @@ export function ThreadActionsDialog({
                 <div className="thread-export-dialog-box mt-4 rounded-2xl border">
                   <div className="thread-export-dialog-box-header flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5">
                     <p className="thread-export-dialog-subtitle text-xs">
-                      Selected {selectedTurnIds.size} of {turnsState.data?.totalTurnCount ?? turns.length}
+                      {translate("sharing.selected_9a976f")} {selectedTurnIds.size} {translate("sharing.of")} {turnsState.data?.totalTurnCount ?? turns.length}
                     </p>
                     <div className="flex items-center gap-2">
                       <button
@@ -531,19 +523,17 @@ export function ThreadActionsDialog({
                         onClick={() => setSelectedTurnIds(new Set(turns.map((turn) => turn.turnId)))}
                         className="thread-export-dialog-secondary-button rounded-full border px-2.5 py-1 text-xs transition"
                       >
-                        Select all
-                      </button>
+                        {translate("sharing.selectAll")}</button>
                       <button
                         type="button"
                         onClick={() => setSelectedTurnIds(new Set())}
                         className="thread-export-dialog-secondary-button rounded-full border px-2.5 py-1 text-xs transition"
                       >
-                        Clear
-                      </button>
+                        {translate("sharing.clear")}</button>
                     </div>
                   </div>
                   {turnsState.status === 'loading' ? (
-                    <p className="thread-export-dialog-subtitle px-3 py-6 text-sm">Loading turns...</p>
+                    <p className="thread-export-dialog-subtitle px-3 py-6 text-sm">{translate("sharing.loadingTurns_3ea426")}</p>
                   ) : turnsState.status === 'failed' ? (
                     <p className="px-3 py-6 text-sm text-rose-500 dark:text-rose-200">{turnsState.error}</p>
                   ) : (
@@ -560,7 +550,7 @@ export function ThreadActionsDialog({
                             className="thread-export-dialog-checkbox h-4 w-4"
                           />
                           <span className="thread-export-dialog-strong shrink-0 text-xs font-medium">
-                            Turn {turn.turnNumber}
+                            {translate("sharing.turn")} {turn.turnNumber}
                           </span>
                           <span className="thread-export-dialog-subtitle shrink-0 text-xs">
                             {formatTurnTime(turn.startedAt)}
@@ -586,11 +576,9 @@ export function ThreadActionsDialog({
                     onChange={(event) => setIncludeTokenAndPrice(event.target.checked)}
                     className="thread-export-dialog-checkbox h-4 w-4"
                   />
-                  Token and price
-                </label>
+                  {translate("sharing.tokenAndPrice")}</label>
                 <p className="thread-export-dialog-box thread-export-dialog-subtitle flex items-center rounded-xl border px-3 py-2 text-xs">
-                  HTML keeps the chat styling and omits tool activity.
-                </p>
+                  {translate("sharing.hTMLKeepsTheChatStylingAndOmits")}</p>
               </div>
             </>
           )}
@@ -598,11 +586,11 @@ export function ThreadActionsDialog({
 
         <div className="thread-export-dialog-footer flex items-center justify-between gap-3 border-t px-5 py-4">
           <p className="thread-export-dialog-subtitle min-w-0 text-xs">
-            {actionMode === 'link' ? 'Read-only · No login required' : actionMode === 'share'
+            {actionMode === 'link' ? translate("sharing.readOnlyNoLoginRequired") : actionMode === 'share'
               ? shareAvailable
-                ? shareDevice ? 'Access applies to all threads on this device.' : 'Only invited members can access this thread.'
-                : 'Sharing is unavailable in this connection.'
-              : `${selectedCount} ${selectedCount === 1 ? 'turn' : 'turns'} selected.`}
+                ? shareDevice ? translate("sharing.accessAppliesToAllThreadsOnThis") : translate("sharing.onlyInvitedMembersCanAccessThisThread")
+                : translate("sharing.sharingIsUnavailableInThisConnection")
+              : translate("sharing.selected_06be07", { value1: selectedCount, value2: selectedCount === 1 ? translate("sharing.turn_b09c73") : translate("sharing.turns_7cb1b2") })}
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -611,7 +599,7 @@ export function ThreadActionsDialog({
               disabled={busy}
               className="thread-export-dialog-secondary-button rounded-full border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {matter ? 'Close' : 'Cancel'}
+              {matter ? translate("sharing.close") : translate("sharing.cancel")}
             </button>
             {actionMode === 'link' || (matter && actionMode === 'share' && !shareAvailable) ? null : actionMode === 'share' ? (
               <button
@@ -620,7 +608,7 @@ export function ThreadActionsDialog({
                 disabled={!canShare}
                 className={`${matter ? 'matter-dialog-primary' : 'ui-status-warning'} rounded-full px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                {busy ? 'Saving...' : editingShare ? 'Save permissions' : shareDevice ? 'Share device' : 'Share this thread'}
+                {busy ? translate("sharing.saving") : editingShare ? translate("sharing.savePermissions") : shareDevice ? translate("sharing.shareDevice") : translate("sharing.shareThisThread")}
               </button>
             ) : (
               <button
@@ -629,7 +617,7 @@ export function ThreadActionsDialog({
                 disabled={!canExport}
                 className={`${matter ? 'matter-dialog-primary' : 'ui-status-warning'} rounded-full px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                {busy ? 'Exporting...' : `Export ${actionMode.toUpperCase()}`}
+                {busy ? translate("sharing.exporting") : translate("sharing.export", { value1: actionMode.toUpperCase() })}
               </button>
             )}
           </div>

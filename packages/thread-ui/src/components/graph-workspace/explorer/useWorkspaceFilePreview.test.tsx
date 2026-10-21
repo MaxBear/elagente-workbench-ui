@@ -35,7 +35,7 @@ let root: Root;
 let result: ReturnType<typeof useWorkspaceFilePreview>;
 let adapter: ThreadWorkspaceAdapter;
 const onError = vi.fn();
-const refreshTree = vi.fn(async () => {});
+const documents = { load: vi.fn(async () => null) } as unknown as Parameters<typeof useWorkspaceFilePreview>[0]['documents'];
 function Harness({ threadId, path }: { threadId: string; path: string }) {
   const identity = useMemo(() => ({ threadId, workspaceId: null }), [threadId]);
   result = useWorkspaceFilePreview({
@@ -49,7 +49,7 @@ function Harness({ threadId, path }: { threadId: string; path: string }) {
     adapter,
     identity,
     onError,
-    refreshTree,
+    documents,
   });
   return <span>{result.previewFile?.content}</span>;
 }
@@ -66,10 +66,10 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   onError.mockReset();
-  refreshTree.mockClear();
   adapter = {
     listTree: vi.fn(),
     readFile: vi.fn(async ({ path }) => preview(path)),
+    textRangeRead: true,
   };
 });
 afterEach(() => {
@@ -130,41 +130,5 @@ describe('workspace preview recovery', () => {
     expect(onError).toHaveBeenLastCalledWith(
       expect.stringContaining('made no progress'),
     );
-  });
-  it('does not publish a save result into the next thread', async () => {
-    const write = deferred<void>();
-    adapter.writeFile = vi.fn(() => write.promise);
-    adapter.readFile = vi.fn(async ({ threadId }) =>
-      preview('notes.txt', { content: threadId }),
-    );
-    await render();
-    let pending!: Promise<void>;
-    await act(async () => {
-      pending = result.saveFile({ path: 'notes.txt', content: 'changed' });
-    });
-    await render('two');
-    await act(async () => {
-      write.resolve();
-      await pending;
-    });
-    expect(result.previewFile?.content).toBe('two');
-    expect(refreshTree).not.toHaveBeenCalled();
-  });
-  it('propagates revision conflicts to the editor and reloads latest bytes', async () => {
-    adapter.writeFile = vi.fn(async () => {
-      throw new Error('FILE_CONFLICT');
-    });
-    await render();
-    await act(async () => {
-      await expect(
-        result.saveFile({ path: 'notes.txt', content: 'draft' }),
-      ).rejects.toThrow('FILE_CONFLICT');
-    });
-    expect(result.previewFile?.content).toBe('first');
-    adapter.readFile = vi.fn(async () =>
-      preview('notes.txt', { content: 'latest' }),
-    );
-    await act(async () => result.reloadFile());
-    expect(result.previewFile?.content).toBe('latest');
   });
 });

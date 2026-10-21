@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import type { ThreadMcpServersDto } from '@remote-codex/shared';
 
 import { authStatusLabel } from './composerPresentation';
@@ -48,13 +49,14 @@ export function ComposerMcpPanel({
   onSaveHttpMcp,
   onSaveRawMcpBlock,
 }: ComposerMcpPanelProps) {
+  useI18n();
   return (
     <div className="p-2">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs text-stone-400">MCP config source</p>
+          <p className="text-xs text-stone-400">{translate("chat.mCPConfigSource")}</p>
           <p className="truncate text-[11px] text-stone-500">
-            {mcpConfigPath ?? '<provider config>'}
+            {mcpConfigPath ?? translate("chat.providerConfig")}
           </p>
         </div>
         {mcpPanelMode === 'list' && mcpConfigEditing ? (
@@ -67,14 +69,12 @@ export function ComposerMcpPanel({
             }}
             className="shrink-0 rounded-full border border-sky-300/35 px-3 py-1.5 text-xs text-sky-100 transition hover:bg-sky-300/10"
           >
-            Add MCP
-          </button>
+            {translate("chat.addMCP")}</button>
         ) : null}
       </div>
       {mcpState.status === 'loading' && !mcpState.data ? (
         <p className="rounded-xl border border-stone-800 bg-stone-950/70 px-3 py-3 text-sm text-stone-400">
-          Loading MCP servers...
-        </p>
+          {translate("chat.loadingMCPServers")}</p>
       ) : null}
       {mcpState.error ? (
         <p className="mb-2 rounded-xl border border-rose-500/35 bg-rose-500/10 px-3 py-3 text-sm text-rose-100/90">
@@ -107,13 +107,10 @@ export function ComposerMcpPanel({
                 HTTP / Streamable HTTP
               </span>
               <span className="text-[11px] uppercase tracking-[0.16em] text-stone-500">
-                Form
-              </span>
+                {translate("chat.form")}</span>
             </div>
             <p className="mt-1 text-xs text-stone-400">
-              Add an MCP server with a name and URL, then write the matching
-              block into provider config.
-            </p>
+              {translate("chat.addAnMCPServerWithAName")}</p>
           </button>
           <button
             type="button"
@@ -125,16 +122,13 @@ export function ComposerMcpPanel({
           >
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-stone-100">
-                stdio / raw block
-              </span>
+                {translate("chat.stdioRawBlock")}</span>
               <span className="text-[11px] uppercase tracking-[0.16em] text-stone-500">
                 TOML
               </span>
             </div>
             <p className="mt-1 text-xs text-stone-400">
-              Write a single `[mcp_servers.name]` block, then save it back into
-              provider config.
-            </p>
+              {translate("chat.writeASingleMcpServersNameBlock")}</p>
           </button>
         </div>
       ) : null}
@@ -142,10 +136,9 @@ export function ComposerMcpPanel({
         <div className="space-y-2 rounded-xl border border-stone-800 bg-stone-950/70 px-3 py-3">
           <div>
             <label className="mb-1 block text-xs text-stone-400">
-              MCP name
-            </label>
+              {translate("chat.mCPName")}</label>
             <input
-              aria-label="MCP name"
+              aria-label={translate("chat.mCPName")}
               value={mcpHttpName}
               onChange={(event) => onSetMcpHttpName(event.target.value)}
               placeholder="openaiDeveloperDocs"
@@ -168,15 +161,14 @@ export function ComposerMcpPanel({
               onClick={() => onSetMcpPanelMode('add')}
               className={`${composerChipButtonClassName} rounded-full border border-stone-700 px-3 py-1.5 text-xs text-stone-300 transition`}
             >
-              Back
-            </button>
+              {translate("chat.back")}</button>
             <button
               type="button"
               onClick={() => void onSaveHttpMcp()}
               disabled={mcpConfigBusy}
               className="ui-status-info rounded-full px-3 py-1.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {mcpConfigBusy ? 'Saving...' : 'Write HTTP MCP'}
+              {mcpConfigBusy ? translate("chat.saving") : translate("chat.writeHTTPMCP")}
             </button>
           </div>
         </div>
@@ -184,10 +176,9 @@ export function ComposerMcpPanel({
       {mcpPanelMode === 'stdio' ? (
         <div className="space-y-2 rounded-xl border border-stone-800 bg-stone-950/70 px-3 py-3">
           <label className="block text-xs text-stone-400">
-            MCP block for provider config
-          </label>
+            {translate("chat.mCPBlockForProviderConfig")}</label>
           <textarea
-            aria-label="MCP block for provider config"
+            aria-label={translate("chat.mCPBlockForProviderConfig")}
             value={mcpRawBlock}
             onChange={(event) => onSetMcpRawBlock(event.target.value)}
             rows={8}
@@ -199,15 +190,14 @@ export function ComposerMcpPanel({
               onClick={() => onSetMcpPanelMode('add')}
               className={`${composerChipButtonClassName} rounded-full border border-stone-700 px-3 py-1.5 text-xs text-stone-300 transition`}
             >
-              Back
-            </button>
+              {translate("chat.back")}</button>
             <button
               type="button"
               onClick={() => void onSaveRawMcpBlock()}
               disabled={mcpConfigBusy}
               className="ui-status-info rounded-full px-3 py-1.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {mcpConfigBusy ? 'Saving...' : 'Write raw block'}
+              {mcpConfigBusy ? translate("chat.saving") : translate("chat.writeRawBlock")}
             </button>
           </div>
         </div>
@@ -225,9 +215,8 @@ export function ComposerMcpPanel({
                     {server.name}
                   </p>
                   <p className="mt-0.5 text-xs text-stone-400">
-                    {server.tools.length} tools · {server.resourceCount}{' '}
-                    resources · {server.resourceTemplateCount} templates
-                  </p>
+                    {server.tools.length} {translate("chat.tools")} {server.resourceCount}{' '}
+                    {translate("chat.resources")} {server.resourceTemplateCount} {translate("chat.templates")}</p>
                 </div>
                 <span className="shrink-0 rounded-full border border-stone-700 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-stone-300">
                   {authStatusLabel(server.authStatus)}
@@ -250,8 +239,7 @@ export function ComposerMcpPanel({
       !mcpState.error &&
       (mcpState.data?.servers.length ?? 0) === 0 ? (
         <p className="rounded-xl border border-stone-800 bg-stone-950/70 px-3 py-3 text-sm text-stone-400">
-          No MCP servers available right now.
-        </p>
+          {translate("chat.noMCPServersAvailableRightNow")}</p>
       ) : null}
     </div>
   );

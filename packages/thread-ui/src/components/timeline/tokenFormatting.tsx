@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import {
   useEffect,
   useLayoutEffect,
@@ -34,6 +35,7 @@ export interface TurnPriceBadge {
 }
 
 function TokenInIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg
       aria-hidden="true"
@@ -50,6 +52,7 @@ function TokenInIcon() {
 }
 
 function TokenOutIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg
       aria-hidden="true"
@@ -66,6 +69,7 @@ function TokenOutIcon() {
 }
 
 function TokenCacheIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg
       aria-hidden="true"
@@ -85,6 +89,7 @@ function TokenCacheIcon() {
 }
 
 function TokenReasonIcon() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <svg
       aria-hidden="true"
@@ -105,6 +110,12 @@ function TokenReasonIcon() {
 export function formatCompactTokenCount(value: number) {
   if (!Number.isFinite(value) || value < 0) {
     return 'unavailable';
+  }
+
+  if (value >= 1_000_000_000) {
+    const rounded =
+      value >= 10_000_000_000 ? Math.round(value / 1_000_000_000) : value / 1_000_000_000;
+    return `${String(rounded.toFixed(1)).replace(/\.0$/, '')}b`;
   }
 
   if (value >= 1_000_000) {
@@ -210,7 +221,7 @@ export function buildTurnTokenDetails(turn: TimelineTurn) {
     nonCachedInputTokens > 0
       ? {
           id: 'in',
-          label: 'Input',
+          label: translate("chat.uncachedInput"),
           tokenCompactValue: formatCompactTokenCount(nonCachedInputTokens),
           tokenRawValue: nonCachedInputTokens,
           usdCompactValue: turn.priceEstimate
@@ -224,7 +235,7 @@ export function buildTurnTokenDetails(turn: TimelineTurn) {
     cachedInputTokens > 0
       ? {
           id: 'cache',
-          label: 'Cached input',
+          label: translate("chat.cacheRead"),
           tokenCompactValue: formatCompactTokenCount(cachedInputTokens),
           tokenRawValue: cachedInputTokens,
           usdCompactValue: turn.priceEstimate
@@ -238,7 +249,7 @@ export function buildTurnTokenDetails(turn: TimelineTurn) {
     cacheWriteInputTokens > 0
       ? {
           id: 'cache-write',
-          label: 'Cache write',
+          label: translate("chat.cacheWrite"),
           tokenCompactValue: formatCompactTokenCount(cacheWriteInputTokens),
           tokenRawValue: cacheWriteInputTokens,
           usdCompactValue: turn.priceEstimate
@@ -252,7 +263,7 @@ export function buildTurnTokenDetails(turn: TimelineTurn) {
     nonReasoningOutputTokens > 0
       ? {
           id: 'out',
-          label: 'Output',
+          label: translate("chat.output"),
           tokenCompactValue: formatCompactTokenCount(nonReasoningOutputTokens),
           tokenRawValue: nonReasoningOutputTokens,
           usdCompactValue: turn.priceEstimate
@@ -276,7 +287,7 @@ export function buildTurnTokenDetails(turn: TimelineTurn) {
     reasoningOutputTokens > 0
       ? {
           id: 'reason',
-          label: 'Reasoning',
+          label: translate("chat.reasoning"),
           tokenCompactValue: formatCompactTokenCount(reasoningOutputTokens),
           tokenRawValue: reasoningOutputTokens,
           usdCompactValue: turn.priceEstimate
@@ -306,7 +317,7 @@ export function buildTurnTokenBadges(turn: TimelineTurn): TurnTokenBadge[] {
   return buildTurnTokenDetails(turn).map((detail) => ({
     id: detail.id,
     label: detail.tokenCompactValue,
-    title: `${detail.label}: ${detail.tokenRawValue} tokens`,
+    title: translate("chat.tokens", { value1: detail.label, value2: detail.tokenRawValue }),
     className: detail.className,
     icon: detail.icon,
   }));
@@ -319,8 +330,8 @@ export function buildTurnPriceBadge(turn: TimelineTurn): TurnPriceBadge {
       : '--',
     title:
       turn.priceEstimate === null || turn.priceEstimate === undefined
-        ? 'Price estimate unavailable for this model.'
-        : `Estimated cost: ${formatDetailedUsd(turn.priceEstimate.totalUsd)}`,
+        ? translate("chat.priceEstimateUnavailableForThisModel")
+        : translate("chat.estimatedCost", { value1: formatDetailedUsd(turn.priceEstimate.totalUsd) }),
     className: turn.priceEstimate
       ? 'token-badge-total'
       : 'token-badge-empty',
@@ -331,6 +342,7 @@ const TURN_HEADER_BADGE_CLASS_NAME =
   'inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-normal leading-none sm:text-[11px]';
 
 export function TurnTokenSummary({ turn }: { turn: TimelineTurn }) {
+  const { locale: i18nLocale } = useI18n();
   const details = buildTurnTokenDetails(turn);
   const priceBadge = buildTurnPriceBadge(turn);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -409,7 +421,9 @@ export function TurnTokenSummary({ turn }: { turn: TimelineTurn }) {
     };
   }, [isDesktopOpen, isMobileOpen]);
 
-  if (!priceBadge && details.length === 0) {
+  // ElAgente: the price badge (and its token breakdown) shows only with a real
+  // price estimate, never as a "--" placeholder with an unavailable tooltip.
+  if (!turn.priceEstimate) {
     return null;
   }
 
@@ -420,7 +434,7 @@ export function TurnTokenSummary({ turn }: { turn: TimelineTurn }) {
           <div
             key={detail.id}
             className="thread-token-popover-row flex items-center justify-between gap-3 rounded-xl border px-2.5 py-1.5 text-[11px]"
-            title={`${detail.label}: ${detail.tokenRawValue} tokens`}
+            title={translate("chat.tokens", { value1: detail.label, value2: detail.tokenRawValue })}
           >
             <span className="thread-token-popover-text inline-flex min-w-0 items-center gap-2">
               <span className="inline-flex shrink-0">{detail.icon}</span>
@@ -449,7 +463,7 @@ export function TurnTokenSummary({ turn }: { turn: TimelineTurn }) {
           >
             <button
               type="button"
-              aria-label="Show token and price details"
+              aria-label={translate("chat.showTokenAndPriceDetails")}
               aria-expanded={isDesktopOpen}
               onFocus={() => setIsDesktopOpen(true)}
               onBlur={() => setIsDesktopOpen(false)}
@@ -469,7 +483,7 @@ export function TurnTokenSummary({ turn }: { turn: TimelineTurn }) {
           <span
             key={detail.id}
             className={`${TURN_HEADER_BADGE_CLASS_NAME} ${detail.className}`}
-            title={`${detail.label}: ${detail.usdCompactValue}, ${detail.tokenRawValue} tokens`}
+            title={translate("chat.tokens_45d08f", { value1: detail.label, value2: detail.usdCompactValue, value3: detail.tokenRawValue })}
           >
             {detail.icon}
             <span className="thread-token-badge-value font-medium">
@@ -482,7 +496,7 @@ export function TurnTokenSummary({ turn }: { turn: TimelineTurn }) {
         {priceBadge ? (
           <button
             type="button"
-            aria-label="Show token and price details"
+            aria-label={translate("chat.showTokenAndPriceDetails")}
             aria-expanded={isMobileOpen}
             onClick={() => setIsMobileOpen((current) => !current)}
             className={`${TURN_HEADER_BADGE_CLASS_NAME} appearance-none whitespace-nowrap bg-transparent !text-[10px] !font-normal !leading-none transition hover:bg-[var(--theme-hover)] sm:!text-[11px] ${priceBadge.className}`}

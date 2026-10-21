@@ -1,23 +1,28 @@
-import { useRef } from 'react';
-import { useModalFocus } from './menu/useModalFocus';
-import { ThemedPortal } from './ThemedPortal';
+import { translate, useI18n } from '../i18n';
+import { X } from 'lucide-react';
 import { DiffDetail } from './DiffDetail';
+import { CopyButton } from './copy/CopyButton';
+import { Dialog, DialogClose, DialogContent, DialogTitle } from './graph-ui/Dialog';
 import { GraphChatMessageContent } from './graph-chat/GraphChatMessageContent';
-import type {ThreadTimelineAdapter} from '../adapters';
+import type { ThreadTimelineAdapter } from '../adapters';
 
 interface LongTextDialogProps {
   open: boolean;
   title: string;
   text: string;
   kind?: string | undefined;
+  /** ElAgente: a deferred detail that failed to load, with a retry. */
   error?: string | undefined;
   onRetry?: (() => void) | undefined;
   onClose: () => void;
+  /** ElAgente: tool-call evidence renders as Markdown with workspace file links. */
   onOpenWorkspaceFile?: ThreadTimelineAdapter['onOpenWorkspaceFile'];
-  workspaceRootPath?: string;
+  workspaceRootPath?: string | undefined;
   resolveHref?: ThreadTimelineAdapter['resolveHref'];
 }
 
+/** A command's whole output or a whole diff. A modal window: focus moves in and
+    stays there, Esc closes it, and focus returns to what opened it. */
 export function LongTextDialog({
   open,
   title,
@@ -27,55 +32,32 @@ export function LongTextDialog({
   onClose,
   onOpenWorkspaceFile, workspaceRootPath, resolveHref,
 }: LongTextDialogProps) {
-  const modalRef = useRef<HTMLDivElement>(null);
-  useModalFocus(modalRef, open, onClose, undefined);
-
-  if (!open) {
-    return null;
-  }
-
+  useI18n();
   return (
-    <ThemedPortal>
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 sm:p-6">
-      <button
-        type="button"
-        aria-label="Close full text"
-        onClick={onClose}
-        style={{backgroundColor: "var(--overlay-scrim)", border: 0}}
-        className="absolute inset-0 bg-[var(--overlay-scrim)] backdrop-blur-sm"
-      />
-      <div
-        ref={modalRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className="thread-detail-dialog relative z-[1] flex max-h-[min(82vh,52rem)] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-fg)] shadow-2xl"
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        aria-describedby={undefined}
+        overlayClassName="z-[90] bg-[var(--overlay-scrim)] backdrop-blur-sm"
+        className="thread-detail-dialog long-text-dialog z-[91] flex max-h-[min(82vh,52rem)] w-[min(56rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-0 text-[var(--theme-fg)] shadow-2xl sm:max-w-none"
       >
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--theme-border)] px-4 py-3 sm:px-5">
-          <p className="truncate text-sm font-medium">{title}</p>
-          <button
-            type="button"
-            aria-label="Close dialog"
-            onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--theme-fg-muted)] transition hover:bg-[var(--theme-hover)]"
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--theme-border)] px-4 py-3 sm:px-5">
+          <DialogTitle className="min-w-0 flex-1 truncate text-sm font-medium">{title}</DialogTitle>
+          <CopyButton value={text} label={translate('chat.copyAll')} className="h-9 w-9" />
+          <DialogClose
+            aria-label={translate('workbench.closeDialog')}
+            className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--theme-fg-muted)] transition hover:bg-[var(--theme-hover)]"
           >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 16 16"
-              className="h-4 w-4 fill-current"
-            >
-              <path d="M3.22 2.47 8 7.25l4.78-4.78 1.06 1.06L9.06 8.31l4.78 4.78-1.06 1.06L8 9.37l-4.78 4.78-1.06-1.06 4.78-4.78-4.78-4.78 1.06-1.06Z" />
-            </svg>
-          </button>
+            <X aria-hidden="true" className="h-4 w-4" />
+          </DialogClose>
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-4 py-4 sm:px-5">
-          {error ? <div role="alert" className="thread-detail-error"><p>{error}</p>{onRetry && <button type="button" onClick={onRetry}>Retry</button>}</div> : null}
+          {error ? <div role="alert" className="thread-detail-error"><p>{error}</p>{onRetry && <button type="button" onClick={onRetry}>{translate('workbench.retry')}</button>}</div> : null}
           {error ? null : kind === 'fileChange' && /^@@ /m.test(text) ? <DiffDetail text={text} /> : ['toolCall', 'agentToolCall', 'skillToolCall'].includes(kind ?? '') ? <GraphChatMessageContent content={text} readOnly onOpenWorkspaceFile={onOpenWorkspaceFile} workspaceRootPath={workspaceRootPath} resolveHref={resolveHref} /> : <pre className="whitespace-pre-wrap break-words text-sm leading-6">
             {text}
           </pre>}
         </div>
-      </div>
-    </div></ThemedPortal>
+      </DialogContent>
+    </Dialog>
   );
 }

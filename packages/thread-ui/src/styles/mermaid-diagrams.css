@@ -1,0 +1,57 @@
+.thread-graph-message-markdown .thread-graph-mermaid {
+  min-width: 0;
+  max-width: 100%;
+  margin: 1rem 0;
+  overflow: hidden;
+  border: 1px solid var(--theme-border);
+  border-radius: 14px;
+  background: var(--theme-panel);
+  white-space: normal;
+}
+
+.thread-graph-mermaid-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 6px 14px;
+  border-bottom: 1px solid var(--theme-border);
+  color: var(--theme-fg-muted);
+  font: 500 11px/1.4 system-ui, sans-serif;
+}
+
+.thread-graph-mermaid-label,
+.thread-graph-mermaid-actions { display: flex; align-items: center; gap: 8px; }
+.thread-graph-mermaid-actions { gap: 2px; }
+.thread-graph-mermaid-actions button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.thread-graph-mermaid-actions button:hover,
+.thread-graph-mermaid-actions button[aria-pressed='true'] { background: var(--theme-hover); color: var(--theme-fg); }
+.thread-graph-mermaid-actions button:focus-visible { outline: 2px solid var(--theme-accent); outline-offset: 1px; }
+.thread-graph-mermaid-canvas { padding: 20px 16px; overflow: auto; }
+.thread-graph-mermaid-canvas > svg { display: block; width: 100%; height: auto; max-height: min(600px, 60svh); margin: auto; }
+.thread-graph-message-markdown .thread-graph-mermaid-source {
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: auto;
+  white-space: pre;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.thread-graph-mermaid-error { display: block; padding: 0 16px 12px; color: var(--theme-fg-muted); font-size: 12px; }
+@media (max-width: 640px) {
+  .thread-graph-mermaid-canvas { padding: 16px 8px; }
+  .thread-graph-mermaid-actions button { width: 36px; height: 36px; }
+}

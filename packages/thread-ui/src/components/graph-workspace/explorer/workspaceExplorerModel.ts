@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../../i18n';
 import type { WorkspaceTreeNode } from '../workspaceTree';
 import type {
   WorkspaceExplorerChildrenState,
@@ -118,7 +119,7 @@ export function workspaceExplorerModelToTree(
   const visit = (nodeId: string): WorkspaceTreeNode => {
     const record = model.nodes.get(nodeId);
     if (!record) {
-      throw new Error(`Workspace explorer node is missing: ${nodeId}`);
+      throw new Error(translate("files.workspaceExplorerNodeIsMissing", { value1: nodeId }));
     }
     const tree: WorkspaceTreeNode = {
       ...record.source,

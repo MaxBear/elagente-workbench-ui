@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../i18n';
 import {
   ClipboardEvent,
   type Dispatch,
@@ -5,6 +6,7 @@ import {
   FormEvent,
   KeyboardEvent,
   useCallback,
+  useEffect,
   type SetStateAction,
   useMemo,
   useRef,
@@ -50,11 +52,14 @@ import {
   derivePromptPasteAction,
   extractFilesFromTransfer,
   formatModelContextTitle,
+  composerAgentKey,
   hasTransferFiles,
   normalizePromptText,
   tokenizePrompt,
   type ComposerAttachmentDraft,
+  type ComposerSendShortcut,
 } from './composer/composerUtils';
+export type { ComposerSendShortcut } from './composer/composerUtils';
 import {
   buildComposerClassNames,
   buildComposerControlState,
@@ -96,6 +101,7 @@ export type ThreadComposerAttachmentPicker = (input: {
 
 export interface ThreadComposerProps {
   activeView: 'chat' | 'shell';
+  sendShortcut?: ComposerSendShortcut;
   edgeToEdgeMobile?: boolean;
   busy?: boolean;
   settingsBusy?: boolean;
@@ -148,12 +154,13 @@ export interface ThreadComposerProps {
   onSubmit: (input: {
     prompt: string;
     attachments?: PromptAttachmentUpload[];
+    delivery?: 'steer';
   }) => Promise<boolean | void> | boolean | void;
   onInterrupt?: () => Promise<void> | void;
   onCompact?: () => Promise<void> | void;
   onOpenSkills?: () => Promise<void> | void;
   onOpenMcp?: () => Promise<void> | void;
-  onOpenHarness?: () => Promise<void> | void;
+  onOpenHarness?: (composerFocusOwner?: string) => Promise<void> | void;
   onOpenHooks?: () => Promise<void> | void;
   onCreateHook?: (input: CreateThreadHookInput) => Promise<void> | void;
   onUpdateHook?: (input: UpdateThreadHookInput) => Promise<void> | void;
@@ -188,6 +195,8 @@ export interface ThreadComposerProps {
   onJumpToNextTurn?: () => void;
   subscriptionUsage?: AgentSubscriptionUsageDto | null;
   onUpdateSettings?: (input: UpdateThreadSettingsInput) => Promise<void> | void;
+  /** The model menu opened: the host may refresh the model list. */
+  onModelMenuOpen?: () => void;
   onToggleView?: () => void;
   onShellCopy?: () => Promise<void> | void;
   onShellControl?: (
@@ -205,12 +214,14 @@ export interface ThreadComposerProps {
 
 export function ThreadComposer({
   activeView,
+  sendShortcut = 'ctrlEnter',
   edgeToEdgeMobile = false,
   busy = false,
   settingsBusy = false,
   compactBusy = false,
   error,
   model = null,
+  agentLabel = null,
   reasoningEffort = null,
   fastMode = false,
   collaborationMode = 'default',
@@ -285,6 +296,7 @@ export function ThreadComposer({
   onJumpToNextTurn,
   subscriptionUsage,
   onUpdateSettings,
+  onModelMenuOpen,
   onToggleView,
   onShellCopy,
   onShellControl,
@@ -293,6 +305,7 @@ export function ThreadComposer({
   onSteerPendingPrompt,
   onCancelPendingPrompt,
 }: ThreadComposerProps) {
+  useI18n();
   const [openMenu, setOpenMenu] = useState<SettingsMenu>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const attachmentCapabilitiesRef = useRef(attachmentCapabilities);
@@ -300,6 +313,18 @@ export function ThreadComposer({
   const canAttach = attachmentCapabilities === undefined ||
     attachmentCapabilities.files || attachmentCapabilities.images;
   const [slashPanelView, setSlashPanelView] = useState<SlashPanelView>('root');
+  // A `/` typed into an empty prompt stays in the prompt and filters the toolbox
+  // by what follows; null when the toolbox was not opened by typing.
+  const [slashQuery, setSlashQuery] = useState<string | null>(null);
+  const [slashActive, setSlashActive] = useState(0);
+  useEffect(() => {
+    if (openMenu !== 'slash' && slashQuery !== null) setSlashQuery(null);
+  }, [openMenu, slashQuery]);
+  const modelMenuOpened = useRef(onModelMenuOpen);
+  modelMenuOpened.current = onModelMenuOpen;
+  useEffect(() => {
+    if (openMenu === 'model') modelMenuOpened.current?.();
+  }, [openMenu]);
   const submitInFlightRef = useRef(false);
   const [mcpPanelMode, setMcpPanelMode] = useState<McpPanelMode>('list');
   const slashCapabilities = useMemo(
@@ -321,6 +346,7 @@ export function ThreadComposer({
       hookTrust: capabilities?.management.hookTrust ?? false,
       planMode: capabilities?.controls.planMode ?? false,
       sandboxMode: capabilities?.controls.sandboxMode ?? false,
+      liveModelSwitch: capabilities?.controls.liveModelSwitch ?? false,
     }),
     [
       capabilities,
@@ -361,6 +387,7 @@ export function ThreadComposer({
     isDraftControlled,
     updateDraft,
     flushControlledDraftToHost,
+    captureSubmission,
   } = useComposerDraft({
     isShellView,
     draftPrompt,
@@ -503,6 +530,7 @@ export function ThreadComposer({
     [model, modelOptions],
   );
   const modelContextTitle = formatModelContextTitle(model, contextUsage);
+  const agent = composerAgentKey(agentLabel);
   const supportedEfforts = currentModel?.supportedReasoningEfforts ?? [];
   const promptSegments = useMemo(
     () => tokenizePrompt(prompt, attachments),
@@ -560,7 +588,7 @@ export function ThreadComposer({
         break;
       case 'openHarness':
         setOpenMenu(null);
-        void onOpenHarness?.();
+        void onOpenHarness?.(menuRef.current?.dataset.composerFocusOwner);
         break;
       case 'noop':
         break;
@@ -634,6 +662,21 @@ export function ThreadComposer({
     [appendAttachments, dismissPromptFocus, onPickAttachment],
   );
 
+  // Take a queued prompt out of the queue and back into the draft, ahead of what is there.
+  async function editPendingPrompt(pendingPromptId: string) {
+    const queued = pendingPrompts.find((entry) => entry.id === pendingPromptId);
+    if (!queued || !onCancelPendingPrompt) return;
+    await onCancelPendingPrompt(pendingPromptId);
+    const text = normalizePromptText(queued.prompt);
+    updateDraft((current) => ({
+      prompt: current.prompt.trim() ? `${text}\n${current.prompt}` : text,
+      attachments: current.attachments,
+    }));
+    pendingSelectionRef.current = { start: text.length, end: text.length };
+    selectionSnapshotRef.current = { start: text.length, end: text.length };
+    promptRef.current?.focus();
+  }
+
   function insertPlainTextIntoPrompt(text: string) {
     if (!text) {
       return;
@@ -702,7 +745,7 @@ export function ThreadComposer({
     }
   }
 
-  async function submitPrompt() {
+  async function submitPrompt(delivery?: 'steer') {
     if (submitInFlightRef.current) {
       return;
     }
@@ -727,14 +770,21 @@ export function ThreadComposer({
         return;
       }
 
-      const submitted = await onSubmit(submitInput);
-      if (submitted === false) {
-        return;
+      const submission = captureSubmission({ prompt, attachments });
+      try {
+        const submitted = await onSubmit({
+          ...submitInput,
+          ...(!isShellView && delivery ? { delivery } : {}),
+        });
+        if (submitted === false) {
+          submission.cancel();
+          return;
+        }
+        submission.complete();
+      } catch (error) {
+        submission.cancel();
+        throw error;
       }
-      updateDraft(() => ({
-        prompt: '',
-        attachments: [],
-      }));
     } finally {
       submitInFlightRef.current = false;
     }
@@ -745,10 +795,30 @@ export function ThreadComposer({
     await submitPrompt();
   }
 
+  // Commands the typed `/query` matches, in toolbox order.
+  function slashCommands(query: string) {
+    const commands = [
+      ...(slashCapabilities.planMode ? ['/plan'] : []),
+      ...availableToolboxItems.map(item => item.command),
+    ];
+    const needle = query.toLowerCase();
+    return commands.filter(command => command.slice(1).toLowerCase().startsWith(needle));
+  }
+  function closeSlashQuery() {
+    setSlashQuery(null);
+    if (openMenu === 'slash') setOpenMenu(null);
+  }
+
   function handlePromptInput() {
     // The browser owns the composition text and selection until it commits.
     if (promptRef.current?.dataset.imeComposing === 'true') return;
     const nextPrompt = serializeEditorPrompt();
+    if (slashQuery !== null) {
+      // Anything but `/` and a command name (a space, a path) is prompt text.
+      const query = /^\/[\w-]*$/.test(nextPrompt) ? nextPrompt.slice(1) : null;
+      if (query === null || slashCommands(query).length === 0) closeSlashQuery();
+      else { setSlashQuery(query); setSlashActive(0); }
+    }
     const nextSelection = snapshotSelection();
     selectionSnapshotRef.current = nextSelection;
     updateDraft((current) => ({
@@ -850,16 +920,46 @@ export function ThreadComposer({
       availableToolboxItems.length > 0 &&
       serializeEditorPrompt().trim().length === 0
     ) {
-      event.preventDefault();
+      // The slash is typed like any character; the toolbox only follows it.
       setSlashPanelView('root');
+      setSlashQuery('');
+      setSlashActive(0);
       setOpenMenu('slash');
       return;
+    }
+    if (openMenu === 'slash' && slashQuery !== null && slashPanelView === 'root') {
+      const count = slashCommands(slashQuery).length;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (count) setSlashActive(index => (index + (event.key === 'ArrowDown' ? 1 : count - 1)) % count);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeSlashQuery();
+        return;
+      }
+      if (event.key === 'Enter' && !event.shiftKey && count) {
+        event.preventDefault();
+        const row = document.querySelectorAll<HTMLButtonElement>('[data-slash-row]:not([disabled])')[slashActive];
+        if (row) {
+          // The typed `/command` was a request for the tool, not prompt text.
+          updateDraft((current) => ({ ...current, prompt: '' }));
+          setSlashQuery(null);
+          row.click();
+        }
+        return;
+      }
     }
 
     const keyAction = derivePromptKeyDownAction({
       key: event.key,
       metaKey: event.metaKey,
       ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+      sendShortcut: isShellView ? 'ctrlEnter' : sendShortcut,
       busy,
       disabled,
     });
@@ -868,12 +968,13 @@ export function ThreadComposer({
       event.preventDefault();
     }
     if (keyAction.submit) {
-      void submitPrompt();
+      void submitPrompt(keyAction.steer ? 'steer' : undefined);
     }
   }
 
   const {
     promptPlaceholder,
+    promptPlaceholderHint,
     interruptLabel,
     sendButtonLabel,
     sendButtonClassName,
@@ -890,6 +991,7 @@ export function ThreadComposer({
     settingsBusy,
     supportedEffortCount: supportedEfforts.length,
     fastMode,
+    sendShortcut,
   });
   const {
     composerLayerClassName,
@@ -917,6 +1019,8 @@ export function ThreadComposer({
   });
   const toolbarProps = useComposerToolbarProps({
     attachmentCapabilities,
+    slashQuery,
+    slashActive,
     isShellView,
     canToggleShellView,
     isMobileShell,
@@ -943,7 +1047,9 @@ export function ThreadComposer({
     goalStatus: goalState.data?.status,
     activeView,
     disabled,
+    promptEmpty: !prompt.trim() && attachments.length === 0,
     model,
+    agent,
     modelOptions,
     modelContextTitle,
     contextUsage,
@@ -989,6 +1095,7 @@ export function ThreadComposer({
       planMode: slashCapabilities.planMode,
       forkFromTurn: slashCapabilities.forkFromTurn,
       sandboxMode: hideSandboxModeControl ? false : slashCapabilities.sandboxMode,
+      liveModelSwitch: slashCapabilities.liveModelSwitch,
     },
     shellControlState,
     onToggleView,
@@ -1054,12 +1161,16 @@ export function ThreadComposer({
     prompt,
     disabled,
     promptPlaceholder,
+    promptPlaceholderHint,
     canInterrupt,
     interruptLabel,
     composerPromptRegionClassName,
     graphChatInputClassName,
     promptInputClassName,
     goalComposeMode,
+    planMode: displayedCollaborationMode === 'plan',
+    settingsBusy,
+    onExitPlanMode: () => { void handleUpdateSettings({ collaborationMode: 'default' }); },
     goalTokenBudget,
     goalLocalError,
     goalBusy,
@@ -1095,6 +1206,8 @@ export function ThreadComposer({
   return (
     <ComposerFrame
       activeView={activeView}
+      agent={agent}
+      busy={busy}
       layerClassName={composerLayerClassName}
       formClassName={formClassName}
       shellClassName={composerShellClassName}
@@ -1120,11 +1233,17 @@ export function ThreadComposer({
             prompts={pendingPrompts}
             onSteer={onSteerPendingPrompt}
             onCancel={onCancelPendingPrompt}
+            {...(onCancelPendingPrompt ? { onEdit: editPendingPrompt } : {})}
           />
         ) : null
       }
       toolbarSlot={
-        <ComposerToolbar {...toolbarProps} />
+        <ComposerToolbar
+          {...toolbarProps}
+          canInterrupt={!isShellView && canInterrupt}
+          interruptLabel={interruptLabel}
+          onInterrupt={onInterrupt}
+        />
       }
       goalSlot={goalSlot}
       shellPromptSlot={shellPromptSlot}

@@ -23,7 +23,6 @@ export function StructuredUsageInline({
       caught instanceof Error ? caught.message : "Invalid usage report";
   }
   if (validationError) report = undefined;
-  const available = report?.availability === "available";
   const fields = [
     ["total", "Total tokens"],
     ["input", "Input tokens"],
@@ -32,6 +31,11 @@ export function StructuredUsageInline({
     ["cacheWrite", "Cache write tokens"],
     ["reasoning", "Reasoning tokens"],
   ] as const;
+  if (!report && !validationError) return null;
+  const available = report?.availability === "available";
+  const availableFields = fields.filter(([key]) => report?.tokens?.[key] !== undefined);
+  const hasReportedValues = availableFields.length > 0 || Boolean(report?.cost);
+  if (!validationError && !hasReportedValues) return null;
   const title = `${scope[0]!.toUpperCase()}${scope.slice(1)} usage`;
   return (
     <span
@@ -40,27 +44,22 @@ export function StructuredUsageInline({
     >
       <span>
         {title}
-        {available ? ":" : " unavailable"}
+        {available || report?.cost ? ":" : " unavailable"}
       </span>
       {available
-        ? fields.map(([key, label]) => (
+        ? availableFields.map(([key, label]) => (
             <span
               key={key}
-              title={`${label}: ${report?.tokens?.[key]?.toLocaleString("en-US") ?? "unavailable"}`}
+              title={`${label}: ${report?.tokens?.[key]?.toLocaleString("en-US")}`}
             >
               {label}:{" "}
-              {report?.tokens?.[key] === undefined
-                ? "unavailable"
-                : formatCompactTokenCount(report.tokens[key]!)}
+              {formatCompactTokenCount(report!.tokens![key]!)}
             </span>
           ))
         : null}
-      <span title="Reported usage cost; this is not a billing ledger or account balance">
-        Cost:{" "}
-        {available && report?.cost
-          ? `${report.cost.amount.toLocaleString("en-US", { maximumFractionDigits: 8 })} ${report.cost.currency}`
-          : "unavailable"}
-      </span>
+      {report?.cost && <span title="Reported usage cost; this is not a billing ledger or account balance">
+        Cost:{" "}{`${report.cost.amount.toLocaleString("en-US", { maximumFractionDigits: 8 })} ${report.cost.currency}`}
+      </span>}
       {validationError ? (
         <span role="alert">Usage unavailable: {validationError}</span>
       ) : null}

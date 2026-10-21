@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { setLocale } from '../../i18n';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   buildShellDetachMessage,
@@ -17,7 +18,6 @@ import {
   normalizeShellOutputEvent,
   SHELL_ATTACH_RETRY_DELAY_MS,
   SHELL_ATTACH_TIMEOUT_MS,
-  SHELL_ATTACH_TIMEOUT_MESSAGE,
   SHELL_RECONNECT_DELAY_MS,
   SHELL_RECONNECT_PROMISE_TIMEOUT_MS,
   shouldScheduleAttachRetry,
@@ -26,6 +26,17 @@ import {
 } from './shellEvents';
 
 describe('shellEvents utilities', () => {
+  afterEach(() => setLocale('en', false));
+
+  it('localizes new reconnect timeout actions after module import without rewriting prior errors', () => {
+    setLocale('en', false);
+    const input = { isCurrentSocket: true, viewerId: null };
+    const englishAction = deriveShellAttachTimeoutAction(input);
+    expect(englishAction?.connectionError).toBe('Shell connection timed out. Reconnecting...');
+    setLocale('zh-CN', false);
+    expect(deriveShellAttachTimeoutAction(input)?.connectionError).toBe('Shell 连接超时，正在重新连接…');
+    expect(englishAction?.connectionError).toBe('Shell connection timed out. Reconnecting...');
+  });
   it('normalizes output payload fields and prompt labels', () => {
     expect(
       normalizeShellOutputEvent(
@@ -519,7 +530,7 @@ describe('shellEvents utilities', () => {
         viewerId: null,
       }),
     ).toEqual({
-      connectionError: SHELL_ATTACH_TIMEOUT_MESSAGE,
+      connectionError: 'Shell connection timed out. Reconnecting...',
       isConnecting: false,
       settleAttachPromise: false,
       closeSocket: true,

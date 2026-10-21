@@ -1,8 +1,10 @@
 import { createContext, useContext } from 'react';
 
 import type { AgentBackendIdDto } from '@remote-codex/shared';
+import type { ComposerSendShortcut } from '../components/composer/composerUtils';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
+export type PhoneHand = 'right' | 'left';
 export type AgentBackendId = AgentBackendIdDto;
 
 export interface AppShellNavContextValue {
@@ -12,6 +14,10 @@ export interface AppShellNavContextValue {
   closeNav: () => void;
   settingsOpen: boolean;
   openSettings: () => void;
+  /** Opens settings on one section, such as `resources`. */
+  openSettingsSection?: (sectionId: string) => void;
+  /** The section the settings dialog opens on; the first one when unset. */
+  settingsSection?: string | null;
   closeSettings: () => void;
   themeMode: ThemeMode;
   setThemeMode: (mode: ThemeMode) => void;
@@ -20,8 +26,22 @@ export interface AppShellNavContextValue {
   setDefaultBackend: (backend: AgentBackendId) => void;
   autoCollapseCompletedTurns?: boolean;
   setAutoCollapseCompletedTurns?: (enabled: boolean) => void;
+  /** One-handed phone layout: status-only top bar, controls in a bottom dock. */
+  phoneDock?: boolean;
+  setPhoneDock?: (enabled: boolean) => void;
+  /** The thumb the one-handed layout is arranged for; left mirrors it. */
+  phoneHand?: PhoneHand;
+  setPhoneHand?: (hand: PhoneHand) => void;
+  /** Opens the map of every thread on the account's devices. */
+  openThreadMap?: () => void;
   showReasoningSummaries?: boolean;
   setShowReasoningSummaries?: (enabled: boolean) => void;
+  sendShortcut?: ComposerSendShortcut;
+  setSendShortcut?: (shortcut: ComposerSendShortcut) => Promise<void>;
+  sendShortcutLoading?: boolean;
+  sendShortcutSaving?: boolean;
+  sendShortcutError?: string | null;
+  refreshSendShortcut?: () => Promise<void>;
 }
 
 export const AppShellNavContext = createContext<AppShellNavContextValue | null>(

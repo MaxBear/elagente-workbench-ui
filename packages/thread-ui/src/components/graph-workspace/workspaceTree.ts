@@ -1,8 +1,6 @@
+import { translate, useI18n } from '../../i18n';
+import { normalizeFileSystemPath, relativeWorkspacePath } from '../workspacePaths';
 import { validateArtifactMetadata } from '@remote-codex/shared';
-import {
-  normalizeFileSystemPath,
-  relativeWorkspacePath,
-} from '../workspacePaths';
 import type {
   AgentRuntimeStatusDto,
   ThreadArtifactDto,
@@ -403,7 +401,7 @@ export function collectWorkspaceItems(
 ) {
   const root: WorkspaceTreeNode = {
     id: 'root',
-    name: detail.workspace.label ?? 'Workspace',
+    name: detail.workspace.label ?? translate("files.workspace"),
     path: '',
     kind: 'directory',
     children: [],

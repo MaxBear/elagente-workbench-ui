@@ -1,14 +1,28 @@
+import { translate, useI18n } from '../i18n';
+import { CopyButton } from './copy/CopyButton';
 import { useLayoutEffect, useRef, useState } from 'react';
+
+/** The path with forward slashes and the home folder as `~`. */
+export function homeRelativePath(path: string) {
+  return path.replace(/\\/g, '/')
+    .replace(/^(?:\/home\/[^/]+|\/Users\/[^/]+|[A-Za-z]:\/Users\/[^/]+|\/root)(?=\/|$)/, '~');
+}
+
+/** ElAgente: whether a workspace path is a real filesystem path that can be copied
+    (absolute POSIX, home-relative or a Windows drive), not an empty or display label. */
+export function isCopyableWorkspacePath(path: string | null | undefined): path is string {
+  return typeof path === 'string' && /^(?:\/|~(?:\/|$)|[A-Za-z]:[\\/])/.test(path.trim());
+}
 
 /** Keep the home/root and nearest directories visible, including on narrow screens. */
 export function WorkbenchPath({ path }: { path: string }) {
+  useI18n();
   const ref = useRef<HTMLSpanElement>(null);
   const [label, setLabel] = useState(path);
   useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
-    const normalized = path.replace(/\\/g, '/')
-      .replace(/^(?:\/home\/[^/]+|\/Users\/[^/]+|[A-Za-z]:\/Users\/[^/]+|\/root)(?=\/|$)/, '~');
+    const normalized = homeRelativePath(path);
     const measure = typeof document.createElement('canvas').getContext === 'function'
       ? document.createElement('canvas').getContext('2d') : null;
     const update = () => {
@@ -38,5 +52,9 @@ export function WorkbenchPath({ path }: { path: string }) {
     if (document.fonts?.ready) void document.fonts.ready.then(update);
     return () => observer?.disconnect();
   }, [path]);
-  return <span ref={ref} className="matter-workspace-path" title={path} aria-label={path}>{label}</span>;
+  // The shortened path keeps its whole value in reach: tooltip, and the copy button beside it.
+  return <span className="matter-workspace-path-chip">
+    <span ref={ref} className="matter-workspace-path" title={path} aria-label={path}>{label}</span>
+    <CopyButton value={path} label={translate('common.copyPath')} />
+  </span>;
 }

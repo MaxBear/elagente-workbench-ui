@@ -234,6 +234,42 @@ describe('useComposerDraft', () => {
     harness.unmount();
   });
 
+  it('preserves newer text and File objects when the host clears an accepted in-flight submission', () => {
+    const onDraftChange = vi.fn();
+    const input = { isShellView: false, draftPrompt: 'sent text', draftAttachments: [], onDraftChange };
+    const harness = renderHookHarness(input);
+    const submission = latestResult!.captureSubmission({ prompt: 'sent text', attachments: [] });
+    const file = new File(['next attachment'], 'next.txt', { type: 'text/plain' });
+    const attachment = { clientId: 'next-file', kind: 'file' as const, placeholder: '[FILE next-file]', originalName: 'next.txt', file };
+    flushSync(() => {
+      latestResult!.updateDraft(() => ({ prompt: '新草稿\n第二行', attachments: [attachment] }), 'deferred');
+    });
+    harness.rerender({ ...input, draftPrompt: '' });
+    flushSync(() => submission.complete());
+    expect(latestResult!.prompt).toBe('新草稿\n第二行');
+    expect(latestResult!.attachments[0]!.file).toBe(file);
+    const restored = applyHostUpdate({ prompt: '', attachments: [] }, onDraftChange.mock.calls.at(-1)![0]);
+    expect(restored.prompt).toBe('新草稿\n第二行');
+    expect(restored.attachments[0]!.file).toBe(file);
+    harness.unmount();
+  });
+
+  it('clears only an unchanged submitted snapshot and preserves a rejected draft', () => {
+    const harness = renderHookHarness({ isShellView: false });
+    flushSync(() => latestResult!.updateDraft(() => ({ prompt: 'first', attachments: [] })));
+    const first = latestResult!.captureSubmission({ prompt: 'first', attachments: [] });
+    flushSync(() => first.complete());
+    expect(latestResult!.prompt).toBe('');
+    flushSync(() => latestResult!.updateDraft(() => ({ prompt: 'retry', attachments: [] })));
+    latestResult!.captureSubmission({ prompt: 'retry', attachments: [] }).cancel();
+    expect(latestResult!.prompt).toBe('retry');
+    const second = latestResult!.captureSubmission({ prompt: 'retry', attachments: [] });
+    flushSync(() => latestResult!.updateDraft(() => ({ prompt: 'next draft', attachments: [] })));
+    flushSync(() => second.complete());
+    expect(latestResult!.prompt).toBe('next draft');
+    harness.unmount();
+  });
+
   it('treats shell mode as uncontrolled even when host draft props are present', () => {
     const onDraftChange = vi.fn();
     const harness = renderHookHarness({

@@ -1,6 +1,6 @@
 # @remote-codex/thread-ui
 
-Shared Remote Codex thread UI components and plugin rendering helpers.
+Shared Pockymoe thread UI components and plugin rendering helpers.
 
 This package is intentionally adapter-driven. It does not import supervisor-web
 API helpers, router libraries, local REST endpoints, websocket endpoint strings,

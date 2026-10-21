@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Loader2, Wrench, XCircle } from 'lucide-react';
 import type { GraphChatToolStatus } from './graphChatToolBlocks';
@@ -56,7 +57,7 @@ function renderResultValue(key: string, value: unknown) {
     typeof value === 'string' &&
     (key === 'stdout' || key === 'stderr' || key === 'result')
   ) {
-    return <pre className="thread-graph-tool-output">{value || '(empty)'}</pre>;
+    return <pre className="thread-graph-tool-output">{value || translate("chat.empty")}</pre>;
   }
 
   if (typeof value === 'object' && value !== null) {
@@ -77,28 +78,29 @@ export function GraphChatToolCall({
   parameters,
   result,
 }: GraphChatToolCallProps) {
+  const { locale: i18nLocale } = useI18n();
   const statusConfig = useMemo(() => {
     switch (status) {
       case 'completed':
         return {
           className: 'is-completed',
           icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-          label: 'Completed',
+          label: translate("chat.completed"),
         };
       case 'failed':
         return {
           className: 'is-failed',
           icon: <XCircle className="h-3.5 w-3.5" />,
-          label: 'Failed',
+          label: translate("chat.failed"),
         };
       default:
         return {
           className: 'is-pending',
           icon: <Loader2 className="h-3.5 w-3.5 animate-spin" />,
-          label: 'Running',
+          label: translate("chat.running"),
         };
     }
-  }, [status]);
+  }, [status, i18nLocale]);
 
   const resultEntries = useMemo(() => normalizeObjectEntries(result), [result]);
   const parameterEntries = useMemo(
@@ -107,8 +109,8 @@ export function GraphChatToolCall({
   );
   const shouldAutoOpen = status === 'pending';
   const actionLabel = /(?:exec|command|shell|terminal)/i.test(toolName)
-    ? 'Ran'
-    : 'Used';
+    ? translate("chat.ran")
+    : translate("chat.used");
   const [openItem, setOpenItem] = useState<string | undefined>(
     shouldAutoOpen ? 'item-1' : undefined,
   );
@@ -141,7 +143,7 @@ export function GraphChatToolCall({
               <span
                 className={`thread-graph-tool-badge ${statusConfig.className}`}
                 title={statusConfig.label}
-                aria-label={`Status: ${statusConfig.label}`}
+                aria-label={translate("chat.status", { value1: statusConfig.label })}
               >
                 {statusConfig.icon}
                 <span className="thread-graph-status-label">
@@ -153,7 +155,7 @@ export function GraphChatToolCall({
 
           <AccordionContent className="thread-graph-tool-content px-4 pb-4 pt-1">
             <section>
-              <h4>Parameters</h4>
+              <h4>{translate("chat.parameters")}</h4>
               <div className="thread-graph-tool-json">
                 {'{'}
                 <br />
@@ -170,7 +172,7 @@ export function GraphChatToolCall({
                   ))
                 ) : (
                   <div>
-                    <span className="thread-graph-tool-null">empty</span>
+                    <span className="thread-graph-tool-null">{translate("chat.empty_ad8710")}</span>
                   </div>
                 )}
                 {'}'}
@@ -179,7 +181,7 @@ export function GraphChatToolCall({
 
             {resultEntries.length > 0 ? (
               <section>
-                <h4>Result</h4>
+                <h4>{translate("chat.result")}</h4>
                 <div className="thread-graph-tool-json">
                   {'{'}
                   <br />

@@ -1,6 +1,11 @@
+import { useWorkspaceDocuments } from "./explorer/useWorkspaceDocuments";
+import { isProtected } from "./explorer/workspaceDocuments";
+import { translate, useI18n } from '../../i18n';
 import { relativeWorkspacePath } from '../workspacePaths';
-import * as Dialog from '@radix-ui/react-dialog';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ImperativePanelHandle } from 'react-resizable-panels';
+import { RenameDialog } from '../RenameDialog';
+import { ConfirmDialog } from '../ConfirmDialog';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   AgentRuntimeStatusDto,
@@ -22,12 +27,15 @@ import {
   graphWorkspacePreviewTargetFromNode,
 } from './GraphWorkspacePreviewPane';
 import { GraphEmptyGarbageDialog } from './GraphEmptyGarbageDialog';
+import { useFilePanel } from '../workbench/FilePanelContext';
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from './GraphResizablePanels';
 
+
+const TREE_MIN_PX = 220;
 export function GraphWorkspaceExplorer({
   activeView,
   detail,
@@ -36,6 +44,7 @@ export function GraphWorkspaceExplorer({
   status,
   focusPathRequest,
   workspaceAdapter,
+  onActiveFileChange,
 }: {
   activeView: 'chat' | 'shell';
   detail: ThreadDetailDto;
@@ -44,7 +53,9 @@ export function GraphWorkspaceExplorer({
   status: AgentRuntimeStatusDto | null;
   focusPathRequest?: { path: string; line?: number; requestId: number; artifactId?: string } | null;
   workspaceAdapter?: ThreadWorkspaceAdapter | null;
+  onActiveFileChange?: (relativePath: string | null) => void;
 }) {
+  useI18n();
   const {
     activeNode,
     capabilities,
@@ -60,6 +71,7 @@ export function GraphWorkspaceExplorer({
     liveNodes,
     loadingDirectoryPaths,
     loadingTree,
+    missingPath,
     refreshWorkspaceTree,
     retryDirectory,
     setLoadingTree,
@@ -90,10 +102,110 @@ export function GraphWorkspaceExplorer({
   );
   const [focusedLine, setFocusedLine] = useState<number | null>(null);
   const [fileTabs, setFileTabs] = useState<WorkspaceFileTab[]>([]);
-  const [dirtyFilePaths, setDirtyFilePaths] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const documents = useWorkspaceDocuments(workspaceAdapter, workspaceIdentity);
+  const readingPositions = useMemo(() => new Map<string, number>(), [documents.source]);
+  const [navigation, setNavigation] = useState<{ scope: string; paths: string[]; index: number }>({ scope: documents.source, paths: [], index: -1 });
+  const selectedFilePath = activeNode?.kind === 'file' ? activeNode.path : null;
+  // The tree opens at least TREE_MIN_PX wide, so its names and toolbar fit;
+  // the reader can still drag it narrower.
+  const workspacePanelRef = useRef<HTMLDivElement>(null);
+  const treePanelRef = useRef<ImperativePanelHandle>(null);
+  useLayoutEffect(() => {
+    const width = workspacePanelRef.current?.clientWidth ?? 0;
+    const tree = treePanelRef.current;
+    if (!tree || width <= 0 || (tree.getSize() / 100) * width >= TREE_MIN_PX) return;
+    tree.resize(Math.min(50, (TREE_MIN_PX / width) * 100));
+  }, []);
+  const activeFileChange = useRef(onActiveFileChange);
+  activeFileChange.current = onActiveFileChange;
+  useEffect(() => {
+    activeFileChange.current?.(selectedFilePath ? relativeWorkspacePath(selectedFilePath, detail.workspace.absPath) : null);
+  }, [selectedFilePath, detail.workspace.absPath]);
+  useEffect(() => () => activeFileChange.current?.(null), []);
+  useLayoutEffect(() => {
+    setNavigation(current => {
+      if (current.scope !== documents.source) return { scope: documents.source, paths: selectedFilePath ? [selectedFilePath] : [], index: selectedFilePath ? 0 : -1 };
+      if (!selectedFilePath || current.paths[current.index] === selectedFilePath) return current;
+      const paths = [...current.paths.slice(0, current.index + 1), selectedFilePath].slice(-100);
+      return { ...current, paths, index: paths.length - 1 };
+    });
+  }, [documents.source, selectedFilePath]);
+  function navigatePreview(direction: -1 | 1) {
+    const index = navigation.index + direction;
+    const path = navigation.paths[index];
+    if (!path) return;
+    setNavigation(current => ({ ...current, index }));
+    setFocusedLine(null);
+    setCollapsedPanel(isMobileViewport ? 'explorer' : null);
+    void focusWorkspacePath(path);
+  }
+  const [newFilePath, setNewFilePath] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [creatingFile, setCreatingFile] = useState(false);
+  const createSource = JSON.stringify([workspaceAdapter?.resourceScopeKey, workspaceIdentity.workspaceId, workspaceIdentity.threadId]);
+  const createOwnerRef = useRef({ source: createSource, busy: false });
+  if (createOwnerRef.current.source !== createSource) createOwnerRef.current = { source: createSource, busy: false };
+  useEffect(() => { setNewFilePath(null); setCreateError(null); setCreatingFile(false); }, [createSource]);
+  function openCreateFile() {
+    const relative = activeNode ? relativeWorkspacePath(activeNode.path, detail.workspace.absPath) : null;
+    const directory = relative
+      ? activeNode?.kind === 'directory' ? relative : relative.slice(0, Math.max(0, relative.lastIndexOf('/')))
+      : '';
+    setNewFilePath(directory ? `${directory}/` : '');
+    setCreateError(null);
+  }
+  async function handleCreateFile() {
+    if (!workspaceAdapter?.createFile || newFilePath === null) return;
+    const owner = createOwnerRef.current;
+    if (owner.busy) return;
+    const path = newFilePath.trim();
+    if (!path || path.length > 4096 || /[\\\x00-\x1f\x7f]/.test(path) || /^[a-z]:/i.test(path) || path.split('/').some(part => !part || part === '.' || part === '..')) {
+      setCreateError(translate('files.invalidNewFilePath')); return;
+    }
+    if (dirtyFilePaths.has(path)) { setCreateError(translate('files.createHasDraft')); return; }
+    owner.busy = true; setCreatingFile(true); setCreateError(null);
+    let created = false;
+    try {
+      await workspaceAdapter.createFile({ ...workspaceIdentity, path });
+      created = true;
+      if (createOwnerRef.current !== owner) return;
+      // Another pane may edit an old cached draft while creation is in flight.
+      const currentDraft = documents.documents.get(path);
+      if ((currentDraft && isProtected(currentDraft)) || !documents.discard(path)) {
+        throw new Error(translate('files.createHasDraft'));
+      }
+      setNewFilePath(null);
+      setFilterQuery('');
+      await refreshWorkspaceTree(path);
+      if (createOwnerRef.current !== owner) return;
+      await focusWorkspacePath(path);
+      if (createOwnerRef.current !== owner) return;
+      const snapshot = await documents.load(path);
+      if (createOwnerRef.current !== owner) return;
+      if (snapshot && !snapshot.readOnlyReason && workspaceAdapter.saveDocument) documents.setEditing(path, true);
+      setFileTabs(tabs => [...tabs.filter(tab => tab.path !== path), { path, name: path.split('/').pop()!, pinned: true }]);
+      setCollapsedPanel(isMobileViewport ? 'explorer' : null);
+    } catch (error) {
+      if (createOwnerRef.current !== owner) return;
+      const message = error instanceof Error ? error.message : translate('files.fileOperationFailed');
+      if (created) setWorkspaceError(translate('files.createdButOpenFailed', { path, error: message }));
+      else setCreateError(message);
+    } finally {
+      owner.busy = false;
+      if (createOwnerRef.current === owner) setCreatingFile(false);
+    }
+  }
+  const createDialog = <RenameDialog open={newFilePath !== null} title={translate('files.newFile')}
+    label={translate('files.newFilePath')} description={translate('files.newFileDescription')}
+    submitLabel={translate('files.createFile')} value={newFilePath ?? ''}
+    onChange={setNewFilePath} onCancel={() => { if (!creatingFile) setNewFilePath(null); }}
+    onSubmit={handleCreateFile} busy={creatingFile} error={createError} />;
+  const dirtyFilePaths = new Set([...documents.documents].filter(([,doc]) => isProtected(doc)).map(([path]) => path));
+  const dirtyKey = [...dirtyFilePaths].join('\0');
+  useEffect(() => {
+    setFileTabs(tabs => tabs.map(tab => dirtyFilePaths.has(tab.path) ? {...tab,pinned:true}:tab));
+  }, [dirtyKey]);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 639px)').matches);
   const explorerScrollerRef = useRef<HTMLDivElement | null>(null);
   const explorerScrollTopRef = useRef(0);
   const restoredRevealRef = useRef<number | null>(null);
@@ -107,25 +219,27 @@ export function GraphWorkspaceExplorer({
   const pendingExplorerScrollRestoreRef = useRef<number | null>(null);
   const {
     downloadOnly,
+    downloadReason,
     imageUrl,
     loadingMore,
     loadMore: handleLoadMore,
     pdfUrl,
     previewFile,
     previewLoading,
-    saveFile: handleSaveFile,
-    reloadFile,
   } = useWorkspaceFilePreview({
     activeNode,
     adapter: workspaceAdapter,
     identity: workspaceIdentity,
     onError: setWorkspaceError,
-    refreshTree: refreshWorkspaceTree,
+    documents,
   });
   const [fileOperation, setFileOperation] = useState<'delete' | 'move' | null>(
     null,
   );
   const [destination, setDestination] = useState('');
+  const activeDocument = previewFile ? documents.documents.get(previewFile.path) : undefined;
+  const currentPreviewFile = previewFile && activeDocument?.snapshot.content != null
+    ? {...previewFile,...activeDocument.snapshot,content:activeDocument.snapshot.content} : previewFile;
   const {
     canDownload,
     canDelete,
@@ -173,6 +287,14 @@ export function GraphWorkspaceExplorer({
     focusFile: (path) => { setCollapsedPanel(null); return focusWorkspacePath(path); },
     workspaceRootPath: detail.workspace.absPath,
   });
+  const canUploadFiles = Boolean(workspaceAdapter?.uploadFile && capabilities?.create === true);
+  const canImportArchives = importFormats.length > 0 &&
+    Boolean((workspaceAdapter as WorkspaceExplorerAdapter)?.importArchive);
+  const canDownloadTar = downloadFormats.includes('tar');
+  const canDownloadZip = downloadFormats.includes('zip');
+  const canTrashFiles = Boolean(capabilities?.trash?.files && workspaceAdapter?.trashFile);
+  const canDeleteFiles = Boolean(capabilities?.delete === 'file' && !capabilities.trash && workspaceAdapter?.deleteFile);
+  const canMoveFiles = Boolean(capabilities?.move === 'file-new-destination' && workspaceAdapter?.moveFile);
 
   useEffect(() => {
     setFileOperation(null);
@@ -186,7 +308,6 @@ export function GraphWorkspaceExplorer({
     setFocusedLine(null);
     ++scrollRestoreGenerationRef.current;
     setFileTabs([]);
-    setDirtyFilePaths(new Set());
   }, [workspaceIdentity.threadId, workspaceIdentity.workspaceId]);
 
   useEffect(() => {
@@ -197,27 +318,25 @@ export function GraphWorkspaceExplorer({
       if (current.some((tab) => tab.path === activeNode.path)) {
         return current;
       }
-      const previewIndex = current.findIndex((tab) => !tab.pinned);
-      const nextTab: WorkspaceFileTab = {
-        name: activeNode.name,
-        path: activeNode.path,
-        pinned: false,
-      };
-      if (previewIndex < 0) {
-        return [...current, nextTab];
-      }
-      return current.map((tab, index) =>
-        index === previewIndex ? nextTab : tab,
-      );
+      return [...current, { name: activeNode.name, path: activeNode.path, pinned: true }];
     });
   }, [activeNode]);
+
+  // Minimized, only the tree shows; opening another file from it brings the editor back.
+  const filePanel = useFilePanel();
+  const minimized = Boolean(filePanel?.minimized);
+  const pathWhenMinimized = useRef<string | null>(null);
+  useEffect(() => { if (minimized) pathWhenMinimized.current = activeNode?.path ?? null; }, [minimized]);
+  useEffect(() => {
+    if (minimized && activeNode?.kind === 'file' && activeNode.path !== pathWhenMinimized.current) filePanel?.setMinimized?.(false);
+  }, [activeNode?.path]);
 
   useEffect(() => {
     if (focusPathRequest) {
       setFocusedLine(focusPathRequest.line ?? null);
-      setCollapsedPanel(null);
+      setCollapsedPanel(isMobileViewport && activeNode?.kind !== 'directory' ? 'explorer' : null);
     }
-  }, [focusPathRequest]);
+  }, [focusPathRequest, isMobileViewport, activeNode?.kind]);
 
   function rememberExplorerScroll() {
     const currentScrollTop =
@@ -236,9 +355,23 @@ export function GraphWorkspaceExplorer({
     }
 
     let frame = 0;
+    const cancel = () => {
+      ++scrollRestoreGenerationRef.current;
+      pendingExplorerScrollRestoreRef.current = null;
+      removeListeners();
+    };
+    const removeListeners = () => {
+      scroller.removeEventListener('wheel', cancel);
+      scroller.removeEventListener('touchstart', cancel);
+      scroller.removeEventListener('pointerdown', cancel);
+    };
+    scroller.addEventListener('wheel', cancel, { passive: true });
+    scroller.addEventListener('touchstart', cancel, { passive: true });
+    scroller.addEventListener('pointerdown', cancel, { passive: true });
     const restore = () => {
       const current = explorerScrollerRef.current;
       if (!current || generation !== scrollRestoreGenerationRef.current) {
+        removeListeners();
         return;
       }
       current.scrollTop = Math.min(
@@ -251,17 +384,25 @@ export function GraphWorkspaceExplorer({
         window.requestAnimationFrame(restore);
       } else {
         pendingExplorerScrollRestoreRef.current = null;
+        removeListeners();
       }
     };
     window.requestAnimationFrame(restore);
   }
 
+  const treeShownForRevealRef = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (
       collapsedPanel === 'explorer' ||
       (focusPathRequest &&
         restoredRevealRef.current !== focusPathRequest.requestId)
     ) {
+      return;
+    }
+    // The first time the list shows after a link opened a file (a phone shows
+    // one or the other), it brings that file into view instead of the old place.
+    if (focusPathRequest && treeShownForRevealRef.current !== focusPathRequest.requestId) {
+      treeShownForRevealRef.current = focusPathRequest.requestId;
       return;
     }
     restoreExplorerScroll();
@@ -321,15 +462,8 @@ export function GraphWorkspaceExplorer({
   function handleCloseTab(path: string) {
     const closingIndex = fileTabs.findIndex((tab) => tab.path === path);
     const nextTabs = fileTabs.filter((tab) => tab.path !== path);
+    if (!documents.discard(path)) return;
     setFileTabs(nextTabs);
-    setDirtyFilePaths((current) => {
-      if (!current.has(path)) {
-        return current;
-      }
-      const next = new Set(current);
-      next.delete(path);
-      return next;
-    });
     if (activeNode?.path !== path) {
       return;
     }
@@ -339,13 +473,36 @@ export function GraphWorkspaceExplorer({
       void focusWorkspacePath(replacement.path);
     } else {
       setSelectedNodeId(null);
+      if (isMobileViewport) setCollapsedPanel('viewer');
     }
   }
 
   const explorerActions = {
     onCopyPath: handleCopyPath,
+    ...(workspaceAdapter?.renameNode ? {onRename: async (node: WorkspaceTreeNode, name: string) => {
+      const relative = relativeWorkspacePath(node.path, detail.workspace.absPath);
+      if (!relative || !name.trim() || name === '.' || name === '..' || /[\\/\x00-\x1f]/.test(name)) throw new Error(translate("files.enterAValidFilenameWithoutPathSeparators"));
+      if ([...dirtyFilePaths].some(path => path === node.path || path.startsWith(`${node.path}/`))) throw new Error(translate("files.saveOrDiscardUnsavedChangesBeforeRenaming"));
+      const prefix = relative.includes('/') ? relative.slice(0, relative.lastIndexOf('/') + 1) : '';
+      const toPath = prefix + name.trim();
+      await workspaceAdapter.renameNode!({...workspaceIdentity, fromPath: relative, toPath});
+      for (const path of documents.documents.keys()) if(path===node.path || path.startsWith(`${node.path}/`)) documents.discard(path);
+      setFileTabs(tabs => tabs.map(tab => tab.path === node.path || tab.path.startsWith(`${node.path}/`) ? {...tab, path: toPath + tab.path.slice(node.path.length), name: tab.path === node.path ? name.trim() : tab.name} : tab));
+      await refreshWorkspaceTree(toPath);
+    }} : {}),
+    ...(workspaceAdapter?.deleteNode ? {onDelete: async (node: WorkspaceTreeNode) => {
+      const relative = relativeWorkspacePath(node.path, detail.workspace.absPath);
+      if (!relative) throw new Error(translate("files.theWorkspaceRootCannotBeDeleted"));
+      if ([...dirtyFilePaths].some(path => path === node.path || path.startsWith(`${node.path}/`))) throw new Error(translate("files.saveOrDiscardUnsavedChangesBeforeDeleting"));
+      await workspaceAdapter.deleteNode!({...workspaceIdentity, path: relative});
+      for (const path of documents.documents.keys()) if(path===node.path || path.startsWith(`${node.path}/`)) documents.discard(path);
+      setFileTabs(tabs => tabs.filter(tab => tab.path !== node.path && !tab.path.startsWith(`${node.path}/`)));
+      if (activeNode?.path === node.path || activeNode?.path.startsWith(`${node.path}/`)) setSelectedNodeId(null);
+      await refreshWorkspaceTree();
+    }} : {}),
+    // ElAgente: downloads are gated by the advertised capabilities; folders may also download as ZIP.
     ...(workspaceAdapter?.downloadNode
-      ? { onDownload: (node: WorkspaceTreeNode, format?: import('../../adapters').ThreadWorkspaceArchiveFormat) => void handleDownload(node, format) }
+      ? { onDownload: (node: WorkspaceTreeNode) => void handleDownload(node) }
       : {}),
     canDownload: (node: WorkspaceTreeNode) => !pending && canDownload(node),
     ...(workspaceAdapter?.downloadNode && downloadFormats.includes('zip')
@@ -364,18 +521,16 @@ export function GraphWorkspaceExplorer({
           },
         }
       : {}),
-    ...(workspaceAdapter?.uploadFile ? { onUpload: pickUploadFile } : {}),
+    ...(canUploadFiles ? { onUpload: pickUploadFile } : {}),
+    ...(workspaceAdapter?.createFile ? { onCreateFile: openCreateFile } : {}),
   };
 
   const explorerPanel = (
     <WorkspaceExplorerPanel
       canEmptyGarbage={Boolean(workspaceAdapter?.emptyGarbage)}
-      canUpload={Boolean(workspaceAdapter?.uploadFile)}
+      canUpload={canUploadFiles}
       pending={pending}
-      canImportArchive={
-        importFormats.length > 0 &&
-        Boolean((workspaceAdapter as WorkspaceExplorerAdapter)?.importArchive)
-      }
+      canImportArchive={canImportArchives}
       importFormats={importFormats}
       downloadFormats={downloadFormats}
       archiveLimits={
@@ -383,27 +538,31 @@ export function GraphWorkspaceExplorer({
           ? `${capabilities.maxArchiveBytes?.toLocaleString() ?? 'bounded'} bytes expanded, ${capabilities.maxArchiveEntries?.toLocaleString() ?? 'bounded'} entries; no symlinks or paths outside the workspace.`
           : undefined
       }
-      onImportArchive={() => archiveInputRef.current?.click()}
-      onDownloadWorkspace={() => void handleDownload(tree)}
-      onDownloadWorkspaceZip={() => void handleDownload(tree, 'zip')}
+      {...(canImportArchives ? {onImportArchive: () => archiveInputRef.current?.click()} : {})}
+      {...(canDownloadTar ? {onDownloadWorkspace: () => void handleDownload(tree)} : {})}
+      {...(canDownloadZip ? {onDownloadWorkspaceZip: () => void handleDownload(tree, 'zip')} : {})}
       canTrash={canTrash}
-      onTrashFile={canListTrash ? () => void trashFile() : undefined}
+      onTrashFile={canTrashFiles ? () => void trashFile() : undefined}
       onOpenTrash={canListTrash ? () => void openTrash() : undefined}
       canDelete={canDelete}
       canMove={canMove}
-      onDeleteFile={capabilities?.trash ? undefined : () => setFileOperation('delete')}
-      onMoveFile={() => {
+      onDeleteFile={canDeleteFiles ? () => setFileOperation('delete') : undefined}
+      onMoveFile={canMoveFiles ? () => {
         setDestination(activeNode?.path ?? '');
         setFileOperation('move');
-      }}
+      } : undefined}
       compactFolders={!isMobileViewport}
       directoryErrors={directoryErrors}
       filterMode={filterMode}
       filterQuery={filterQuery}
       initialLoading={Boolean(workspaceAdapter && !adapterModel && loadingTree)}
       rootError={workspaceAdapter && !adapterModel ? workspaceError : null}
-      {...(collapsedPanel === 'viewer'
-        ? { onExpandViewer: () => setCollapsedPanel(null) }
+      {...(minimized ? {} : collapsedPanel === 'viewer'
+        ? {
+            onExpandViewer: () => { if (!isMobileViewport || activeNode?.kind === 'file') setCollapsedPanel(isMobileViewport ? 'explorer' : null); },
+            // On phones the editor can only be shown for an open file.
+            expandViewerAvailable: !isMobileViewport || activeNode?.kind === 'file',
+          }
         : {
             onCollapse: () => {
               rememberExplorerScroll();
@@ -426,13 +585,17 @@ export function GraphWorkspaceExplorer({
         setSelectedNodeId(nodeId);
       }}
       onSelectNode={(node) => {
+        setNavigation(current => ({ ...current, paths: [], index: -1 }));
         setFocusedLine(null);
-        if (isMobileViewport && node.kind !== 'directory') {
+        if ((isMobileViewport || collapsedPanel === 'viewer') && node.kind !== 'directory') {
           rememberExplorerScroll();
           setCollapsedPanel('explorer');
         }
       }}
-      onToggle={toggleDirectory}
+      onToggle={(path) => {
+        toggleDirectory(path);
+        setFocusedLine(null);
+      }}
       selectedNodeId={activeNode?.id ?? null}
       revealRequestKey={focusPathRequest?.requestId}
       tree={tree}
@@ -443,11 +606,17 @@ export function GraphWorkspaceExplorer({
   const viewerPanel = (
     <GraphWorkspacePreviewPane
       key={`${workspaceIdentity.threadId}:${workspaceIdentity.workspaceId}`}
+      mobileNavigation={isMobileViewport}
+      readingPositions={readingPositions}
+      {...(navigation.index > 0 ? { onNavigateBack: () => navigatePreview(-1), previousFilePath: navigation.paths[navigation.index - 1] } : {})}
+      {...(navigation.index < navigation.paths.length - 1 ? { onNavigateForward: () => navigatePreview(1) } : {})}
       activeFilePath={activeNode?.kind === 'file' ? activeNode.path : null}
       dirtyFilePaths={dirtyFilePaths}
-      error={null}
+      error={workspaceError ?? capabilityError}
+      missingPath={missingPath}
       fileTabs={fileTabs}
       downloadOnly={downloadOnly}
+      downloadReason={downloadReason}
       {...(activeNode?.kind === 'file' && canDownload(activeNode)
         ? { onDownloadFile: () => handleDownload(activeNode) }
         : {})}
@@ -455,41 +624,26 @@ export function GraphWorkspaceExplorer({
       loadingMore={loadingMore}
       focusLine={focusedLine}
       onOpenWorkspaceFile={(path) => {
+        // Returning to the directory ends a preview chain. A link opened from
+        // that same document starts a fresh chain with its current position.
+        if (selectedFilePath) setNavigation(current => current.index < 0 ? { ...current, paths: [selectedFilePath], index: 0 } : current);
         setFocusedLine(null);
-        setCollapsedPanel(null);
+        setCollapsedPanel(isMobileViewport ? 'explorer' : null);
         void focusWorkspacePath(path);
       }}
-      onLoadMore={() => void handleLoadMore()}
+      {...(workspaceAdapter?.textRangeRead ? { onLoadMore: handleLoadMore } : {})}
+      onReturnToFiles={() => { setNavigation(current => ({ ...current, paths: [], index: -1 })); setCollapsedPanel('viewer'); }}
       onCloseFileTab={handleCloseTab}
-      onDirtyChange={(path, dirty) => {
-        if (dirty) {
-          setFileTabs((current) =>
-            current.map((tab) =>
-              tab.path === path ? { ...tab, pinned: true } : tab,
-            ),
-          );
-        }
-        setDirtyFilePaths((current) => {
-          if (current.has(path) === dirty) {
-            return current;
-          }
-          const next = new Set(current);
-          if (dirty) {
-            next.add(path);
-          } else {
-            next.delete(path);
-          }
-          return next;
-        });
+      onSelectFileTab={(path) => {
+        setNavigation(current => ({ ...current, paths: [], index: -1 }));
+        void focusWorkspacePath(path);
       }}
-      onSelectFileTab={(path) => void focusWorkspacePath(path)}
-      {...(workspaceAdapter?.writeFile &&
-      activeNode &&
-      relativeWorkspacePath(activeNode.path, detail.workspace.absPath) !== null
-        ? { onSaveFile: handleSaveFile }
-        : {})}
-      {...(collapsedPanel === 'explorer'
-        ? { onExpandExplorer: () => setCollapsedPanel(null) }
+      documents={documents}
+      resourceScopeKey={documents.source}
+      canSaveDocument={Boolean(workspaceAdapter?.saveDocument)}
+      onSaveAndClose={async (path) => { if (await documents.save(path)) handleCloseTab(path); }}
+      {...(collapsedPanel === 'explorer' || isMobileViewport
+        ? { onExpandExplorer: () => { setNavigation(current => ({ ...current, paths: [], index: -1 })); setCollapsedPanel(isMobileViewport ? 'viewer' : null); } }
         : {
             onCollapse: () => {
               rememberExplorerScroll();
@@ -497,9 +651,8 @@ export function GraphWorkspaceExplorer({
             },
           })}
       pdfUrl={pdfUrl}
-      previewFile={previewFile}
+      previewFile={currentPreviewFile}
       previewLoading={previewLoading}
-      onReloadFile={() => void reloadFile()}
       plugins={plugins}
       {...(workspaceAdapter?.getRawFileUrl
         ? {
@@ -515,179 +668,97 @@ export function GraphWorkspaceExplorer({
     />
   );
 
-  function renderWorkspace(content: import('react').ReactNode) {
+  const overlays = <>
+    <input ref={fileInputRef} type="file" aria-label={translate("files.workspaceUploadFileInput")} data-testid="workspace-upload-file-input" className="hidden" onChange={event => void handleUpload(event)} />
+    {/* ElAgente: archive import, trash and the capability-gated move and delete. */}
+    <input ref={archiveInputRef} type="file" accept={importFormats.map((format) => `.${format}`).join(',')} aria-label="Workspace archive import input" data-testid="workspace-archive-import-input" className="hidden" onChange={(event) => void handleArchiveImport(event)} />
+    {showGarbageDialog && <GraphEmptyGarbageDialog files={garbageFiles} onCancel={() => setShowGarbageDialog(false)} onConfirm={() => void handleConfirmEmptyGarbage()} />}
+    {createDialog}
+    {(capabilityError || (notice && !showTrash)) ? (
+      <div role={capabilityError ? 'alert' : 'status'} className="workspace-operation-notice">{capabilityError ?? notice}</div>
+    ) : null}
+    <WorkspaceTrashDialog
+      open={showTrash}
+      list={trashList}
+      pending={pending}
+      error={workspaceError}
+      notice={notice}
+      canRestore={canRestoreTrash}
+      canEmpty={canEmptyTrash}
+      confirming={confirmTrashEmpty}
+      onClose={() => { setShowTrash(false); setConfirmTrashEmpty(false); }}
+      onRefresh={() => void openTrash()}
+      onRestore={(entry) => void restoreTrash(entry)}
+      onConfirmingChange={setConfirmTrashEmpty}
+      onEmpty={() => void emptyTrash()}
+    />
+    <ConfirmDialog
+      open={fileOperation === 'delete'}
+      title="Permanently delete file"
+      description={`Permanently delete ${activeNode?.name ?? 'this file'}? This connection has no reversible trash. Immutable artifacts are retained, but workspace file links can stop working.`}
+      confirmLabel="Delete permanently"
+      busy={pending}
+      onCancel={() => setFileOperation(null)}
+      onConfirm={() => { setFileOperation(null); if (canDelete) void deleteFile(); }}
+    />
+    <RenameDialog
+      open={fileOperation === 'move'}
+      title="Move file"
+      label="New file path"
+      description="Move the selected file to a new workspace path. Existing files cannot be replaced."
+      submitLabel="Move file"
+      value={destination}
+      busy={pending}
+      onChange={setDestination}
+      onCancel={() => setFileOperation(null)}
+      onSubmit={() => { setFileOperation(null); if (canMove) void moveFile(destination); }}
+    />
+  </>;
+
+  if (minimized) {
     return (
-      <div className="flex h-full min-h-0 flex-col">
-        {workspaceError || capabilityError ? (
-          <div
-            role="alert"
-            className="px-3 py-2 text-sm text-rose-700 dark:text-rose-200"
-          >
-            {workspaceError || capabilityError}
-          </div>
-        ) : null}
-        {notice && !showTrash ? (
-          <div role="status" className="max-h-28 shrink-0 overflow-auto break-words px-3 py-2 text-sm">
-            {notice}
-          </div>
-        ) : null}
-        {showGarbageDialog ? (
-          <GraphEmptyGarbageDialog
-            files={garbageFiles}
-            onCancel={() => setShowGarbageDialog(false)}
-            onConfirm={() => void handleConfirmEmptyGarbage()}
-          />
-        ) : null}
-        <WorkspaceTrashDialog
-          open={showTrash}
-          list={trashList}
-          pending={pending}
-          error={workspaceError}
-          notice={notice}
-          canRestore={canRestoreTrash}
-          canEmpty={canEmptyTrash}
-          confirming={confirmTrashEmpty}
-          onClose={() => { setShowTrash(false); setConfirmTrashEmpty(false); }}
-          onRefresh={() => void openTrash()}
-          onRestore={(entry) => void restoreTrash(entry)}
-          onConfirmingChange={setConfirmTrashEmpty}
-          onEmpty={() => void emptyTrash()}
-        />
-        <Dialog.Root
-          open={fileOperation !== null}
-          onOpenChange={(open) => {
-            if (!open) setFileOperation(null);
-          }}
-        >
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
-          <Dialog.Content
-            className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-[var(--theme-panel)] p-6 shadow-xl"
-            onOpenAutoFocus={(event) => {
-              if (fileOperation === 'delete') {
-                event.preventDefault();
-                document
-                  .querySelector<HTMLButtonElement>(
-                    '[aria-label="Cancel file operation"]',
-                  )
-                  ?.focus();
-              }
-            }}
-          >
-            <Dialog.Title>
-              {fileOperation === 'delete'
-                ? 'Permanently delete file'
-                : 'Move file'}
-            </Dialog.Title>
-            <Dialog.Description>
-              {fileOperation === 'delete'
-                ? `Permanently delete ${activeNode?.name}? This connection has no reversible trash. Immutable artifacts are retained, but workspace file links can stop working.`
-                : 'Move the selected file to a new workspace path. Existing files cannot be replaced.'}
-            </Dialog.Description>
-            {fileOperation === 'move' ? (
-              <input
-                aria-label="New file path"
-                value={destination}
-                onChange={(event) => setDestination(event.currentTarget.value)}
-              />
-            ) : null}
-            <button
-              type="button"
-              aria-label="Cancel file operation"
-              disabled={pending}
-              onClick={() => setFileOperation(null)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={
-                pending || (fileOperation === 'delete' ? !canDelete : !canMove)
-              }
-              onClick={() => {
-                const operation = fileOperation;
-                setFileOperation(null);
-                if (operation === 'delete') void deleteFile();
-                else void moveFile(destination);
-              }}
-            >
-              {fileOperation === 'delete' ? 'Delete permanently' : 'Move file'}
-            </button>
-          </Dialog.Content>
-        </Dialog.Root>
-        <div className="min-h-0 flex-1">{content}</div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          aria-label="Workspace upload file input"
-          data-testid="workspace-upload-file-input"
-          className="hidden"
-          onChange={(event) => void handleUpload(event)}
-        />
-        <input
-          ref={archiveInputRef}
-          type="file"
-          accept={importFormats.map((format) => `.${format}`).join(',')}
-          aria-label="Workspace archive import input"
-          data-testid="workspace-archive-import-input"
-          className="hidden"
-          onChange={(event) => void handleArchiveImport(event)}
-        />
+      <div data-testid="workspace-panel" data-minimized="true" className="relative h-full min-h-0 w-full overflow-hidden p-1">
+        {explorerPanel}
+        {overlays}
       </div>
     );
   }
 
-  if (collapsedPanel === 'explorer') {
-    return renderWorkspace(
+  if (collapsedPanel === 'explorer' || (isMobileViewport && collapsedPanel === null && activeNode?.kind === 'file')) {
+    return (
       <div
         data-testid="workspace-panel"
         className="relative h-full min-h-0 w-full overflow-hidden p-1"
       >
         {viewerPanel}
-      </div>,
+        {overlays}
+      </div>
     );
   }
 
-  if (collapsedPanel === 'viewer') {
-    return renderWorkspace(
+  if (collapsedPanel === 'viewer' || isMobileViewport) {
+    return (
       <div
         data-testid="workspace-panel"
         className="relative h-full min-h-0 w-full overflow-hidden p-1"
       >
         {explorerPanel}
-      </div>,
+        {overlays}
+      </div>
     );
   }
 
-  return renderWorkspace(
+  return (
     <div
+      ref={workspacePanelRef}
       data-testid="workspace-panel"
       className="flex h-full min-h-0 w-full overflow-hidden bg-transparent p-1"
     >
-      {isMobileViewport ? (
-        <ResizablePanelGroup
-          direction="vertical"
-          autoSaveId={`workspace-explorer-mobile:${workspaceIdentity.threadId}`}
-          className="thread-graph-workspace-mobile-stack"
-        >
-          <ResizablePanel defaultSize={42} minSize={18}>
-            <div className="thread-graph-workspace-mobile-explorer h-full min-h-0 overflow-hidden">
-              {explorerPanel}
-            </div>
-          </ResizablePanel>
-          <ResizableHandle className="thread-graph-workspace-resize-handle h-1 bg-transparent after:h-px after:bg-slate-200/80 after:transition-colors hover:after:bg-slate-300 dark:after:bg-[#303642] dark:hover:after:bg-[#475063]" />
-          <ResizablePanel defaultSize={58} minSize={18}>
-            <div className="thread-graph-workspace-mobile-viewer h-full min-h-0 overflow-hidden">
-              {viewerPanel}
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        <ResizablePanelGroup
+      <ResizablePanelGroup
           direction="horizontal"
-          autoSaveId={`workspace-explorer-desktop:${workspaceIdentity.threadId}`}
           className="thread-graph-workspace-resizable"
         >
-          <ResizablePanel defaultSize={28} minSize={18}>
+          <ResizablePanel ref={treePanelRef} defaultSize={28} minSize={18}>
             <div className="thread-graph-workspace-explorer-pane h-full min-h-0 overflow-hidden">
               {explorerPanel}
             </div>
@@ -699,7 +770,7 @@ export function GraphWorkspaceExplorer({
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
-      )}
-    </div>,
+      {overlays}
+    </div>
   );
 }

@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import { type ReactNode } from 'react';
 import {
   BarChart2,
@@ -20,6 +21,7 @@ import {
 } from './GraphAccordion';
 
 function GuideTag({ children }: { children: ReactNode }) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <span className="thread-guide-tag inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[10px]">
       {children}
@@ -28,6 +30,7 @@ function GuideTag({ children }: { children: ReactNode }) {
 }
 
 function GuideBullets({ items }: { items: ReactNode[] }) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <ul className="space-y-1 text-[12px] text-[var(--theme-fg-muted)]">
       {items.map((item, index) => (
@@ -41,6 +44,7 @@ function GuideBullets({ items }: { items: ReactNode[] }) {
 }
 
 function SectionIcon({ children }: { children: ReactNode }) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <span className="thread-guide-icon flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
       {children}
@@ -59,6 +63,7 @@ function GuideAccordionItem({
   icon: ReactNode;
   children: ReactNode;
 }) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <AccordionItem
       value={value}
@@ -76,126 +81,100 @@ function GuideAccordionItem({
 }
 
 export function GraphGuidePanel() {
+  const { locale: i18nLocale } = useI18n();
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="shrink-0 border-b border-[var(--theme-border)] px-4 py-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-fg-muted)]">
-          What can I do?
-        </h2>
+          {translate("files.whatCanIDo")}</h2>
         <p className="mt-0.5 text-[11px] text-[var(--theme-fg-muted)]">
-          Upload files, ask in plain language, get results.
-        </p>
+          {translate("files.uploadFilesAskInPlainLanguageGet")}</p>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-6">
         <Accordion
           type="multiple"
-          defaultValue={['start', 'workspace', 'remote-codex']}
+          defaultValue={['start', 'workspace', 'pockymoe']}
           className="space-y-0"
         >
         <GuideAccordionItem
           value="start"
-          title="Getting Started"
+          title={translate("files.gettingStarted")}
           icon={<Zap className="h-3 w-3" />}
         >
           <p className="text-[11px] leading-5 text-[var(--theme-fg-muted)]">
-            graphchat connects a language model to your files and a set of
-            tools. Each Remote Codex thread has its own isolated workspace.
-          </p>
+            {translate("files.graphchatConnectsALanguageModelToYour")}</p>
           <GuideBullets
             items={[
-              'Upload data files via the Workspace panel',
-              'Type a question or task in plain language',
-              'The agent calls tools, writes results to the workspace, and explains what it found',
-              'Agent-produced files appear in the workspace automatically when the host reports changes',
+              translate("files.uploadDataFilesViaTheWorkspacePanel"),
+              translate("files.typeAQuestionOrTaskInPlain"),
+              translate("files.theAgentCallsToolsWritesResultsTo"),
+              translate("files.agentProducedFilesAppearInTheWorkspace"),
             ]}
           />
         </GuideAccordionItem>
 
         <GuideAccordionItem
           value="workspace"
-          title="Workspace Explorer"
+          title={translate("files.workspaceExplorer")}
           icon={<FolderOpen className="h-3 w-3" />}
         >
           <div className="flex items-start gap-2">
             <Upload className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--theme-fg-muted)]" />
             <div>
               <p className="text-[11px] font-medium text-[var(--theme-fg)]">
-                Upload
-              </p>
+                {translate("files.upload")}</p>
               <p className="text-[11px] leading-5 text-[var(--theme-fg-muted)]">
-                Upload files through the Workspace panel when the host exposes
-                workspace upload support. Composer attachments stay available
-                for prompt context.
-              </p>
+                {translate("files.uploadFilesThroughTheWorkspacePanelWhen")}</p>
             </div>
           </div>
           <div className="flex items-start gap-2">
             <Plus className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--theme-fg-muted)]" />
             <div>
               <p className="text-[11px] font-medium text-[var(--theme-fg)]">
-                New files and folders
-              </p>
+                {translate("files.newFilesAndFolders")}</p>
               <p className="text-[11px] leading-5 text-[var(--theme-fg-muted)]">
-                Remote Codex normally creates files through tools and shell
-                commands. They appear in Explorer after workspace refreshes.
-              </p>
+                {translate("files.pockymoeNormallyCreatesFilesThroughTools")}</p>
             </div>
           </div>
           <div className="flex items-start gap-2">
             <MoveRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--theme-fg-muted)]" />
             <div>
               <p className="text-[11px] font-medium text-[var(--theme-fg)]">
-                Move and organize
-              </p>
+                {translate("files.moveAndOrganize")}</p>
               <p className="text-[11px] leading-5 text-[var(--theme-fg-muted)]">
-                Use the agent or terminal to reorganize files. Explorer keeps
-                the GraphChat file tree and preview flow.
-              </p>
+                {translate("files.useTheAgentOrTerminalToReorganize")}</p>
             </div>
           </div>
           <div className="flex items-start gap-2">
             <Trash2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" />
             <div>
               <p className="text-[11px] font-medium text-[var(--theme-fg)]">
-                Garbage folder
-              </p>
+                {translate("files.garbageFolder")}</p>
               <p className="text-[11px] leading-5 text-[var(--theme-fg-muted)]">
-                If the host exposes garbage controls, Explorer can permanently
-                empty unwanted workspace files.
-              </p>
+                {translate("files.ifTheHostExposesGarbageControlsExplorer")}</p>
             </div>
           </div>
           <div className="flex items-start gap-2">
             <RefreshCw className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--theme-fg-muted)]" />
             <div>
               <p className="text-[11px] font-medium text-[var(--theme-fg)]">
-                Refresh
-              </p>
+                {translate("files.refresh")}</p>
               <p className="text-[11px] leading-5 text-[var(--theme-fg-muted)]">
-                Resync the file tree manually after shell commands, external
-                changes, or agent tool runs.
-              </p>
+                {translate("files.resyncTheFileTreeManuallyAfterShell")}</p>
             </div>
           </div>
           <div className="rounded-lg border border-[var(--theme-border)] p-2.5">
             <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--theme-fg-muted)]">
-              Preview surfaces
-            </p>
+              {translate("files.previewSurfaces")}</p>
             <GuideBullets
               items={[
                 <>
-                  <GuideTag>.xyz .extxyz .cif</GuideTag> use the 3D molecule
-                  plugin.
-                </>,
+                  <GuideTag>.xyz .extxyz .cif</GuideTag> {translate("files.useThe3DMoleculePlugin")}</>,
                 <>
-                  <GuideTag>.png .jpg .gif .svg .webp</GuideTag> use inline
-                  image preview.
-                </>,
+                  <GuideTag>.png .jpg .gif .svg .webp</GuideTag> {translate("files.useInlineImagePreview")}</>,
                 <>
-                  <GuideTag>.py .json .ts .md .csv</GuideTag> use text/code
-                  preview.
-                </>,
-                'Large files load in chunks when the workspace adapter supports it.',
+                  <GuideTag>.py .json .ts .md .csv</GuideTag> {translate("files.useTextCodePreview")}</>,
+                translate("files.largeFilesLoadInChunksWhenThe"),
               ]}
             />
           </div>
@@ -203,39 +182,35 @@ export function GraphGuidePanel() {
 
         <GuideAccordionItem
           value="viewer"
-          title="Viewer"
+          title={translate("files.viewer")}
           icon={<FileImage className="h-3 w-3" />}
         >
           <p className="text-[11px] leading-5 text-[var(--theme-fg-muted)]">
-            Viewer is the GraphChat-style artifact surface. It opens Remote
-            Codex artifacts through the same frontend plugin renderers used in
-            rich message bubbles, and previews workspace files from Explorer.
-          </p>
+            {translate("files.viewerIsTheGraphChatStyleArtifactSurface")}</p>
           <GuideBullets
             items={[
-              'Expand one artifact at a time for inspection',
-              'Fallback JSON preview is available for unknown artifact types',
-              '3D molecule artifacts remain interactive when the XYZ plugin is enabled',
+              translate("files.expandOneArtifactAtATimeFor"),
+              translate("files.fallbackJSONPreviewIsAvailableForUnknown"),
+              translate("files.3DMoleculeArtifactsRemainInteractiveWhenThe"),
             ]}
           />
         </GuideAccordionItem>
 
         <GuideAccordionItem
           value="usage"
-          title="Tool Usage & Chat"
+          title={translate("files.toolUsageChat")}
           icon={<BarChart2 className="h-3 w-3" />}
         >
           <div className="flex items-start gap-2">
             <BarChart2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--theme-fg-muted)]" />
             <div>
               <p className="text-[11px] font-medium text-[var(--theme-fg)]">
-                Usage tab
-              </p>
+                {translate("files.usageTab")}</p>
               <GuideBullets
                 items={[
-                  'Bar chart of tool and command counts for this thread',
-                  'Expandable call log: inspect every input and output',
-                  'Recent live events appear with persisted history',
+                  translate("files.barChartOfToolAndCommandCounts"),
+                  translate("files.expandableCallLogInspectEveryInputAnd"),
+                  translate("files.recentLiveEventsAppearWithPersistedHistory"),
                 ]}
               />
             </div>
@@ -244,13 +219,12 @@ export function GraphGuidePanel() {
             <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--theme-fg-muted)]" />
             <div>
               <p className="text-[11px] font-medium text-[var(--theme-fg)]">
-                Chat controls
-              </p>
+                {translate("files.chatControls")}</p>
               <GuideBullets
                 items={[
-                  'New Chat creates a fresh Remote Codex thread with its own workspace',
-                  'Interrupt, compact, goal controls, and model controls remain in the composer',
-                  'Shell view stays available when a shell adapter is attached',
+                  translate("files.newChatCreatesAFreshPockymoe"),
+                  translate("files.interruptCompactGoalControlsAndModelControls"),
+                  translate("files.shellViewStaysAvailableWhenAShell"),
                 ]}
               />
             </div>
@@ -258,16 +232,16 @@ export function GraphGuidePanel() {
         </GuideAccordionItem>
 
         <GuideAccordionItem
-          value="remote-codex"
-          title="Remote Codex Extras"
+          value="pockymoe"
+          title={translate("files.pockymoeExtras")}
           icon={<Code2 className="h-3 w-3" />}
         >
           <GuideBullets
             items={[
-              'Slash toolbox: skills, MCP, hooks, goals, forks, model controls, provider settings',
-              'Rich message bubbles: reasoning, commands, searches, file reads, file changes, plans, action requests, artifacts',
-              'Plugin surfaces: terminal, XYZ molecule viewer, inline code renderers, and imported plugin panels',
-              'Thread metadata stays in the left rail and Workspace tab instead of replacing chat',
+              translate("files.slashToolboxSkillsMCPHooksGoalsForks"),
+              translate("files.richMessageBubblesReasoningCommandsSearchesFile"),
+              translate("files.pluginSurfacesTerminalXYZMoleculeViewerInline"),
+              translate("files.threadMetadataStaysInTheLeftRail"),
             ]}
           />
         </GuideAccordionItem>

@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../../i18n';
 import { relativeWorkspacePath } from '../../workspacePaths';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -33,6 +34,7 @@ import type {
 } from './workspaceExplorerTypes';
 import { useWorkspaceExplorerPersistence } from './useWorkspaceExplorerPersistence';
 import { validateWorkspaceOperationCapabilities } from './workspaceOperationCapabilities';
+import { linkedDirectoryNodes, linkedParentDirectory } from './workspaceLinkedFiles';
 
 export interface UseWorkspaceExplorerControllerInput {
   activeView: 'chat' | 'shell';
@@ -72,6 +74,7 @@ export function useWorkspaceExplorerController({
   focusPathRequest = null,
   workspaceAdapter,
 }: UseWorkspaceExplorerControllerInput) {
+  const { locale } = useI18n();
   const workspaceIdentity = useMemo(
     () => ({
       threadId: detail.thread.id,
@@ -140,7 +143,7 @@ export function useWorkspaceExplorerController({
   const persistence = useWorkspaceExplorerPersistence(workspaceIdentity);
   const fallbackTree = useMemo(
     () => collectWorkspaceItems(detail, artifacts, status, activeView),
-    [activeView, artifacts, detail, status],
+    [activeView, artifacts, detail, status, locale],
   );
   const fallbackFirstSelectableNode = findFirstPreviewNode(fallbackTree);
   const initialPersistedState = useRef(persistence.read());
@@ -152,30 +155,14 @@ export function useWorkspaceExplorerController({
   );
   const [linkedFiles, setLinkedFiles] = useState<WorkspaceTreeNode[]>([]);
   const tree = useMemo(() => {
+    // ElAgente: immutable artifacts stay inspectable beside the native workspace files.
     const root = adapterTree
-      ? {
-          ...adapterTree,
-          children: [...adapterTree.children, ...fallbackTree.children],
-        }
+      ? { ...adapterTree, children: [...adapterTree.children, ...fallbackTree.children] }
       : fallbackTree;
     return linkedFiles.length
-      ? {
-          ...root,
-          children: [
-            ...root.children,
-            {
-              id: 'linked-files',
-              path: 'linked-files:',
-              name: 'Linked files',
-              kind: 'directory' as const,
-              children: linkedFiles,
-              childrenLoaded: true,
-              hasChildren: true,
-            },
-          ],
-        }
+      ? { ...root, children: [...root.children, ...linkedDirectoryNodes(linkedFiles)] }
       : root;
-  }, [adapterTree, fallbackTree, linkedFiles]);
+  }, [adapterTree, fallbackTree, linkedFiles, locale]);
   const nodeMap = useMemo(() => flattenWorkspaceNodes(tree), [tree]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(() => {
     const selectedPath = focusPathRequest
@@ -220,6 +207,9 @@ export function useWorkspaceExplorerController({
     () => new Map(),
   );
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  // A link whose file or folder is not on this device: shown calmly in the
+  // viewer with its path, not as a raw error.
+  const [missingPath, setMissingPath] = useState<string | null>(null);
 
   const activeNode =
     selectedNodeId === null ? null : (nodeMap.get(selectedNodeId) ?? null);
@@ -341,7 +331,7 @@ export function useWorkspaceExplorerController({
           return;
         }
         setWorkspaceError(
-          error instanceof Error ? error.message : 'Failed to load workspace',
+          error instanceof Error ? error.message : translate("files.failedToLoadWorkspace"),
         );
         setAdapterModel(null);
       } finally {
@@ -413,7 +403,7 @@ export function useWorkspaceExplorerController({
           return;
         }
         const message =
-          error instanceof Error ? error.message : 'Failed to load directory';
+          error instanceof Error ? error.message : translate("files.failedToLoadDirectory");
         setWorkspaceError(message);
         setDirectoryErrors((current) => new Map(current).set(path, message));
       } finally {
@@ -469,11 +459,9 @@ export function useWorkspaceExplorerController({
         focusGenerationRef.current === generation;
       setSelectedNodeId(`workspace:${targetPath}`);
       setFilterQuery('');
-      const external =
-        relativeWorkspacePath(path, detail.workspace.absPath) === null;
-      const ancestors = external
-        ? ['linked-files:']
-        : ancestorDirectoryPaths(targetPath);
+      setMissingPath(null);
+      const external = relativeWorkspacePath(path, detail.workspace.absPath) === null;
+      const ancestors = external ? [linkedParentDirectory(targetPath)] : ancestorDirectoryPaths(targetPath);
       setExpandedPaths((current) => {
         const next = new Set(current);
         next.add('');
@@ -507,14 +495,8 @@ export function useWorkspaceExplorerController({
           return;
         }
         if (external) {
-          if (!workspaceAdapter.statLinkedFile)
-            throw new Error(
-              'Only the device owner can preview files outside this workspace.',
-            );
-          const node = await workspaceAdapter.statLinkedFile({
-            ...workspaceIdentity,
-            path: targetPath,
-          });
+          if (!workspaceAdapter.statLinkedFile) throw new Error(translate("files.onlyTheDeviceOwnerCanPreviewFiles"));
+          const node = await workspaceAdapter.statLinkedFile({...workspaceIdentity, path: targetPath});
           if (!isCurrent()) return;
           const linked = workspaceTreeNodeToGraphNode({
             ...node,
@@ -547,20 +529,31 @@ export function useWorkspaceExplorerController({
           }
           nextModel = mergeWorkspaceExplorerSubtree(nextModel, loadedNode);
         }
+        const target = findWorkspaceExplorerNodeByPath(nextModel, targetPath);
+        if (target?.kind === 'directory') {
+          const loadedNode = workspaceTreeNodeToGraphNode(await workspaceAdapter.listTree({ ...workspaceIdentity, path: targetPath }));
+          if (!isCurrent()) return;
+          nextModel = mergeWorkspaceExplorerSubtree(nextModel, loadedNode);
+          setExpandedPaths(current => new Set(current).add(targetPath));
+        }
         adapterModelRef.current = nextModel;
         setAdapterModel(nextModel);
         if (!hasWorkspaceExplorerPath(nextModel, targetPath)) {
-          throw new Error(`File not found: ./${targetPath}`);
+          throw new MissingTargetError(translate("files.fileNotFound", { value1: targetPath }));
         }
         setSelectedNodeId(`workspace:${targetPath}`);
       } catch (error) {
         if (!isCurrent()) {
           return;
         }
+        if (isMissingTarget(error)) {
+          setMissingPath(external ? path : targetPath);
+          return;
+        }
         setWorkspaceError(
           error instanceof Error
             ? error.message
-            : `Failed to open ${targetPath}`,
+            : translate("files.failedToOpen", { value1: targetPath }),
         );
       } finally {
         if (isCurrent()) {
@@ -776,6 +769,7 @@ export function useWorkspaceExplorerController({
     liveNodes,
     loadingDirectoryPaths,
     loadingTree,
+    missingPath,
     nodeMap,
     refreshWorkspaceTree,
     retryDirectory: loadDirectoryChildren,
@@ -790,6 +784,7 @@ export function useWorkspaceExplorerController({
       focusPendingRef.current = false;
       setLoadingTree(false);
       setWorkspaceError(null);
+      setMissingPath(null);
       setSelectedNodeId(id);
     },
     setWorkspaceError,
@@ -798,4 +793,14 @@ export function useWorkspaceExplorerController({
     workspaceError,
     workspaceIdentity,
   };
+}
+
+class MissingTargetError extends Error {}
+
+/** A linked target that is not there: a workspace path absent from the tree,
+    or a file outside it that the Supervisor cannot find. */
+function isMissingTarget(error: unknown) {
+  if (error instanceof MissingTargetError) return true;
+  const code = (error as { code?: unknown; payload?: { code?: unknown } } | null)?.payload?.code ?? (error as { code?: unknown } | null)?.code;
+  return code === 'file_unavailable' || (error instanceof Error && /no such file|not found|cannot find/i.test(error.message));
 }

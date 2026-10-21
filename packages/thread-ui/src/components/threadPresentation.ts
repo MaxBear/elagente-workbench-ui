@@ -1,3 +1,5 @@
+import { getLocale } from '../i18n';
+import { translate, useI18n } from '../i18n';
 import type {
   ThreadDto,
   ThreadHistoryItemDto,
@@ -6,10 +8,10 @@ import type {
 
 export function formatShortTimestamp(value: string | null) {
   if (!value) {
-    return 'Time unavailable';
+    return translate("chat.timeUnavailable");
   }
 
-  return new Date(value).toLocaleString([], {
+  return new Date(value).toLocaleString(getLocale(), {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -20,15 +22,15 @@ export function formatShortTimestamp(value: string | null) {
 
 export function formatLongTimestamp(value: string | null) {
   if (!value) {
-    return 'Time unavailable';
+    return translate("chat.timeUnavailable");
   }
 
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleString(getLocale());
 }
 
 function formatMessageTime(value: string | null, precise: boolean) {
   if (!value) {
-    return 'Time unavailable';
+    return translate("chat.timeUnavailable");
   }
 
   const date = new Date(value);
@@ -42,9 +44,9 @@ function formatMessageTime(value: string | null, precise: boolean) {
     ...(precise ? { second: '2-digit' } : {}),
   };
   if (isToday) {
-    return date.toLocaleTimeString([], options);
+    return date.toLocaleTimeString(getLocale(), options);
   }
-  return date.toLocaleString([], {
+  return date.toLocaleString(getLocale(), {
     ...options,
     month: 'short',
     day: 'numeric',
@@ -63,19 +65,19 @@ export function formatPreciseMessageTimestamp(value: string | null) {
 export function threadStatusLabel(status: ThreadDto['status']) {
   switch (status) {
     case 'recovering':
-      return 'Confirming status';
+      return translate("chat.confirmingStatus");
     case 'idle':
-      return 'Idle';
+      return translate("chat.idle");
     case 'running':
-      return 'Running';
+      return translate("chat.running");
     case 'interrupted':
-      return 'Interrupted';
+      return translate("chat.interrupted");
     case 'failed':
-      return 'Failed';
+      return translate("chat.failed");
     case 'not_loaded':
-      return 'Not Loaded';
+      return translate('chat.notLoaded');
     case 'system_error':
-      return 'System Error';
+      return translate('chat.systemError');
   }
 }
 
@@ -99,17 +101,17 @@ export function threadStatusClassName(status: ThreadDto['status']) {
 export function turnStatusLabel(status: ThreadTurnDto['status'] | 'sending') {
   switch (status) {
     case 'recovering':
-      return 'Confirming status';
+      return translate("chat.confirmingStatus");
     case 'sending':
-      return 'Sending';
+      return translate('chat.sendingStatus');
     case 'completed':
-      return 'Completed';
+      return translate("chat.completed");
     case 'interrupted':
-      return 'Interrupted';
+      return translate("chat.interrupted");
     case 'failed':
-      return 'Failed';
+      return translate("chat.failed");
     case 'inProgress':
-      return 'Running';
+      return translate("chat.running");
   }
 }
 
@@ -170,37 +172,37 @@ export function historyItemAccentClassName(kind: ThreadHistoryItemDto['kind']) {
 export function historyItemLabel(kind: ThreadHistoryItemDto['kind']) {
   switch (kind) {
     case 'userMessage':
-      return 'User';
+      return translate("chat.user");
     case 'agentMessage':
-      return 'Agent';
+      return translate("chat.agent");
     case 'artifact':
-      return 'Artifact';
+      return translate("chat.artifact_aa778b");
     case 'image':
-      return 'Image';
+      return translate("chat.image");
     case 'contextCompaction':
-      return 'Context';
+      return translate("chat.context");
     case 'commandExecution':
-      return 'Command';
+      return translate("chat.command");
     case 'webSearch':
-      return 'Web Search';
+      return translate("chat.webSearch_9f1a43");
     case 'fileRead':
-      return 'File Read';
+      return translate("chat.fileRead_2986bc");
     case 'reasoning':
-      return 'Reasoning';
+      return translate("chat.reasoning");
     case 'agentToolCall':
-      return 'Agent';
+      return translate("chat.agent");
     case 'skillToolCall':
-      return 'Skill';
+      return translate("chat.skill");
     case 'toolCall':
-      return 'Tool';
+      return translate("chat.tool");
     case 'plan':
-      return 'Plan';
+      return translate("chat.plan");
     case 'fileChange':
-      return 'File Change';
+      return translate("chat.fileChange_cf4620");
     case 'hook':
-      return 'Hook';
+      return translate("chat.hook");
     case 'other':
-      return 'Other';
+      return translate("chat.other");
   }
 }
 

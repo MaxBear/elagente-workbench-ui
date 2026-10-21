@@ -14,5 +14,5 @@ export type {
   ArtifactExtractor,
   PluginRegistrySnapshot,
   RegisteredPlugin,
-  RemoteCodexPluginManifest,
+  PockymoePluginManifest,
 } from './types';

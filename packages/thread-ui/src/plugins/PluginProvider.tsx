@@ -1,7 +1,9 @@
+import { translate, useI18n } from '../i18n';
 import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -10,22 +12,28 @@ import type {
   ImportPluginInput,
   PluginDto,
   UpdatePluginInput,
-  ThreadArtifactDto,
 } from '@remote-codex/shared';
 import {
   PluginContext,
   mergePluginState,
+  pluginCapabilities,
   type PluginContextValue,
 } from './plugin-context';
 import type {
-  ArtifactRenderContext,
   FrontendPluginModule,
-  InlineCodeRenderContext,
+  PluginSettingsSnapshot,
+  PluginSettingsContribution,
+  ThreadPluginAdapter,
+  UpstreamConnectionHost,
   ExtensionHostAdapter,
 } from './plugin-types';
-import {createExtensionPluginApi, extensionModuleAvailable} from './extension-api';
 
 export interface PluginProviderAdapter {
+  connections?: UpstreamConnectionHost;
+  /** Per-conversation plugin switches and settings, when the device supports them. */
+  threads?: ThreadPluginAdapter;
+  loadPluginSettings?: (pluginId: string) => Promise<PluginSettingsSnapshot>;
+  savePluginSettings?: (pluginId: string, settings: PluginSettingsSnapshot) => Promise<PluginSettingsSnapshot>;
   fetchPlugins?: () => Promise<PluginDto[]> | PluginDto[];
   importPlugin?: (input: ImportPluginInput) => Promise<PluginDto> | PluginDto;
   updatePlugin?: (
@@ -38,6 +46,31 @@ export interface PluginProviderAdapter {
 const DEFAULT_PLUGIN_PROVIDER_ADAPTER: PluginProviderAdapter = {};
 const DEFAULT_BUILTIN_PLUGINS: FrontendPluginModule[] = [];
 
+function PluginSettingsSection({ section, pluginId, plugin, adapter, onSaved }: {
+  section: PluginSettingsContribution;
+  pluginId: string;
+  plugin: PluginDto;
+  adapter: PluginProviderAdapter;
+  onSaved: () => void;
+}) {
+  // A getter keeps the descriptor current without rebuilding the context, which
+  // would reload the form (and drop unsaved edits) on every switch change.
+  const current = useRef(plugin);
+  current.current = plugin;
+  const context = useMemo(() => ({
+    pluginId,
+    load: () => adapter.loadPluginSettings!(pluginId),
+    save: async (settings: PluginSettingsSnapshot) => {
+      const saved = await adapter.savePluginSettings!(pluginId, settings);
+      onSaved();
+      return saved;
+    },
+    ...(adapter.connections ? { connections: adapter.connections } : {}),
+    get plugin() { return current.current; },
+  }), [adapter, pluginId, onSaved]);
+  return section.render(context);
+}
+
 export function PluginProvider({
   adapter = DEFAULT_PLUGIN_PROVIDER_ADAPTER,
   builtinPlugins = DEFAULT_BUILTIN_PLUGINS,
@@ -49,11 +82,20 @@ export function PluginProvider({
   extensionHost?: ExtensionHostAdapter;
   children: ReactNode;
 }) {
+  useI18n();
   const [plugins, setPlugins] = useState<PluginDto[]>(() =>
     mergePluginState(builtinPlugins, []),
   );
+  const [settingsPluginIds, setSettingsPluginIds] = useState<Set<string>>(new Set());
+  // Bumped after device-wide settings are saved, so conversation scopes that inherit
+  // them can refresh without depending on adapter identity.
+  const [settingsVersion, setSettingsVersion] = useState(0);
+  const settingsSaved = useCallback(() => setSettingsVersion(value => value + 1), []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // True only once the device answered with its plugins; module defaults alone
+  // (for example when a view-only share cannot read them) are not authoritative.
+  const [devicePluginsKnown, setDevicePluginsKnown] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -63,8 +105,11 @@ export function PluginProvider({
         ? await adapter.fetchPlugins()
         : [];
       setPlugins(mergePluginState(builtinPlugins, serverPlugins));
+      setSettingsPluginIds(new Set(serverPlugins.filter(plugin => plugin.available !== false).map(plugin => plugin.id)));
+      setDevicePluginsKnown(Boolean(adapter.fetchPlugins));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load plugins.');
+      setDevicePluginsKnown(false);
+      setError(err instanceof Error ? err.message : translate("workbench.unableToLoadPlugins"));
     } finally {
       setLoading(false);
     }
@@ -107,20 +152,39 @@ export function PluginProvider({
             ),
           );
         }
-        setError(err instanceof Error ? err.message : 'Unable to update plugin.');
+        setError(err instanceof Error ? err.message : translate("workbench.unableToUpdatePlugin"));
         throw err;
       }
     },
     [adapter],
   );
 
+  const setPluginDefaultEnabled = useCallback(
+    async (pluginId: string, defaultEnabled: boolean) => {
+      const previous = plugins.find((plugin) => plugin.id === pluginId)?.defaultEnabled;
+      setError(null);
+      setPlugins((current) => current.map((plugin) => (plugin.id === pluginId ? { ...plugin, defaultEnabled } : plugin)));
+      if (!adapter.updatePlugin) return;
+      try {
+        const updated = await adapter.updatePlugin(pluginId, { defaultEnabled });
+        setPlugins((current) => current.map((plugin) => (plugin.id === updated.id ? updated : plugin)));
+      } catch (err) {
+        setPlugins((current) => current.map((plugin) => (plugin.id === pluginId && plugin.defaultEnabled === defaultEnabled ? { ...plugin, defaultEnabled: previous } : plugin)));
+        setError(err instanceof Error ? err.message : translate("workbench.unableToUpdatePlugin"));
+        throw err;
+      }
+    },
+    [adapter, plugins],
+  );
+
   const importPluginManifest = useCallback(
     async (input: ImportPluginInput) => {
       if (!adapter.importPlugin) {
-        throw new Error('Plugin import is not available.');
+        throw new Error(translate("workbench.pluginImportIsNotAvailable"));
       }
 
       const imported = await adapter.importPlugin(input);
+      setSettingsPluginIds(current => new Set([...current, imported.id]));
       setPlugins((current) => {
         const next = current.filter((plugin) => plugin.id !== imported.id);
         return [...next, imported];
@@ -132,10 +196,11 @@ export function PluginProvider({
   const uninstallPlugin = useCallback(
     async (pluginId: string) => {
       if (!adapter.deletePlugin) {
-        throw new Error('Plugin uninstall is not available.');
+        throw new Error(translate("workbench.pluginUninstallIsNotAvailable"));
       }
 
       const removed = await adapter.deletePlugin(pluginId);
+      setSettingsPluginIds(current => new Set([...current].filter(id => id !== removed.id)));
       setPlugins((current) =>
         current.filter((plugin) => plugin.id !== removed.id),
       );
@@ -143,93 +208,63 @@ export function PluginProvider({
     [adapter],
   );
 
-  const enabledModules = useMemo(() => {
-    const enabledIds = new Set(
-      plugins.filter((plugin) => plugin.enabled).map((plugin) => plugin.id),
-    );
-    return builtinPlugins.filter((module) =>
-      enabledIds.has(module.manifest.id) && extensionModuleAvailable(module, extensionHost),
-    );
-  }, [builtinPlugins, plugins, extensionHost]);
-
-  const extensions = useMemo(() => createExtensionPluginApi(enabledModules, extensionHost), [enabledModules, extensionHost]);
-
-  const renderArtifact = useCallback(
-    (context: ArtifactRenderContext) => {
-      const module = enabledModules.find(
-        (entry) =>
-          entry.renderArtifact &&
-          entry.manifest.capabilities.artifactTypes.some(
-            (type) => type.type === context.artifact.type,
-          ),
-      );
-      return module?.renderArtifact?.({...context, extensionHost: extensions.extensionHost}) ?? null;
-    },
-    [enabledModules, extensions],
+  const capabilities = useMemo(
+    () => pluginCapabilities(builtinPlugins, plugins, extensionHost),
+    [builtinPlugins, plugins, extensionHost],
   );
 
-  const renderInlineCode = useCallback(
-    (context: InlineCodeRenderContext) => {
-      for (const module of enabledModules) {
-        for (const renderer of module.inlineCodeRenderers ?? []) {
-          if (!renderer.languages.includes(context.language.trim().toLowerCase())) {
-            continue;
-          }
-          const rendered = renderer.render(context);
-          if (rendered) {
-            return rendered;
-          }
-        }
-      }
-      return null;
-    },
-    [enabledModules],
-  );
-
-  const hasRendererForArtifact = useCallback(
-    (artifact: ThreadArtifactDto) =>
-      enabledModules.some(
-        (entry) =>
-          Boolean(entry.renderArtifact) &&
-          entry.manifest.capabilities.artifactTypes.some(
-            (type) => type.type === artifact.type,
-          ),
-      ),
-    [enabledModules],
-  );
-
-  const getThreadPanels = useCallback(
-    extensions.getExtensionPanels,
-    [extensions],
-  );
+  const getSettingsSections = useCallback((pluginId?: string) => builtinPlugins.flatMap(module => {
+    if (pluginId !== undefined && module.manifest.id !== pluginId) return [];
+    const devicePlugin = plugins.find(plugin => plugin.id === module.manifest.id);
+    const browser = devicePlugin?.enabled && devicePlugin.available !== false
+      ? (module.browserSettingsSections ?? []).map(section => ({
+        id: `plugin:${module.manifest.id}:${section.id}`,
+        label: section.label,
+        ...(section.description ? { description: section.description } : {}),
+        content: section.render(),
+      }))
+      : [];
+    if (!adapter.loadPluginSettings || !adapter.savePluginSettings) return browser;
+    if (!settingsPluginIds.has(module.manifest.id) || !devicePlugin || devicePlugin.available === false) return browser;
+    return [...browser, ...(module.settingsSections ?? []).map(section => ({
+      id: `plugin:${module.manifest.id}:${section.id}`,
+      label: section.label,
+      description: section.description,
+      content: <PluginSettingsSection section={section} pluginId={module.manifest.id} plugin={devicePlugin} adapter={adapter} onSaved={settingsSaved} />,
+    }))];
+  }), [adapter, builtinPlugins, plugins, settingsPluginIds, settingsSaved]);
 
   const value = useMemo<PluginContextValue>(
     () => ({
-      extensions,
       plugins,
       loading,
       error,
       refresh,
       importPluginManifest,
       setPluginEnabled,
+      setPluginDefaultEnabled,
       uninstallPlugin,
-      renderArtifact,
-      renderInlineCode,
-      hasRendererForArtifact,
-      getThreadPanels,
+      getSettingsSections,
+      ...capabilities,
+      modules: builtinPlugins,
+      adapter,
+      settingsVersion,
+      devicePluginsKnown,
     }),
     [
-      extensions,
+      adapter,
+      builtinPlugins,
+      capabilities,
+      devicePluginsKnown,
       error,
-      getThreadPanels,
-      hasRendererForArtifact,
+      getSettingsSections,
       importPluginManifest,
       loading,
       plugins,
       refresh,
-      renderArtifact,
-      renderInlineCode,
       setPluginEnabled,
+      setPluginDefaultEnabled,
+      settingsVersion,
       uninstallPlugin,
     ],
   );

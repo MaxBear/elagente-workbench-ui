@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import {
   useCallback,
   useEffect,
@@ -91,6 +92,7 @@ export function useComposerHookConfig({
   onTrustHook,
   onUntrustHook,
 }: UseComposerHookConfigInput): UseComposerHookConfigResult {
+  useI18n();
   const [hooksPanelMode, setHooksPanelMode] =
     useState<HooksPanelMode>('list');
   const [hookScope, setHookScope] = useState<HookScope>('project');
@@ -172,7 +174,7 @@ export function useComposerHookConfig({
     const target = editableHookTarget(hook);
     if (!target) {
       setHookConfigError(
-        'Only command hooks in global or project hooks.json can be edited here.',
+        translate("chat.onlyCommandHooksInGlobalOrProject"),
       );
       return;
     }
@@ -190,21 +192,21 @@ export function useComposerHookConfig({
 
   const saveHook = useCallback(async () => {
     if (hooksPanelMode === 'edit' && !onUpdateHook) {
-      setHookConfigError('Hook editing is unavailable in this view.');
+      setHookConfigError(translate("chat.hookEditingIsUnavailableInThisView"));
       return;
     }
     if (hooksPanelMode !== 'edit' && !onCreateHook) {
-      setHookConfigError('Hook editing is unavailable in this view.');
+      setHookConfigError(translate("chat.hookEditingIsUnavailableInThisView"));
       return;
     }
     if (hooksPanelMode === 'edit' && !editingHookTarget) {
-      setHookConfigError('Select a hook to edit first.');
+      setHookConfigError(translate("chat.selectAHookToEditFirst"));
       return;
     }
 
     const command = hookCommand.trim();
     if (!command) {
-      setHookConfigError('Hook command cannot be empty.');
+      setHookConfigError(translate("chat.hookCommandCannotBeEmpty"));
       return;
     }
 
@@ -214,7 +216,7 @@ export function useComposerHookConfig({
       normalizedTimeout &&
       (timeoutSec === null || !Number.isInteger(timeoutSec) || timeoutSec <= 0)
     ) {
-      setHookConfigError('Timeout must be a positive number of seconds.');
+      setHookConfigError(translate("chat.timeoutMustBeAPositiveNumberOf"));
       return;
     }
 
@@ -240,15 +242,13 @@ export function useComposerHookConfig({
         await onCreateHook?.(payload);
       }
       setHookConfigSuccess(
-        `${hookScope === 'project' ? 'Project' : 'Global'} hook ${
-          hooksPanelMode === 'edit' ? 'updated' : 'written'
-        } in hooks.json and trusted.`,
+        translate("chat.hookInHooksJsonAndTrusted", { value1: hookScope === 'project' ? translate("chat.project_f6f4da") : translate("chat.global_5f1184"), value2: hooksPanelMode === 'edit' ? 'updated' : 'written' }),
       );
       setHooksPanelMode('list');
       setEditingHookTarget(null);
     } catch (error) {
       setHookConfigError(
-        error instanceof Error ? error.message : 'Unable to write hooks.json.',
+        error instanceof Error ? error.message : translate("chat.unableToWriteHooksJson"),
       );
     } finally {
       setHookConfigBusy(false);
@@ -269,7 +269,7 @@ export function useComposerHookConfig({
   const trustHook = useCallback(
     async (hook: AgentHookDto) => {
       if (!onTrustHook || !hook.currentHash) {
-        setHookConfigError('Hook trust is unavailable in this view.');
+        setHookConfigError(translate("chat.hookTrustIsUnavailableInThisView"));
         return;
       }
 
@@ -282,10 +282,10 @@ export function useComposerHookConfig({
           key: hook.key,
           currentHash: hook.currentHash,
         });
-        setHookConfigSuccess('Hook trusted.');
+        setHookConfigSuccess(translate("chat.hookTrusted"));
       } catch (error) {
         setHookConfigError(
-          error instanceof Error ? error.message : 'Unable to trust hook.',
+          error instanceof Error ? error.message : translate("chat.unableToTrustHook"),
         );
       } finally {
         setHookConfigBusy(false);
@@ -297,7 +297,7 @@ export function useComposerHookConfig({
   const untrustHook = useCallback(
     async (hook: AgentHookDto) => {
       if (!onUntrustHook) {
-        setHookConfigError('Hook trust is unavailable in this view.');
+        setHookConfigError(translate("chat.hookTrustIsUnavailableInThisView"));
         return;
       }
 
@@ -309,10 +309,10 @@ export function useComposerHookConfig({
         await onUntrustHook({
           key: hook.key,
         });
-        setHookConfigSuccess('Hook untrusted.');
+        setHookConfigSuccess(translate("chat.hookUntrusted"));
       } catch (error) {
         setHookConfigError(
-          error instanceof Error ? error.message : 'Unable to untrust hook.',
+          error instanceof Error ? error.message : translate("chat.unableToUntrustHook"),
         );
       } finally {
         setHookConfigBusy(false);

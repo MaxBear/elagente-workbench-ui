@@ -1,5 +1,8 @@
 import { extensionOf } from '../workspaceTree';
 
+export const DRAWIO_MAX_BYTES = 8 * 1024 * 1024;
+export function isDrawioPath(path: string) { return ['drawio', 'dio'].includes(extensionOf(path)); }
+
 // Formats for which this Explorer has no renderer. Do not fetch them as text.
 const DOWNLOAD_EXTENSIONS = new Set([
   'zip', '7z', 'rar', 'tar', 'gz', 'tgz', 'bz2', 'xz', 'zst', 'br',

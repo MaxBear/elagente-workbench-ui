@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import {
   useCallback,
   useState,
@@ -55,6 +56,7 @@ export function useComposerGoal({
   closeMenu,
   resetSlashPanel,
 }: UseComposerGoalInput): UseComposerGoalResult {
+  useI18n();
   const [goalComposeMode, setGoalComposeMode] = useState(false);
   const [goalTokenBudget, setGoalTokenBudget] = useState('');
   const [goalBusy, setGoalBusy] = useState(false);
@@ -63,7 +65,7 @@ export function useComposerGoal({
   const submitGoal = useCallback(async () => {
     const objective = prompt.trim();
     if (!objective) {
-      setGoalLocalError('Goal objective cannot be empty.');
+      setGoalLocalError(translate("chat.goalObjectiveCannotBeEmpty"));
       return false;
     }
 
@@ -75,12 +77,12 @@ export function useComposerGoal({
         !Number.isInteger(tokenBudget) ||
         tokenBudget <= 0)
     ) {
-      setGoalLocalError('Token budget must be a positive number in thousands.');
+      setGoalLocalError(translate("chat.tokenBudgetMustBeAPositiveNumber"));
       return false;
     }
 
     if (!onUpdateGoal) {
-      setGoalLocalError('/goal is unavailable in this view.');
+      setGoalLocalError(translate("chat.goalIsUnavailableInThisView"));
       return false;
     }
 
@@ -110,7 +112,7 @@ export function useComposerGoal({
       return true;
     } catch (error) {
       setGoalLocalError(
-        error instanceof Error ? error.message : 'Unable to set goal.',
+        error instanceof Error ? error.message : translate("chat.unableToSetGoal"),
       );
       return false;
     } finally {

@@ -194,4 +194,17 @@ describe('useComposerMenuLifecycle', () => {
     menuSurface.remove();
     harness.unmount();
   });
+  it('returns keyboard focus to the owning composer trigger before Escape closes a menu', () => {
+    const harness = renderHookHarness();
+    const controls = document.createElement('div');
+    controls.innerHTML = '<button data-composer-menu-trigger="true">Slash</button><div data-composer-menu-surface="true"><button>Menu action</button></div>';
+    document.body.append(controls);
+    controls.querySelector<HTMLButtonElement>('[data-composer-menu-surface] button')!.focus();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.activeElement).toBe(controls.querySelector('[data-composer-menu-trigger]'));
+    expect(harness.setOpenMenu).toHaveBeenCalledWith(null);
+    controls.remove();
+    harness.unmount();
+  });
+
 });

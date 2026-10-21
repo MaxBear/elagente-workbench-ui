@@ -32,6 +32,50 @@ afterEach(() => {
 });
 
 describe('GraphChatMessageContent', () => {
+  it('reveals code actions only for touch/pen taps and clears them when switching to a mouse', () => {
+    const element = render(<GraphChatMessageContent content={'```js\nconst value = 1;\n```'} />);
+    const block = element.querySelector('.thread-graph-code-block')!;
+    const code = block.querySelector('code')!;
+    const button = block.querySelector('button')!;
+    const pointer = (target: Element, type: string, pointerType: string) => {
+      const event = new MouseEvent(type, { bubbles: true });
+      Object.defineProperty(event, 'pointerType', { value: pointerType });
+      act(() => { target.dispatchEvent(event); });
+    };
+    pointer(code, 'pointerup', 'mouse');
+    expect(block.getAttribute('data-touch-actions')).toBe('false');
+    pointer(code, 'pointerup', 'touch');
+    expect(block.getAttribute('data-touch-actions')).toBe('true');
+    pointer(button, 'pointerup', 'touch');
+    expect(block.getAttribute('data-touch-actions')).toBe('true');
+    pointer(code, 'pointerup', 'touch');
+    expect(block.getAttribute('data-touch-actions')).toBe('false');
+    pointer(code, 'pointerup', 'pen');
+    expect(block.getAttribute('data-touch-actions')).toBe('true');
+    pointer(block, 'pointerover', 'mouse');
+    expect(block.getAttribute('data-touch-actions')).toBe('false');
+  });
+
+  it('renders README HTML, linked image dimensions and collapsible Markdown without executing embedded content', () => {
+    const element = render(<GraphChatMessageContent content={[
+      '<p align="center"><a href="https://example.com/docs"><img alt="English" src="https://example.com/badge.svg" width="88" onerror="alert(1)"></a></p>',
+      '<h1 align="center"><img src="https://example.com/logo.png" alt="Logo" width="44"> Project</h1>',
+      '<details><summary>Install</summary>\n\n**Run** `setup`<br>Next step\n\n</details>',
+      '<script>alert(1)</script><style>body { display:none }</style><iframe src="https://example.com"></iframe><a href="javascript:alert(1)">Unsafe link</a>',
+      '```html\n<p align="center">Literal example</p>\n```',
+      '$E=mc^2$',
+    ].join('\n\n')} />);
+    expect(element.querySelector('p[align="center"] a img')?.getAttribute('src')).toBe('https://example.com/badge.svg');
+    expect(element.querySelector('a button')).toBeNull();
+    expect((element.querySelector('a img') as HTMLImageElement).style.width).toBe('88px');
+    expect(element.querySelector('h1')?.textContent).toBe(' Project');
+    expect(element.querySelector('details summary')?.textContent).toBe('Install');
+    expect(element.querySelector('details strong')?.textContent).toBe('Run');
+    expect(element.querySelector('details br')).not.toBeNull();
+    expect(element.querySelector('script, style, iframe, [onerror], a[href^="javascript:"]')).toBeNull();
+    expect(element.querySelector('pre code')?.textContent).toContain('<p align="center">Literal example</p>');
+    expect(element.querySelector('.katex')).not.toBeNull();
+  });
   it('parses CJK emphasis while preserving literal stars in code and escapes', () => {
     const element = render(<GraphChatMessageContent content={'对，**原生 Mac 使用 `proxy-env`。**如果继续。\n\n核心是：**两种模式。**文件共享。\n\n`**literal**` 和 \\*\\*escaped\\*\\*'} />);
     expect(Array.from(element.querySelectorAll('strong')).map(node => node.textContent)).toEqual(['原生 Mac 使用 proxy-env。', '两种模式。']);
@@ -203,5 +247,24 @@ it('keeps Windows drive and file URLs through Markdown sanitization and opens th
   const links = element.querySelectorAll('a');
   for (const link of Array.from(links).slice(0,3)) act(() => {link.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));});
   expect(open.mock.calls).toEqual([[{path:'a.png'}],[{path:'a.png'}],[{path:'a.png'}]]);
-  expect(links[3]!.getAttribute('href')).not.toContain('javascript:');
+  expect(links[3]!.getAttribute('href') ?? '').not.toContain('javascript:');
+});
+
+it('makes verified inline and plain paths clickable while leaving missing paths, URLs and fences intact', async () => {
+  const open = vi.fn();
+  const resolve = vi.fn(async (path: string) => ['docs/assets', 'docs/readme.md'].includes(path));
+  let element!: HTMLDivElement;
+  await act(async () => {
+    element = render(<GraphChatMessageContent workspaceRootPath="/code" resolveWorkspacePath={resolve} onOpenWorkspaceFile={open}
+      content={'Files: `docs/assets/`, docs/readme.md. Missing `docs/no.txt`. [Web](https://example.com/docs/readme.md) [`docs/readme.md`](docs/readme.md)\n\n```sh\ncat docs/readme.md\n```'} />);
+  });
+  const links = Array.from(element.querySelectorAll('a'));
+  expect(links.map(link => link.textContent)).toEqual(['docs/assets/', 'docs/readme.md', 'Web', 'docs/readme.md']);
+  expect(element.querySelector('a a')).toBeNull();
+  expect(element.querySelector('pre a')).toBeNull();
+  expect(resolve).not.toHaveBeenCalledWith('https://example.com/docs/readme.md');
+  act(() => links[0]!.click());
+  expect(open).toHaveBeenCalledWith({ path: 'docs/assets' });
+  act(() => links[1]!.click());
+  expect(open).toHaveBeenCalledWith({ path: 'docs/readme.md' });
 });

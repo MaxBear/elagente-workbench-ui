@@ -6,6 +6,7 @@ export default defineConfig({
   entry: {
     'builtin-plugins': 'src/builtin-plugins.ts',
     index: 'src/index.ts',
+    i18n: 'src/i18n/index.tsx',
     'scientific-viewer': 'src/scientific-viewer.ts',
     'workspace-editor.worker': 'src/workspace-editor.worker.ts',
     'workspace-panel': 'src/workspace-panel.ts',

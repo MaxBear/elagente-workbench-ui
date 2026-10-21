@@ -93,6 +93,10 @@ export function useComposerMenuLifecycle({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        // Removing a focused menu item otherwise sends focus to the document.
+        // Return to its composer trigger before closing the surface.
+        const surface = document.activeElement?.closest('[data-composer-menu-surface]');
+        surface?.parentElement?.querySelector<HTMLElement>('[data-composer-menu-trigger="true"]')?.focus({ preventScroll: true });
         setOpenMenu(null);
       }
     }

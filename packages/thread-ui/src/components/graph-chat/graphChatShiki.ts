@@ -1,12 +1,23 @@
 import type { HighlighterCore } from 'shiki/core';
 
+/** Shiki theme whose token colors are CSS variables (`--shiki-token-*`), so a theme
+ *  preset can define its syntax palette in CSS for both color modes. */
+export const CSS_VARIABLES_SYNTAX_THEME = 'pockymoe-css-variables';
+
+/** The Shiki theme for code: the theme's CSS palette when it declares
+ *  `code.cssSyntaxPalette`. */
+export function syntaxThemeFor(dark: boolean, cssPalette: boolean) {
+  if (cssPalette) return CSS_VARIABLES_SYNTAX_THEME;
+  return dark ? 'ayu-dark' : 'github-light-default';
+}
+
 let graphChatHighlighterPromise: Promise<HighlighterCore> | null = null;
 
 export function getGraphChatHighlighter() {
   graphChatHighlighterPromise ??= Promise.all([
     import('shiki/core'),
     import('shiki/engine/javascript'),
-    import('shiki/themes/ayu-light.mjs'),
+    import('shiki/themes/github-light-default.mjs'),
     import('shiki/themes/ayu-dark.mjs'),
     import('shiki/langs/javascript.mjs'),
     import('shiki/langs/typescript.mjs'),
@@ -33,7 +44,7 @@ export function getGraphChatHighlighter() {
     import('shiki/langs/xml.mjs'),
   ]).then(
     ([
-      { createHighlighterCore },
+      { createHighlighterCore, createCssVariablesTheme },
       { createJavaScriptRegexEngine },
       ayuLight,
       ayuDark,
@@ -63,7 +74,11 @@ export function getGraphChatHighlighter() {
     ]) =>
       createHighlighterCore({
         engine: createJavaScriptRegexEngine(),
-        themes: [ayuLight.default, ayuDark.default],
+        themes: [
+          ayuLight.default,
+          ayuDark.default,
+          createCssVariablesTheme({ name: CSS_VARIABLES_SYNTAX_THEME, variablePrefix: '--shiki-', fontStyle: true }),
+        ],
         langs: [
           javascript.default,
           typescript.default,

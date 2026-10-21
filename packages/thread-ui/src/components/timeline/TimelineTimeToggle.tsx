@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import { useState } from 'react';
 import { formatLongTimestamp, formatShortTimestamp } from '../threadPresentation';
 function formatRelativeTurnTime(
@@ -7,7 +8,7 @@ function formatRelativeTurnTime(
   const startMillis = Date.parse(startedAt ?? '');
   const itemMillis = Date.parse(timestamp ?? '');
   if (!Number.isFinite(startMillis) || !Number.isFinite(itemMillis)) {
-    return timestamp ? formatShortTimestamp(timestamp) : 'Time unavailable';
+    return timestamp ? formatShortTimestamp(timestamp) : translate("chat.timeUnavailable");
   }
 
   const totalSeconds = Math.max(
@@ -33,24 +34,29 @@ export function TimelineTimeToggle({
   timestamp,
   endTimestamp,
   turnStartedAt,
+  displayMode = 'offset',
 }: {
   absoluteLabel: string;
   endTimestamp?: string | null | undefined;
   className?: string;
   timestamp: string | null | undefined;
   turnStartedAt: string | null | undefined;
+  displayMode?: 'offset' | 'duration';
 }) {
+  useI18n();
   const [showAbsolute, setShowAbsolute] = useState(false);
   if (!timestamp) {
     return null;
   }
 
-  const absoluteTitle = formatLongTimestamp(timestamp);
+  const absoluteTitle = formatLongTimestamp(timestamp) + (endTimestamp && endTimestamp !== timestamp ? ` – ${formatLongTimestamp(endTimestamp)}` : '');
   const relativeLabel = formatRelativeTurnTime(turnStartedAt, timestamp);
   const hasRange = endTimestamp && endTimestamp !== timestamp;
   const label = showAbsolute
     ? absoluteLabel + (hasRange ? ` – ${formatShortTimestamp(endTimestamp)}` : '')
-    : relativeLabel + (hasRange ? ` – ${formatRelativeTurnTime(turnStartedAt, endTimestamp)}` : '');
+    : displayMode === 'duration' && endTimestamp
+      ? formatRelativeTurnTime(timestamp, endTimestamp)
+      : relativeLabel + (hasRange ? ` – ${formatRelativeTurnTime(turnStartedAt, endTimestamp)}` : '');
 
   return (
     <span
@@ -58,7 +64,7 @@ export function TimelineTimeToggle({
       tabIndex={0}
       className={`thread-graph-relative-time rounded-full px-1.5 py-0.5 ${className}`}
       title={showAbsolute ? relativeLabel : absoluteTitle}
-      aria-label={`Toggle timestamp, currently ${label}`}
+      aria-label={translate("chat.toggleTimestampCurrently", { value1: label })}
       onClick={(event) => {
         event.stopPropagation();
         setShowAbsolute((value) => !value);

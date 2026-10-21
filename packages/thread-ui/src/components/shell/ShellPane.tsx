@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import {
   forwardRef,
   useCallback,
@@ -10,6 +11,7 @@ import {
 import 'xterm/css/xterm.css';
 import type { FitAddon } from '@xterm/addon-fit';
 import type { Terminal } from 'xterm';
+import { ClipboardPaste, Copy, Eraser, ListChecks, TextSelect } from 'lucide-react';
 
 import type {
   ShellSessionDto,
@@ -48,6 +50,16 @@ import {
   type ShellPaneRuntimeState,
 } from './shellState';
 import { useShellSocketLifecycle } from './useShellSocketLifecycle';
+import { useDocumentThemeRevision } from '../themeHooks';
+import { TerminalMenu } from './TerminalMenu';
+import { TerminalSelection } from './TerminalSelection';
+import { terminalPreferences } from './terminalPreferences';
+import { copyText, isRiskyPaste, pastedLineCount, readClipboardText } from './terminalClipboard';
+
+/** Mac keeps ⌘C / ⌘V for the clipboard and Ctrl for the terminal. */
+const MAC = typeof navigator !== 'undefined' && /Mac|iP(?:hone|ad|od)/.test(navigator.platform);
+/** A press this long on a touch screen opens text selection. */
+const LONG_PRESS_MS = 550;
 
 export type ToolboxFeedbackState = 'idle' | 'done' | 'failed';
 
@@ -60,6 +72,10 @@ export interface ShellPaneHandle {
     action: 'ctrl_c' | 'ctrl_d' | 'esc' | 'tab' | 'up' | 'down' | 'clear',
   ) => boolean;
   copyLastCommandOutput: () => Promise<boolean>;
+  /** Paste the clipboard, or offer a paste field where the browser cannot read it. */
+  pasteFromClipboard: () => Promise<void>;
+  /** Show the terminal's text for the phone's own selection and copy. */
+  startSelection: () => void;
   focus: () => void;
   refreshLayout: (options?: {
     focus?: boolean;
@@ -73,6 +89,11 @@ interface ShellPaneProps {
   shell: ShellSessionDto | null;
   isActive: boolean;
   isVisible: boolean;
+  /**
+   * Take keyboard focus when this active pane becomes visible. Off when the
+   * terminal only follows another chat, so it cannot steal the composer's focus.
+   */
+  autoFocus?: boolean;
   isMobileShell: boolean;
   effectiveTheme: 'light' | 'dark';
   workspacePathMissing: boolean;
@@ -87,6 +108,9 @@ interface ShellPaneProps {
   onFeedback?: (tone: ToolboxFeedbackState, text: string) => void;
 }
 
+/** Quiet time after the last host resize before the PTY gets the new size. */
+const SHELL_RESIZE_SETTLE_MS = 160;
+
 function refValue<T>(ref: { current: T }) {
   return ref.current;
 }
@@ -99,6 +123,7 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
       shell,
       isActive,
       isVisible,
+      autoFocus = true,
       isMobileShell,
       effectiveTheme,
       workspacePathMissing,
@@ -110,6 +135,8 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
     },
     ref,
   ) {
+  useI18n();
+    const themeRevision = useDocumentThemeRevision();
     const transformRef = useRef(inputTransform);
     transformRef.current = inputTransform;
     const terminalRef = useRef<Terminal | null>(null);
@@ -130,6 +157,7 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
     const lastCommandOutputRef = useRef('');
     const resizeObserverRef = useRef<ResizeObserver | null>(null);
     const lastSentSizeRef = useRef<{ cols: number; rows: number } | null>(null);
+    const backendResizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const snapshotCursorRef = useRef<{
       cursorX: number | undefined;
       cursorY: number | undefined;
@@ -147,7 +175,7 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
     const isMobileShellRef = useRef(isMobileShell);
     const sendShellInputRef = useRef<(data: string) => boolean>(() => false);
     const syncTerminalSizeRef = useRef<
-      () => { cols: number; rows: number } | null
+      (options?: { syncBackendSize?: boolean; deferBackendSize?: boolean }) => { cols: number; rows: number } | null
     >(() => null);
     const refreshTerminalLayoutRef = useRef<() => void>(() => {});
     const attachPromiseControllerRef = useRef(
@@ -157,6 +185,48 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
     );
     const [terminalHostNode, setTerminalHostNode] =
       useState<HTMLDivElement | null>(null);
+    const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+    const [selecting, setSelecting] = useState<{ point?: { x: number; y: number } } | null>(null);
+    const [pendingPaste, setPendingPaste] = useState<string | null>(null);
+    const [pasteField, setPasteField] = useState(false);
+    const onFeedbackRef = useRef(onFeedback);
+    onFeedbackRef.current = onFeedback;
+    const copyFeedback = useCallback(async (text: string) => {
+      const copied = await copyText(text);
+      onFeedbackRef.current?.(copied ? 'done' : 'failed', translate(copied ? 'files.copied' : 'files.copyFailed'));
+      return copied;
+    }, []);
+    const copySelection = useCallback(() => {
+      const terminal = terminalRef.current;
+      if (!terminal?.hasSelection()) return false;
+      void copyFeedback(terminal.getSelection());
+      terminal.clearSelection();
+      return true;
+    }, [copyFeedback]);
+    /** Paste through xterm (bracketed when the shell asked for it), after a
+        confirmation when a shell would run several lines right away. */
+    const pasteText = useCallback((text: string) => {
+      const terminal = terminalRef.current;
+      if (!terminal || !text) return;
+      if (terminalPreferences().pasteWarning && isRiskyPaste(text, terminal.modes.bracketedPasteMode)) {
+        setPendingPaste(text);
+        return;
+      }
+      terminal.paste(text);
+      terminal.focus();
+    }, []);
+    const pasteFromClipboard = useCallback(async () => {
+      const text = await readClipboardText();
+      if (text === null) {
+        // Plain http or a denied permission: a field the system paste can reach.
+        if (isMobileShellRef.current || window.matchMedia?.('(pointer: coarse)').matches) setPasteField(true);
+        else onFeedbackRef.current?.('failed', translate('files.terminalClipboardBlocked'));
+        return;
+      }
+      pasteText(text);
+    }, [pasteText]);
+    const clipboardRef = useRef({ copySelection, pasteFromClipboard });
+    clipboardRef.current = { copySelection, pasteFromClipboard };
     const [terminalReady, setTerminalReady] = useState(false);
     const [viewerId, setViewerIdState] = useState<string | null>(null);
     const [isConnecting, setIsConnecting] = useState(false);
@@ -240,42 +310,72 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
       return rect.width > 0 && rect.height > 0;
     }, [isVisible, terminalHostNode]);
 
+    const sendBackendSize = useCallback(() => {
+      const terminal = terminalRef.current;
+      if (!terminal || terminal.cols <= 0 || terminal.rows <= 0) {
+        return;
+      }
+      const resizeDecision = deriveShellResizeDecision({
+        size: { cols: terminal.cols, rows: terminal.rows },
+        previousSize: lastSentSizeRef.current,
+        shellId: shellIdRef.current,
+        viewerId: viewerIdRef.current,
+        syncBackendSize: true,
+      });
+      lastSentSizeRef.current = resizeDecision.nextLastSentSize;
+      if (resizeDecision.message && socketRef.current) {
+        socketRef.current.send(resizeDecision.message);
+      }
+    }, []);
+
     const syncTerminalSize = useCallback(
-      (options?: { syncBackendSize?: boolean }) => {
+      (options?: { syncBackendSize?: boolean; deferBackendSize?: boolean }) => {
         const terminal = terminalRef.current;
         const fitAddon = fitAddonRef.current;
         if (!terminal || !fitAddon || !isTerminalVisible()) {
           return null;
         }
 
-        fitAddon.fit();
+        // FitAddon.fit() clears the screen before resizing and xterm repaints on
+        // the next frame, so every step of a panel drag flashed a blank terminal.
+        // Resizing directly keeps the old rows on screen until they repaint.
+        const dimensions = fitAddon.proposeDimensions();
+        if (
+          dimensions &&
+          dimensions.cols > 0 &&
+          dimensions.rows > 0 &&
+          (dimensions.cols !== terminal.cols || dimensions.rows !== terminal.rows)
+        ) {
+          // A terminal showing its newest line keeps showing it at any size.
+          const following = terminal.buffer.active.viewportY >= terminal.buffer.active.baseY;
+          terminal.resize(dimensions.cols, dimensions.rows);
+          if (following) terminal.scrollToBottom();
+        }
         if (terminal.cols <= 0 || terminal.rows <= 0) {
           return null;
         }
 
         const size = { cols: terminal.cols, rows: terminal.rows };
-        const resizeDecision = deriveShellResizeDecision({
-          size,
-          previousSize: lastSentSizeRef.current,
-          shellId: shellIdRef.current,
-          viewerId: viewerIdRef.current,
-          syncBackendSize: options?.syncBackendSize !== false,
-        });
         if (options?.syncBackendSize === false) {
           return size;
         }
-
-        lastSentSizeRef.current = resizeDecision.nextLastSentSize;
-        if (!resizeDecision.message) {
-          return size;
+        // Every PTY resize makes the shell redraw its prompt, so while a panel is
+        // being dragged only the size it settles on is sent.
+        if (backendResizeTimerRef.current) {
+          clearTimeout(backendResizeTimerRef.current);
+          backendResizeTimerRef.current = null;
         }
-
-        if (socketRef.current) {
-          socketRef.current.send(resizeDecision.message);
+        if (options?.deferBackendSize) {
+          backendResizeTimerRef.current = setTimeout(() => {
+            backendResizeTimerRef.current = null;
+            sendBackendSize();
+          }, SHELL_RESIZE_SETTLE_MS);
+        } else {
+          sendBackendSize();
         }
         return size;
       },
-      [isTerminalVisible],
+      [isTerminalVisible, sendBackendSize],
     );
 
     useEffect(() => {
@@ -319,6 +419,22 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
     useEffect(() => {
       refreshTerminalLayoutRef.current = () => refreshTerminalLayout();
     }, [refreshTerminalLayout]);
+
+    useEffect(() => {
+      if (!isMobileShell || !isVisible || !terminalReady) return;
+      let frame = 0;
+      const refresh = () => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => refreshTerminalLayoutRef.current());
+      };
+      // Keyboard focus can scroll xterm after its host ResizeObserver runs.
+      // Refit and reveal the input after the visual viewport has settled too.
+      window.visualViewport?.addEventListener('resize', refresh);
+      return () => {
+        cancelAnimationFrame(frame);
+        window.visualViewport?.removeEventListener('resize', refresh);
+      };
+    }, [isMobileShell, isVisible, terminalReady]);
 
     useEffect(() => {
       onRuntimeStateChange({
@@ -377,7 +493,7 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
           fontSize: 13,
           lineHeight: 1.25,
           scrollback: 3000,
-          theme: terminalThemeFor(effectiveTheme),
+          theme: terminalThemeFor(effectiveTheme, terminalHostNode),
         });
         const fitAddon = new FitConstructor();
         terminal.loadAddon(fitAddon);
@@ -388,6 +504,22 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
         terminal.attachCustomKeyEventHandler((event) => {
           if (event.type !== 'keydown') {
             return true;
+          }
+
+          if (!MAC && event.ctrlKey && !event.altKey && !event.metaKey) {
+            const key = event.key.toLowerCase();
+            // Ctrl+C copies a selection and interrupts only without one.
+            if (key === 'c' && terminal.hasSelection()) {
+              event.preventDefault();
+              clipboardRef.current.copySelection();
+              return false;
+            }
+            // Ctrl+V pastes at a shell prompt; full-screen programs (vim, less,
+            // on the alternate screen) keep it as a key unless set to paste.
+            // Returning false leaves the browser's paste to reach xterm.
+            if (key === 'v' && (event.shiftKey || terminalPreferences().ctrlV === 'paste' || terminal.buffer.active.type === 'normal')) {
+              return false;
+            }
           }
 
           if (
@@ -412,8 +544,15 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
         setTerminalReady(true);
         terminalInitializingRef.current = false;
 
+        let resizeFrame = 0;
         resizeObserverRef.current = new ResizeObserver(() => {
-          refreshTerminalLayoutRef.current();
+          // Follow the host at most once a frame and keep the buffer as it is:
+          // redrawing the snapshot here made the terminal flash while dragging.
+          if (resizeFrame) return;
+          resizeFrame = requestAnimationFrame(() => {
+            resizeFrame = 0;
+            syncTerminalSizeRef.current({ deferBackendSize: true });
+          });
         });
         resizeObserverRef.current.observe(terminalHostNode);
 
@@ -423,7 +562,7 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
       })().catch((error: unknown) => {
         if (cancelled) return;
         terminalInitializingRef.current = false;
-        setConnectionError(error instanceof Error ? error.message : 'Unable to initialize terminal.');
+        setConnectionError(error instanceof Error ? error.message : translate("files.unableToInitializeTerminal"));
       });
 
       return () => {
@@ -433,6 +572,8 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
         terminalInputSubscriptionRef.current = null;
         resizeObserverRef.current?.disconnect();
         resizeObserverRef.current = null;
+        if (backendResizeTimerRef.current) clearTimeout(backendResizeTimerRef.current);
+        backendResizeTimerRef.current = null;
         setTerminalReady(false);
         terminalRef.current?.dispose();
         terminalRef.current = null;
@@ -440,6 +581,70 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
         lastSentSizeRef.current = null;
       };
     }, [effectiveTheme, terminalHostNode]);
+
+    useEffect(() => {
+      const host = terminalHostNode;
+      if (!host) return;
+      // Confirm a risky paste before xterm sends it.
+      const paste = (event: ClipboardEvent) => {
+        const terminal = terminalRef.current;
+        const text = event.clipboardData?.getData('text/plain') ?? '';
+        if (!terminal || !terminalPreferences().pasteWarning || !isRiskyPaste(text, terminal.modes.bracketedPasteMode)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setPendingPaste(text);
+      };
+      // Copy a mouse selection as soon as the button is released.
+      const mouseUp = (event: MouseEvent) => {
+        if (event.button !== 0) return;
+        window.setTimeout(() => {
+          const terminal = terminalRef.current;
+          if (terminalPreferences().copyOnSelect && terminal?.hasSelection()) void copyFeedback(terminal.getSelection());
+        }, 0);
+      };
+      let press: { id: number; x: number; y: number; timer: number } | null = null;
+      const cancelPress = () => { if (press) window.clearTimeout(press.timer); press = null; };
+      const openSelection = (x: number, y: number) => { cancelPress(); setMenu(null); setSelecting({ point: { x, y } }); };
+      const pointerDown = (event: PointerEvent) => {
+        if (event.pointerType !== 'touch') return;
+        cancelPress();
+        const { clientX: x, clientY: y } = event;
+        press = { id: event.pointerId, x, y, timer: window.setTimeout(() => openSelection(x, y), LONG_PRESS_MS) };
+      };
+      const pointerMove = (event: PointerEvent) => {
+        if (press && press.id === event.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 8) cancelPress();
+      };
+      const contextMenu = (event: MouseEvent) => {
+        event.preventDefault();
+        // A long press on a touch screen (Android's context menu) selects text.
+        if ((event as PointerEvent).pointerType === 'touch' || isMobileShellRef.current) {
+          openSelection(event.clientX, event.clientY);
+          return;
+        }
+        if (terminalPreferences().rightClick === 'copyPaste') {
+          if (!clipboardRef.current.copySelection()) void clipboardRef.current.pasteFromClipboard();
+          return;
+        }
+        setMenu({ x: event.clientX, y: event.clientY });
+      };
+      host.addEventListener('paste', paste, true);
+      host.addEventListener('mouseup', mouseUp);
+      host.addEventListener('pointerdown', pointerDown);
+      host.addEventListener('pointermove', pointerMove);
+      host.addEventListener('pointerup', cancelPress);
+      host.addEventListener('pointercancel', cancelPress);
+      host.addEventListener('contextmenu', contextMenu);
+      return () => {
+        cancelPress();
+        host.removeEventListener('paste', paste, true);
+        host.removeEventListener('mouseup', mouseUp);
+        host.removeEventListener('pointerdown', pointerDown);
+        host.removeEventListener('pointermove', pointerMove);
+        host.removeEventListener('pointerup', cancelPress);
+        host.removeEventListener('pointercancel', cancelPress);
+        host.removeEventListener('contextmenu', contextMenu);
+      };
+    }, [copyFeedback, terminalHostNode]);
 
     useEffect(() => {
       const resetAction = deriveShellMissingSessionResetAction({
@@ -468,8 +673,8 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
         return;
       }
 
-      terminal.options.theme = terminalThemeFor(effectiveTheme);
-    }, [effectiveTheme]);
+      terminal.options.theme = terminalThemeFor(effectiveTheme, terminalHostNode);
+    }, [effectiveTheme, themeRevision, terminalHostNode]);
 
     useEffect(() => {
       const terminal = terminalRef.current;
@@ -486,7 +691,7 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
       }
 
       const frame = window.requestAnimationFrame(() => {
-        refreshTerminalLayout({ focus: isActive, syncBackendSize: false });
+        refreshTerminalLayout({ focus: isActive && autoFocus, syncBackendSize: false });
         if (
           !socketRef.current &&
           shell?.id &&
@@ -499,7 +704,7 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
       return () => {
         window.cancelAnimationFrame(frame);
       };
-    }, [isActive, isVisible, refreshTerminalLayout, shell?.id, terminalReady]);
+    }, [autoFocus, isActive, isVisible, refreshTerminalLayout, shell?.id, terminalReady]);
 
     useEffect(() => {
       const terminal = terminalRef.current;
@@ -513,7 +718,7 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
         if (disposed || frame) return;
         frame = requestAnimationFrame(() => {
           frame = 0;
-          syncTerminalSizeRef.current();
+          syncTerminalSizeRef.current({ deferBackendSize: true });
         });
       };
       const rendered = terminal.onRender(fit);
@@ -717,18 +922,16 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
             lastCommandOutputRef.current.trim() ||
             getVisibleTerminalText(terminalHostNode);
           if (!output) {
-            onFeedback?.('failed', 'Nothing to copy');
+            onFeedback?.('failed', translate("files.nothingToCopy"));
             return false;
           }
 
-          try {
-            await navigator.clipboard.writeText(output);
-            onFeedback?.('done', 'Copied');
-            return true;
-          } catch {
-            onFeedback?.('failed', 'Copy failed');
-            return false;
-          }
+          return copyFeedback(output);
+        },
+        pasteFromClipboard,
+        startSelection() {
+          setMenu(null);
+          setSelecting({});
         },
         focus() {
           terminalRef.current?.focus();
@@ -738,8 +941,10 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
         },
       }),
       [
+        copyFeedback,
         onFeedback,
         onShellUpdate,
+        pasteFromClipboard,
         refreshTerminalLayout,
         sendShellClear,
         sendShellInput,
@@ -753,15 +958,15 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
 
     return (
       <div
-        className={`relative min-h-0 flex-1 overflow-hidden ${
+        className={`shell-pane relative min-h-0 flex-1 overflow-hidden ${
           isActive ? 'shell-pane-active' : ''
         }`}
-        onMouseDown={onActivate}
+        onPointerDown={onActivate}
         data-pane-id={paneId}
       >
         <div
           ref={setTerminalHostNode}
-          className={`h-full w-full px-2 py-2 sm:px-3 sm:py-3 ${
+          className={`shell-pane-host h-full w-full ${
             isMobileShell ? 'mobile-shell-direct' : ''
           }`}
           onClick={() => {
@@ -769,12 +974,58 @@ export const ShellPane = forwardRef<ShellPaneHandle, ShellPaneProps>(
             terminalRef.current?.focus();
           }}
         />
-        {isActive && (
-          <div className="pointer-events-none absolute right-2 top-2 rounded-md border border-sky-300/30 bg-sky-300/10 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-sky-100">
-            Active
+        {selecting && terminalRef.current && (
+          <TerminalSelection terminal={terminalRef.current} host={terminalHostNode} point={selecting.point}
+            onCopy={text => void copyFeedback(text)} onClose={() => setSelecting(null)} />
+        )}
+        {menu && (
+          <TerminalMenu anchor={menu} label={translate('files.terminalMenu')} onClose={() => setMenu(null)}>
+            {([
+              ['copy', translate('files.terminalCopy'), <Copy key="i" size={15} />, () => { copySelection(); }, !terminalRef.current?.hasSelection()],
+              ['paste', translate('files.terminalPaste'), <ClipboardPaste key="i" size={15} />, () => { void pasteFromClipboard(); }, false],
+              ['select-all', translate('files.terminalSelectAll'), <TextSelect key="i" size={15} />, () => { terminalRef.current?.selectAll(); }, false],
+              ['last-output', translate('files.terminalCopyLastOutput'), <ListChecks key="i" size={15} />, () => { void copyFeedback(lastCommandOutputRef.current.trim() || getVisibleTerminalText(terminalHostNode)); }, false],
+              ['clear', translate('files.terminalClear'), <Eraser key="i" size={15} />, () => { sendShellClear(); }, false],
+            ] as const).map(([key, label, icon, run, disabled]) => (
+              <button key={key} type="button" role="menuitem" className="terminal-menu-item" disabled={disabled}
+                onClick={() => { setMenu(null); run(); terminalRef.current?.focus(); }}>
+                {icon}<span>{label}</span>
+              </button>
+            ))}
+          </TerminalMenu>
+        )}
+        {pendingPaste !== null && (
+          <div className="terminal-paste-confirm" role="alertdialog" aria-label={translate('files.terminalPaste')}>
+            <span>{translate('files.terminalPasteConfirm', { count: pastedLineCount(pendingPaste) })}</span>
+            <button type="button" onClick={() => { setPendingPaste(null); terminalRef.current?.focus(); }}>{translate('files.cancel')}</button>
+            <button type="button" className="is-primary" autoFocus onClick={() => {
+              const terminal = terminalRef.current;
+              setPendingPaste(null);
+              terminal?.paste(pendingPaste);
+              terminal?.focus();
+            }}>{translate('files.terminalPasteAnyway')}</button>
           </div>
         )}
+        {pasteField && <TerminalPasteField onSend={text => { setPasteField(false); pasteText(text); }} onCancel={() => setPasteField(false)} />}
       </div>
     );
   },
 );
+
+/** Where the browser cannot read the clipboard (plain http, denied): a field
+    the system's own paste reaches, to check or edit before sending. */
+function TerminalPasteField({ onSend, onCancel }: { onSend: (text: string) => void; onCancel: () => void }) {
+  useI18n();
+  const [text, setText] = useState('');
+  return (
+    <form className="terminal-paste-field" onSubmit={event => { event.preventDefault(); if (text) onSend(text); }}>
+      <textarea autoFocus value={text} rows={3} aria-label={translate('files.terminalPasteField')}
+        placeholder={translate('files.terminalPasteField')} onChange={event => setText(event.target.value)}
+        onKeyDown={event => { if (event.key === 'Escape') onCancel(); }} />
+      <div>
+        <button type="button" onClick={onCancel}>{translate('files.cancel')}</button>
+        <button type="submit" className="is-primary" disabled={!text}>{translate('files.terminalPasteSend')}</button>
+      </div>
+    </form>
+  );
+}

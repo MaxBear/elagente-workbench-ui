@@ -1,0 +1,81 @@
+/* ElAgente host integration for the upstream (Pockymoe) workbench. Only what the
+   host's own platform shell, scientific viewers and file operations need; the
+   rest of the workbench keeps upstream styles. */
+
+/* The platform shell already has a rail: the workbench drops its own column. */
+@media (min-width: 640px) {
+  .thread-ui-shell .matter-workbench.has-host-rail { grid-template-columns: var(--matter-sidebar-width, 236px) minmax(0, 1fr); }
+  .thread-ui-shell .matter-workbench.has-host-rail.is-sidebar-hidden { grid-template-columns: 0 minmax(0, 1fr); }
+  .thread-ui-shell .matter-workbench.has-host-rail { grid-template-rows: minmax(0, 1fr); }
+  .thread-ui-shell .matter-workbench.has-host-rail > .matter-sidebar { grid-column: 1; grid-row: 1; }
+  .thread-ui-shell .matter-workbench.has-host-rail > .matter-main { grid-column: 2; grid-row: 1; }
+}
+@media (max-width: 1000px) and (min-width: 640px) {
+  .thread-ui-shell .matter-workbench.has-host-rail { grid-template-columns: var(--matter-sidebar-width, 200px) minmax(0, 1fr); }
+}
+
+/* A reloading thread's timeline stays mounted (hidden) so molecular viewers keep
+   their camera and frames. */
+.thread-timeline-frame { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.thread-timeline-frame[hidden] { display: none !important; }
+
+/* Scientific tables scroll instead of breaking numbers and labels. */
+.thread-markdown-table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.thread-markdown-table-scroll table { min-width: max-content; }
+
+/* A deferred tool detail that failed to load, with its retry. */
+.thread-detail-error { color: var(--theme-fg); display: grid; gap: 12px; }
+.thread-detail-error button { justify-self: start; border: 1px solid var(--theme-border-strong); padding: 8px 16px; border-radius: 5px; }
+
+/* Result of an archive, trash, move or delete operation, over the file panes. */
+.workspace-operation-notice {
+  position: absolute; z-index: 20; left: 8px; right: 8px; bottom: 8px;
+  max-height: 7rem; overflow: auto; padding: 8px 10px;
+  border: 1px solid var(--theme-border); border-radius: 8px;
+  background: var(--theme-panel); color: var(--theme-fg); font-size: 12px; line-height: 1.5;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 14%); overflow-wrap: anywhere;
+}
+.workspace-operation-notice[role='alert'] { color: var(--theme-danger, #dc2626); }
+
+/* Thread row menu (WorkbenchThreadMenu): Pockymoe apps/supervisor-web/src/matter-theme.css
+   (b35e997b) recent-thread rules, with the accepted palette's focus ring. */
+.recent-thread-actions { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: var(--theme-fg-muted); }
+.recent-thread-actions:hover, .recent-thread-actions[aria-expanded='true'] { background: var(--theme-hover); color: var(--theme-fg); }
+.recent-thread-menu { position: fixed; z-index: 100; width: 260px; max-height: calc(100dvh - 16px); overflow-y: auto; padding: 6px; border-radius: 12px; border: 1px solid var(--theme-border-strong); color: var(--theme-fg); background: var(--theme-panel); box-shadow: var(--theme-shadow); }
+.recent-thread-menu > button { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 36px; padding: 8px; border: 0; border-radius: 7px; font-size: 12px; text-align: left; }
+.recent-thread-menu > button:hover:not(:disabled) { background: var(--theme-hover); }
+.recent-thread-menu > button:disabled { opacity: .45; }
+.recent-thread-menu > button[data-copy-state='copied'] { color: var(--status-success-fg, #15803d); }
+.recent-thread-menu > button[data-copy-state='failed'] { color: var(--theme-danger, #c2410c); }
+.recent-thread-menu > .recent-thread-delete { color: var(--status-danger-fg); }
+.recent-thread-menu :focus-visible { outline: 2px solid var(--theme-focus-ring); outline-offset: -2px; }
+.recent-thread-menu > p { padding: 8px; font-size: 11px; line-height: 1.5; color: var(--theme-fg-muted); }
+/* Up to two lines of the title, so threads with one prefix stay apart. */
+.recent-thread-menu > .recent-thread-menu-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; font-weight: 600; color: var(--theme-fg); border-bottom: 1px solid var(--theme-border); margin-bottom: 4px; }
+@media (max-width: 639px) {
+  .recent-thread-menu > button { min-height: 44px; }
+  .recent-thread-actions { width: 32px; height: 36px; }
+}
+
+/* Phone status bar with nothing to show (MatterWorkbench `is-empty`): only the safe area. */
+@media (max-width: 639px) {
+  .thread-ui-shell .matter-workbench.has-phone-dock:has(> .matter-topbar.is-empty),
+  .thread-ui-shell .matter-workbench.has-phone-dock.is-sidebar-hidden:has(> .matter-topbar.is-empty) {
+    grid-template-rows: env(safe-area-inset-top) minmax(0, 1fr) auto;
+  }
+  .thread-ui-shell .matter-workbench.has-phone-dock > .matter-topbar.is-status-only.is-empty { min-height: 0; height: env(safe-area-inset-top); padding: 0; border-bottom: 0; overflow: hidden; }
+}
+
+/* Phone More sheet: the host's Settings trigger is its own full-tile touch target
+   (upstream only stretches an invisible ::after over the tile). Spacers keep the icon
+   and the "Settings" label exactly where the upstream tile draws them. One class more
+   specific than phone-dock.css, which the package also injects at runtime after this file. */
+@media (max-width: 639px) {
+  .thread-ui-shell .matter-workbench .matter-phone-sheet .matter-phone-sheet-settings::before { content: ''; display: block; flex: none; width: 20px; height: 20px; }
+  .thread-ui-shell .matter-workbench .matter-phone-sheet .matter-phone-sheet-settings > :first-child {
+    position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; width: 100%; min-width: 0; height: 100%; padding: 4px 2px; border-radius: 12px; font-size: 11px; line-height: 1.2;
+  }
+  .thread-ui-shell .matter-workbench .matter-phone-sheet .matter-phone-sheet-settings > :first-child::after { content: ''; position: static; display: block; height: 1.2em; }
+  .thread-ui-shell .matter-workbench .matter-phone-sheet .matter-phone-sheet-settings > span { pointer-events: none; }
+}

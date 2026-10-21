@@ -1,7 +1,7 @@
 import * as react from 'react';
 import { ReactNode } from 'react';
 import { ArtifactMetadata, ScientificTarget, ViewerRequest, ViewerAcknowledgement, ExtensionDiscovery } from '@remote-codex/shared';
-import { E as ExtensionHostAdapter } from './plugin-types-Bjl4gyeh.js';
+import { E as ExtensionHostAdapter } from './plugin-types-C1Ip6feU.js';
 import { GLViewer } from '3dmol';
 
 type ThreeDmolApi = {

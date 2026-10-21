@@ -54,6 +54,14 @@ Provider credentials and worker command lines are never entered in the UI.
   cancellation. It does not infer compute cancellation from a stopped turn.
   Its agent selector uses the shared `renderNavigationHeader` slot; no alternate
   sidebar or topbar conversation dropdown is maintained by the host.
+- Workbench navigation search filters the conversation DTOs supplied to the
+  current surface by title and agent subtitle, then navigates through the host
+  callback. It does not query transcript contents or conversations outside the
+  current agent scope. The composer accepts host-supplied `modelOptions`,
+  `reasoningEffort` and `onUpdateSettings`; this app currently supplies an empty
+  model catalog and no settings writer because the app-server does not expose
+  model discovery or thread-option updates. The UI therefore shows no fabricated
+  choices; wire those props when the backend contract supports them.
 - `packages/plugin-xyz` registers `elagente.xyz` for `chem.structure` artifacts.
   It reads immutable bytes, verifies SHA-256 and calls the existing 3Dmol viewer.
   The app packages 3Dmol locally. Plugin code is trusted application code;

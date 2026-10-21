@@ -1,3 +1,5 @@
+import { getLocale } from '../../i18n';
+import { translate, useI18n } from '../../i18n';
 import type {
   ThreadGoalDto,
   ThreadGoalStatusDto,
@@ -40,15 +42,15 @@ function elapsedLabel(seconds: number) {
 function statusLabel(status: ThreadGoalStatusDto) {
   switch (status) {
     case 'budgetLimited':
-      return 'Budget limited';
+      return translate("chat.budgetLimited");
     case 'complete':
-      return 'Complete';
+      return translate("chat.complete");
     case 'terminated':
-      return 'Terminated';
+      return translate("chat.terminated");
     case 'paused':
-      return 'Paused';
+      return translate("chat.paused");
     default:
-      return 'Active';
+      return translate("chat.active");
   }
 }
 
@@ -65,6 +67,7 @@ export function ComposerGoalsPanel({
   onBack: () => void;
   onUpdateGoal?: (input: UpdateThreadGoalInput) => Promise<void> | void;
 }) {
+  useI18n();
   const goals = mergeGoals(goalState.data, goalHistory);
   const currentGoalKey = goalState.data ? goalKey(goalState.data) : null;
   return (
@@ -75,9 +78,8 @@ export function ComposerGoalsPanel({
           onClick={onBack}
           className="min-h-9 rounded-lg px-2 text-xs font-medium text-[var(--theme-fg-muted)] transition hover:bg-[var(--theme-hover)] hover:text-[var(--theme-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent-border)]"
         >
-          Back
-        </button>
-        <span className="text-xs font-semibold text-[var(--theme-fg)]">Goals</span>
+          {translate("chat.back")}</button>
+        <span className="text-xs font-semibold text-[var(--theme-fg)]">{translate("chat.goals")}</span>
       </div>
       {goalState.error ? (
         <p className="m-3 rounded-lg border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-3 py-2 text-xs text-[var(--status-danger-fg)]">
@@ -85,14 +87,13 @@ export function ComposerGoalsPanel({
         </p>
       ) : null}
       {goalState.status === 'loading' && goals.length === 0 ? (
-        <div className="space-y-2 p-3" role="status" aria-label="Loading goals">
+        <div className="space-y-2 p-3" role="status" aria-label={translate("chat.loadingGoals")}>
           <div className="h-12 animate-pulse rounded-lg bg-[var(--theme-muted)] motion-reduce:animate-none" />
           <div className="h-12 animate-pulse rounded-lg bg-[var(--theme-muted)] motion-reduce:animate-none" />
         </div>
       ) : goals.length === 0 ? (
         <p className="px-4 py-5 text-center text-sm text-[var(--theme-fg-muted)]">
-          No goals in this thread yet.
-        </p>
+          {translate("chat.noGoalsInThisThreadYet")}</p>
       ) : (
         <div className="max-h-72 divide-y divide-[var(--theme-border)] overflow-y-auto">
           {goals.map((goal) => {
@@ -110,7 +111,7 @@ export function ComposerGoalsPanel({
                   </span>
                 </div>
                 <p className="mt-1.5 text-[11px] text-[var(--theme-fg-muted)]">
-                  {elapsedLabel(goal.timeUsedSeconds)} · {goal.tokensUsed.toLocaleString()} tokens
+                  {elapsedLabel(goal.timeUsedSeconds)} · {goal.tokensUsed.toLocaleString(getLocale())} tokens
                 </p>
                 {actionable && onUpdateGoal ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -120,24 +121,21 @@ export function ComposerGoalsPanel({
                       onClick={() => void onUpdateGoal({ status: 'active' })}
                       className="min-h-9 rounded-lg border border-[var(--theme-border)] px-3 text-xs font-medium text-[var(--theme-fg)] transition hover:bg-[var(--theme-hover)] disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      Continue
-                    </button>
+                      {translate("chat.continue")}</button>
                     <button
                       type="button"
                       disabled={busy || goal.status === 'paused'}
                       onClick={() => void onUpdateGoal({ status: 'paused' })}
                       className="min-h-9 rounded-lg border border-[var(--theme-border)] px-3 text-xs font-medium text-[var(--theme-fg)] transition hover:bg-[var(--theme-hover)] disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      Pause
-                    </button>
+                      {translate("chat.pause")}</button>
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => void onUpdateGoal({ status: 'terminated' })}
                       className="min-h-9 rounded-lg px-3 text-xs font-medium text-[var(--status-danger-fg)] transition hover:bg-[var(--status-danger-bg)] disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      Terminate
-                    </button>
+                      {translate("chat.terminate")}</button>
                   </div>
                 ) : null}
               </div>

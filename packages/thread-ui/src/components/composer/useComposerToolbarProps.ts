@@ -42,6 +42,8 @@ export interface ComposerToolbarCapabilities {
   planMode: boolean;
   sandboxMode: boolean;
   forkFromTurn: boolean;
+  /** A model chosen mid-turn applies from the turn's next model call. */
+  liveModelSwitch?: boolean;
 }
 
 export interface UseComposerToolbarPropsInput {
@@ -72,7 +74,9 @@ export interface UseComposerToolbarPropsInput {
   goalStatus: ThreadGoalDto['status'] | undefined;
   activeView: 'chat' | 'shell';
   disabled: boolean;
+  promptEmpty?: boolean;
   model: string | null | undefined;
+  agent?: string | undefined;
   modelOptions: ModelOptionDto[];
   modelContextTitle: string;
   contextUsage: ThreadContextUsageDto | null | undefined;
@@ -112,6 +116,9 @@ export interface UseComposerToolbarPropsInput {
   mcpHttpUrl: string;
   mcpRawBlock: string;
   capabilities: ComposerToolbarCapabilities;
+  /** What follows a typed `/`, filtering the toolbox; null when not opened by typing. */
+  slashQuery?: string | null;
+  slashActive?: number;
   shellControlState: ThreadShellControlState | null;
   onToggleView?: () => void;
   onDismissPromptFocus: () => void;
@@ -183,7 +190,9 @@ export function useComposerToolbarProps({
   goalStatus,
   activeView,
   disabled,
+  promptEmpty,
   model,
+  agent,
   modelOptions,
   modelContextTitle,
   contextUsage,
@@ -223,6 +232,8 @@ export function useComposerToolbarProps({
   mcpHttpUrl,
   mcpRawBlock,
   capabilities,
+  slashQuery = null,
+  slashActive = 0,
   shellControlState,
   onToggleView,
   onDismissPromptFocus,
@@ -265,11 +276,16 @@ export function useComposerToolbarProps({
   onClearShell,
   onShellControl,
 }: UseComposerToolbarPropsInput): ComposerToolbarProps {
-  const slashToolboxProps: ComposerSlashToolboxProps | null = isShellView
+  // ElAgente: a host with no toolbox items and no plan mode (a scientific Agent)
+  // shows no slash button, rather than a menu that only says nothing is available.
+  const slashToolboxProps: ComposerSlashToolboxProps | null = isShellView ||
+    (availableToolboxItems.length === 0 && !capabilities.planMode)
     ? null
     : {
         open: openMenu === 'slash',
         slashPanelView,
+        slashQuery,
+        slashActive,
         availableToolboxItems,
         planModeAvailable: capabilities.planMode,
         forkFromTurnAvailable: capabilities.forkFromTurn,
@@ -394,6 +410,7 @@ export function useComposerToolbarProps({
     : {
         openMenu,
         model,
+        agent,
         modelOptions,
         modelContextTitle,
         contextUsage,
@@ -401,11 +418,13 @@ export function useComposerToolbarProps({
         supportedEfforts,
         sandboxMode,
         sandboxModeAvailable: capabilities.sandboxMode,
+        liveModelSwitch: capabilities.liveModelSwitch ?? false,
         settingsBusy,
         goalComposeMode,
         goalBusy,
         activeView,
         disabled,
+        ...(promptEmpty !== undefined ? { promptEmpty } : {}),
         fastMode,
         sendButtonLabel,
         sendButtonClassName,

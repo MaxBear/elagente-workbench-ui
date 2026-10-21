@@ -5,10 +5,6 @@ const matterStyles = readFileSync(
   new URL('./matter-workbench.css', import.meta.url),
   'utf8',
 );
-const terminalStyles = readFileSync(
-  new URL('./terminal-theme.css', import.meta.url),
-  'utf8',
-);
 
 function tokenValue(block: string, token: string) {
   const match = block.match(new RegExp(`${token}:\\s*([^;]+);`));
@@ -118,9 +114,4 @@ describe('Classic workbench palette', () => {
     ).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps Terminal phosphor green and ink-blue focus independent', () => {
-    expect(terminalStyles).toContain('--theme-focus-ring: #4de3a2');
-    expect(terminalStyles).toContain('--theme-focus-ring: #0a47c4');
-    expect(terminalStyles).toContain('--theme-accent-solid: #4de3a2');
-  });
 });

@@ -1,4 +1,5 @@
 import { createContext, type ReactNode } from 'react';
+import type { SettingsSection } from '../components/SettingsPanels';
 
 import type {
   ImportPluginInput,
@@ -9,10 +10,17 @@ import type {
   ArtifactRenderContext,
   FrontendPluginModule,
   InlineCodeRenderContext,
+  MessagePresentation,
+  MessagePresentationContext,
+  PluginActionOutputContext,
   ThreadPanelContribution,
   ExtensionHostAdapter,
+  ThreadPluginDto,
+  ThreadPluginSettingsInput,
+  ThreadPluginSettingsSnapshot,
 } from './plugin-types';
 import {createExtensionPluginApi, extensionModuleAvailable, type ExtensionPluginApi} from './extension-api';
+import type { PluginProviderAdapter } from './PluginProvider';
 
 export interface PluginContextValue {
   extensions?: ExtensionPluginApi;
@@ -22,11 +30,134 @@ export interface PluginContextValue {
   refresh: () => Promise<void>;
   importPluginManifest: (input: ImportPluginInput) => Promise<void>;
   setPluginEnabled: (pluginId: string, enabled: boolean) => Promise<void>;
+  /** Whether conversations that follow the device have the plugin on. */
+  setPluginDefaultEnabled: (pluginId: string, enabled: boolean) => Promise<void>;
   uninstallPlugin: (pluginId: string) => Promise<void>;
   renderArtifact: (context: ArtifactRenderContext) => ReactNode | null;
   renderInlineCode: (context: InlineCodeRenderContext) => ReactNode | null;
   hasRendererForArtifact: (artifact: ThreadArtifactDto) => boolean;
   getThreadPanels: () => ThreadPanelContribution[];
+  /** Sections are ids `plugin:<pluginId>:<sectionId>`; pass a plugin id for one plugin's sections. */
+  getSettingsSections: (pluginId?: string) => SettingsSection[];
+  presentMessage: (
+    context: MessagePresentationContext,
+  ) => MessagePresentation | null;
+  renderActionOutput: (
+    pluginId: string,
+    context: PluginActionOutputContext,
+  ) => ReactNode | null;
+  /** The plugin modules this host ships. */
+  modules?: FrontendPluginModule[];
+  adapter?: PluginProviderAdapter;
+  /** Changes whenever device-wide plugin settings are saved. */
+  settingsVersion?: number;
+  /** Whether `plugins` reflects the device's answer rather than module defaults. */
+  devicePluginsKnown?: boolean;
+  /** Inside a conversation scope: the device-wide context, for global management. */
+  device?: PluginContextValue;
+  /** Inside a conversation scope: its switches and settings. */
+  thread?: ThreadPluginScopeState;
+}
+
+export type ThreadPluginScopeStatus =
+  | 'loading'
+  | 'ready'
+  | 'unsupported'
+  | 'forbidden'
+  | 'error';
+
+export interface ThreadPluginScopeState {
+  threadId: string;
+  status: ThreadPluginScopeStatus;
+  plugins: ThreadPluginDto[];
+  error: string | null;
+  /** Per plugin: the last failed change, kept until the next attempt. */
+  pluginErrors: Record<string, { message: string; conflict: boolean }>;
+  pending: Record<string, boolean>;
+  reload: () => Promise<void>;
+  setEnabledOverride: (
+    pluginId: string,
+    enabled: boolean | null,
+  ) => Promise<void>;
+  resetSettings: (pluginId: string) => Promise<void>;
+  loadSettings: (pluginId: string) => Promise<ThreadPluginSettingsSnapshot>;
+  saveSettings: (
+    pluginId: string,
+    input: ThreadPluginSettingsInput,
+  ) => Promise<ThreadPluginSettingsSnapshot>;
+}
+
+type PluginCapabilities = Pick<
+  PluginContextValue,
+  | 'extensions'
+  | 'renderArtifact'
+  | 'renderInlineCode'
+  | 'hasRendererForArtifact'
+  | 'getThreadPanels'
+  | 'presentMessage'
+  | 'renderActionOutput'
+>;
+
+/**
+ * Renderers and panels for the plugins enabled in a scope. Stored results (such as a
+ * polished reply) are presented by any shipped module, so turning a plugin off stops
+ * new work without hiding what it already produced.
+ */
+export function pluginCapabilities(
+  modules: FrontendPluginModule[],
+  plugins: PluginDto[],
+  /** ElAgente: reviewed contribution modules join only when the host advertises them. */
+  extensionHost?: ExtensionHostAdapter,
+): PluginCapabilities {
+  const enabledIds = new Set(
+    plugins
+      .filter((plugin) => plugin.enabled && plugin.available !== false)
+      .map((plugin) => plugin.id),
+  );
+  const enabledModules = modules.filter((module) =>
+    enabledIds.has(module.manifest.id) && extensionModuleAvailable(module, extensionHost),
+  );
+  const extensions = createExtensionPluginApi(enabledModules, extensionHost);
+  const artifactModule = (type: string) =>
+    enabledModules.find(
+      (entry) =>
+        Boolean(entry.renderArtifact) &&
+        entry.manifest.capabilities.artifactTypes.some(
+          (artifactType) => artifactType.type === type,
+        ),
+    );
+  return {
+    extensions,
+    renderArtifact: (context) =>
+      artifactModule(context.artifact.type)?.renderArtifact?.({ ...context, extensionHost: extensions.extensionHost }) ?? null,
+    renderInlineCode: (context) => {
+      for (const module of enabledModules) {
+        for (const renderer of module.inlineCodeRenderers ?? []) {
+          if (
+            !renderer.languages.includes(context.language.trim().toLowerCase())
+          )
+            continue;
+          const rendered = renderer.render(context);
+          if (rendered) return rendered;
+        }
+      }
+      return null;
+    },
+    hasRendererForArtifact: (artifact) =>
+      Boolean(artifactModule(artifact.type)),
+    getThreadPanels: extensions.getExtensionPanels,
+    presentMessage: (context) => {
+      for (const module of modules) {
+        const presentation = module.presentMessage?.(context);
+        if (presentation) return presentation;
+      }
+      return null;
+    },
+    renderActionOutput: (pluginId, context) =>
+      modules
+        .find((module) => module.manifest.id === pluginId)
+        ?.renderActionOutput?.(context) ?? null,
+  };
 }
 
 export function mergePluginState(
@@ -35,8 +166,15 @@ export function mergePluginState(
 ): PluginDto[] {
   const byId = new Map(serverPlugins.map((plugin) => [plugin.id, plugin]));
   const merged: PluginDto[] = modules.map((module) => ({
+    // Keep the device's availability report (for example a missing harness).
+    ...byId.get(module.manifest.id),
     ...module.manifest,
-    enabled: byId.get(module.manifest.id)?.enabled ?? true,
+    capabilities: {
+      ...module.manifest.capabilities,
+      ...byId.get(module.manifest.id)?.capabilities,
+    },
+    enabled:
+      byId.get(module.manifest.id)?.enabled ?? module.defaultEnabled ?? true,
     source: byId.get(module.manifest.id)?.source ?? 'builtin',
   }));
   const moduleIds = new Set(modules.map((module) => module.manifest.id));
@@ -53,53 +191,19 @@ export function createDefaultPluginContextValue(
   extensionHost?: ExtensionHostAdapter,
 ): PluginContextValue {
   const plugins = mergePluginState(modules, []);
-  const extensions = createExtensionPluginApi(modules, extensionHost);
-  const enabledModules = modules.filter(m => extensionModuleAvailable(m, extensions.extensionHost));
-  const renderArtifact: PluginContextValue['renderArtifact'] = (context) => {
-    const module = enabledModules.find(
-      (entry) =>
-        entry.renderArtifact &&
-        entry.manifest.capabilities.artifactTypes.some(
-          (type) => type.type === context.artifact.type,
-        ),
-    );
-    return module?.renderArtifact?.({...context, extensionHost: extensions.extensionHost}) ?? null;
-  };
-  const renderInlineCode: PluginContextValue['renderInlineCode'] = (context) => {
-    for (const module of enabledModules) {
-      for (const renderer of module.inlineCodeRenderers ?? []) {
-        if (!renderer.languages.includes(context.language.trim().toLowerCase())) {
-          continue;
-        }
-        const rendered = renderer.render(context);
-        if (rendered) {
-          return rendered;
-        }
-      }
-    }
-    return null;
-  };
-
   return {
-    extensions,
     plugins,
     loading: false,
     error: null,
     async refresh() {},
     async importPluginManifest() {},
     async setPluginEnabled() {},
+    async setPluginDefaultEnabled() {},
     async uninstallPlugin() {},
-    renderArtifact,
-    renderInlineCode,
-    hasRendererForArtifact: (artifact) =>
-      enabledModules.some(
-        (entry) =>
-          Boolean(entry.renderArtifact) &&
-          entry.manifest.capabilities.artifactTypes.some(
-            (type) => type.type === artifact.type,
-          ),
-      ),
-    getThreadPanels: extensions.getExtensionPanels,
+    getSettingsSections: () => [],
+    ...pluginCapabilities(modules, plugins, extensionHost),
+    modules,
+    adapter: {},
   };
 }
 

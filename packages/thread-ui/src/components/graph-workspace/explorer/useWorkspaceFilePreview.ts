@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../../i18n';
 import { useLayoutEffect, useRef, useState } from 'react';
 
 import type {
@@ -13,7 +14,8 @@ import {
 import type { WorkspaceTreeNode } from '../workspaceTree';
 import type { WorkspaceExplorerIdentity } from './useWorkspaceExplorerPersistence';
 
-import { isBinaryPreview, isDownloadOnlyPath } from './filePreviewPolicy';
+import type { WorkspaceDocuments } from "./useWorkspaceDocuments";
+import { DRAWIO_MAX_BYTES, isBinaryPreview, isDownloadOnlyPath, isDrawioPath } from './filePreviewPolicy';
 
 const PREVIEW_CHUNK_BYTES = 24_000;
 const MAX_MOLECULAR_PREVIEW_BYTES = 10 * 1024 * 1024;
@@ -23,19 +25,22 @@ export function useWorkspaceFilePreview({
   adapter,
   identity,
   onError,
-  refreshTree,
+  documents,
 }: {
   activeNode: WorkspaceTreeNode | null;
   adapter?: ThreadWorkspaceAdapter | null;
   identity: WorkspaceExplorerIdentity;
   onError: (error: string | null) => void;
-  refreshTree: (preferredPath?: string | null) => Promise<void>;
+  documents: WorkspaceDocuments;
 }) {
   const generation = useRef(0);
   const loadingMoreRef = useRef(false);
+  useI18n();
   const [previewFile, setPreviewFile] =
     useState<ThreadWorkspaceFilePreview | null>(null);
   const [downloadOnly, setDownloadOnly] = useState(false);
+  // Why a file is offered as a download rather than shown, when that is known.
+  const [downloadReason, setDownloadReason] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -64,6 +69,7 @@ export function useWorkspaceFilePreview({
       setPreviewLoading(true);
       onError(null);
       setDownloadOnly(false);
+      setDownloadReason(null);
       setPreviewFile(null);
       setImageUrl(null);
       setPdfUrl(null);
@@ -73,6 +79,9 @@ export function useWorkspaceFilePreview({
           return;
         }
         const extension = extensionOf(currentPath);
+        if (isDrawioPath(currentPath) && (activeNode?.size ?? 0) > DRAWIO_MAX_BYTES) {
+          throw new Error(translate("files.diagramPreviewSupportsFilesUpTo8"));
+        }
         const rawUrl = currentAdapter.getRawFileUrl?.({
           ...identity,
           path: currentPath,
@@ -84,9 +93,9 @@ export function useWorkspaceFilePreview({
           return;
         }
         if (PDF_EXTENSIONS.has(extension) && currentAdapter.readRawFile) {
-          const blob = await currentAdapter.readRawFile({...identity, path: currentPath, signal: abort.signal});
+          const blob = await currentAdapter.readRawFile({ ...identity, path: currentPath, signal: abort.signal });
           if (cancelled) return;
-          objectUrl = URL.createObjectURL(blob.type === 'application/pdf' ? blob : new Blob([blob], {type: 'application/pdf'}));
+          objectUrl = URL.createObjectURL(blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' }));
           setPdfUrl(objectUrl);
           return;
         }
@@ -96,10 +105,15 @@ export function useWorkspaceFilePreview({
           }
           return;
         }
-        let file = await currentAdapter.readFile({
+        const safe = !currentPath.startsWith('/') && !/^[a-z]:[\\/]/i.test(currentPath) && !isDrawioPath(currentPath)
+          ? await documents.load(currentPath, abort.signal) : null;
+        if (safe && safe.content == null && !['fileTooLarge','safeUnavailable'].includes(safe.readOnlyReason??'')) {
+          if (!cancelled) setDownloadOnly(true); return;
+        }
+        let file = safe?.content != null ? { ...safe, content: safe.content, nextOffset: safe.size } : await currentAdapter.readFile({
           ...identity,
           path: currentPath,
-          limit: PREVIEW_CHUNK_BYTES,
+          limit: isDrawioPath(currentPath) ? DRAWIO_MAX_BYTES : PREVIEW_CHUNK_BYTES,
         });
         // Molecular parsers need complete frames, not a partial text preview.
         if (MOLECULAR_EXTENSIONS.has(extension)) {
@@ -130,13 +144,18 @@ export function useWorkspaceFilePreview({
           }
         }
         if (!cancelled) {
-          if (isBinaryPreview(file.content)) setDownloadOnly(true);
+          if (isBinaryPreview(file.content)) { setDownloadOnly(true); setDownloadReason('unsupportedEncodingOrBinaryFile'); }
           else setPreviewFile(file);
         }
       } catch (error) {
         if (!cancelled) {
-          onError(
-            error instanceof Error ? error.message : 'Failed to read file',
+          // A file that is not text cannot be previewed: offer the download
+          // instead of an error.
+          if (error instanceof Error && /unsupportedEncodingOrBinaryFile/.test(error.message)) {
+            setDownloadOnly(true);
+            setDownloadReason('unsupportedEncodingOrBinaryFile');
+          } else onError(
+            error instanceof Error ? error.message : translate("files.failedToReadFile"),
           );
         }
       } finally {
@@ -159,10 +178,11 @@ export function useWorkspaceFilePreview({
     adapter,
     identity,
     onError,
+    documents.load,
   ]);
 
   async function loadMore() {
-    if (!adapter || !previewFile?.truncated || loadingMoreRef.current) return;
+    if (!adapter?.textRangeRead || !previewFile?.truncated || loadingMoreRef.current) return;
     const request = generation.current;
     const file = previewFile;
     loadingMoreRef.current = true;
@@ -200,51 +220,14 @@ export function useWorkspaceFilePreview({
     }
   }
 
-  async function saveFile(input: { path: string; content: string }) {
-    if (!adapter?.writeFile)
-      throw new Error('Editing is unavailable for this connection.');
-    const request = generation.current;
-    onError(null);
-    await adapter.writeFile({ ...identity, ...input });
-    if (request !== generation.current) return;
-    await refreshTree(input.path);
-    if (request !== generation.current) return;
-    const file = await adapter.readFile({
-      ...identity,
-      path: input.path,
-      limit: PREVIEW_CHUNK_BYTES,
-    });
-    if (request === generation.current) setPreviewFile(file);
-  }
-
-  async function reloadFile() {
-    if (!adapter || activeNode?.kind !== 'file') return;
-    const request = generation.current;
-    onError(null);
-    try {
-      const file = await adapter.readFile({
-        ...identity,
-        path: activeNode.path,
-        limit: PREVIEW_CHUNK_BYTES,
-      });
-      if (request === generation.current) setPreviewFile(file);
-    } catch (error) {
-      if (request === generation.current)
-        onError(
-          error instanceof Error ? error.message : 'Failed to reload file.',
-        );
-    }
-  }
-
   return {
     downloadOnly,
+    downloadReason,
     imageUrl,
     loadingMore,
     loadMore,
     pdfUrl,
     previewFile,
     previewLoading,
-    saveFile,
-    reloadFile,
   };
 }

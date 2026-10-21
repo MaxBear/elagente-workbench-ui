@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { act } from 'react';
+import { setLocale } from '../../i18n';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -70,6 +72,7 @@ async function runAsyncAction(action: () => Promise<void> | undefined) {
 describe('useComposerMcpConfig', () => {
   beforeEach(() => {
     latestResult = null;
+    setLocale('en', false);
     (
       globalThis as typeof globalThis & {
         IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -79,7 +82,33 @@ describe('useComposerMcpConfig', () => {
 
   afterEach(() => {
     latestResult = null;
+    setLocale('en', false);
     vi.restoreAllMocks();
+  });
+
+  it('uses the current language for new saves after import and retains prior notices', async () => {
+    const onReadProviderConfig = vi.fn(() => hostFile(''));
+    const onWriteProviderConfig = vi.fn((content: string) => hostFile(content));
+    const harness = renderHookHarness({ onReadProviderConfig, onWriteProviderConfig });
+    try {
+      act(() => latestResult?.setMcpRawBlock('[mcp_servers.docs]\ncommand = "node"\n'));
+      await act(async () => { await latestResult?.saveRawMcpBlock(); });
+      const englishNotice = latestResult?.mcpConfigSuccess;
+      expect(englishNotice).toContain('MCP entry written');
+      act(() => setLocale('zh-CN', false));
+      expect(latestResult?.mcpConfigSuccess).toBe(englishNotice);
+      await act(async () => { await latestResult?.saveRawMcpBlock(); });
+      expect(latestResult?.mcpConfigSuccess).toContain('MCP');
+      expect(latestResult?.mcpConfigSuccess).not.toBe(englishNotice);
+      expect(latestResult?.mcpConfigSuccess).toContain('已写入');
+      act(() => {
+        latestResult?.setMcpHttpName('docs');
+        latestResult?.setMcpHttpUrl('https://example.test/mcp');
+      });
+      await act(async () => { await latestResult?.saveHttpMcp(); });
+      expect(latestResult?.mcpConfigSuccess).toContain('已写入');
+      expect(onWriteProviderConfig).toHaveBeenLastCalledWith('[mcp_servers.docs]\nurl = "https://example.test/mcp"\n');
+    } finally { harness.unmount(); }
   });
 
   it('rejects invalid HTTP MCP names and URLs before reading provider config', async () => {

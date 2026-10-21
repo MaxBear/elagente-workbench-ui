@@ -1,17 +1,10 @@
 import {
-  AlignVerticalDistributeCenter,
   ArrowUpRight,
   Box,
   Boxes,
-  Bubbles,
-  CircleX,
   Eraser,
-  Rotate3d,
   Send,
-  Share2,
-  Spline,
   Trash2,
-  Waypoints,
 } from 'lucide-react';
 
 import {
@@ -57,51 +50,6 @@ export default function GraphMoleculeViewerLowerButtonGroup({
   return (
     <>
       <div className="thread-graph-molecule-lower-toolbar flex w-full shrink-0 flex-wrap justify-between gap-2">
-        <GraphMoleculeButtonGroup>
-          <GraphMoleculeIconButton
-            label="Distance: unavailable; requires an agent contribution"
-            disabled
-          >
-            <AlignVerticalDistributeCenter className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton
-            label="Connectivity: unavailable; requires an agent contribution"
-            disabled
-          >
-            <Share2 className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton
-            label="Angle: unavailable; requires an agent contribution"
-            disabled
-          >
-            <Waypoints className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton
-            label="Dihedral: unavailable; requires an agent contribution"
-            disabled
-          >
-            <Spline className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton
-            label="Add dummy atoms: unavailable; requires an agent contribution"
-            disabled
-          >
-            <Bubbles className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton
-            label="Delete atoms: unavailable; requires an agent contribution"
-            disabled
-          >
-            <CircleX className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton
-            label="Rotate: unavailable; requires an agent contribution"
-            disabled
-          >
-            <Rotate3d className="size-4" />
-          </GraphMoleculeIconButton>
-        </GraphMoleculeButtonGroup>
-
         <GraphMoleculeButtonGroup>
           <GraphMoleculeIconButton
             label={unitCellVisible ? 'Hide unit cell' : 'Show unit cell'}

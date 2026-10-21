@@ -1,5 +1,7 @@
+import { translate, useI18n } from '../../i18n';
 import { useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor/editor/editor.api.js';
+import { cssHexVariable, useDocumentThemeRevision } from '../themeHooks';
 import 'monaco-editor/languages/definitions/cpp/register.js';
 import 'monaco-editor/languages/definitions/css/register.js';
 import 'monaco-editor/languages/definitions/html/register.js';
@@ -49,7 +51,7 @@ if (!monaco.languages.getLanguages().some(({ id }) => id === 'json')) {
   });
 }
 
-monaco.editor.defineTheme('remote-codex-dark', {
+monaco.editor.defineTheme('pockymoe-dark', {
   base: 'vs-dark',
   inherit: true,
   rules: [],
@@ -67,7 +69,7 @@ monaco.editor.defineTheme('remote-codex-dark', {
   },
 });
 
-monaco.editor.defineTheme('remote-codex-light', {
+monaco.editor.defineTheme('pockymoe-light', {
   base: 'vs',
   inherit: true,
   rules: [],
@@ -85,7 +87,65 @@ monaco.editor.defineTheme('remote-codex-light', {
   },
 });
 
+const editorColorVariables: Record<string, string> = {
+  'editor.background': '--editor-bg',
+  'editorGutter.background': '--editor-bg',
+  'editor.foreground': '--editor-fg',
+  'editorLineNumber.foreground': '--editor-line-number',
+  'editorLineNumber.activeForeground': '--editor-fg',
+  'editor.lineHighlightBackground': '--editor-line-highlight',
+  'editor.selectionBackground': '--editor-selection',
+  'editor.inactiveSelectionBackground': '--editor-selection-inactive',
+  'editorCursor.foreground': '--editor-cursor',
+  'editorIndentGuide.background1': '--editor-indent',
+  'editorIndentGuide.activeBackground1': '--editor-indent-active',
+  'diffEditor.insertedTextBackground': '--editor-diff-inserted',
+  'diffEditor.removedTextBackground': '--editor-diff-removed',
+  'diffEditor.insertedLineBackground': '--editor-diff-inserted-line',
+  'diffEditor.removedLineBackground': '--editor-diff-removed-line',
+  'editorBracketHighlight.foreground1': '--editor-bracket-1',
+  'editorBracketHighlight.foreground2': '--editor-bracket-2',
+  'editorBracketHighlight.foreground3': '--editor-bracket-3',
+};
+/** Monarch token scopes colored by the optional `--editor-token-*` palette. */
+const editorTokenVariables: Record<string, string[]> = {
+  '--editor-token-keyword': ['keyword', 'keyword.json', 'storage'],
+  '--editor-token-string': ['string', 'string.value', 'attribute.value', 'regexp', 'string.escape'],
+  '--editor-token-constant': ['number', 'constant', 'predefined'],
+  '--editor-token-comment': ['comment', 'comment.doc'],
+  '--editor-token-type': ['type', 'type.identifier', 'tag', 'key', 'attribute.name', 'metatag'],
+  '--editor-token-punctuation': ['delimiter', 'delimiter.bracket', 'delimiter.parenthesis', 'operator'],
+};
+/** The Monaco theme for a container. A theme preset may set `--editor-*` hex colors
+ *  (at least `--editor-bg`) on an ancestor, and optionally a syntax palette
+ *  (`--editor-token-*`); otherwise the built-in theme is used.
+ *  Monaco themes are global, so all editors switch together. */
+export function editorThemeFor(dark: boolean, container: Element | null | undefined) {
+  const base = dark ? 'pockymoe-dark' : 'pockymoe-light';
+  const colors = Object.fromEntries(Object.entries(editorColorVariables)
+    .map(([key, variable]) => [key, cssHexVariable(container, variable)])
+    .filter((entry): entry is [string, string] => Boolean(entry[1])));
+  if (!colors['editor.background']) return base;
+  const rules = Object.entries(editorTokenVariables).flatMap(([variable, tokens]) => {
+    const color = cssHexVariable(container, variable);
+    const fontStyle = variable === '--editor-token-comment' ? 'italic' : undefined;
+    return color ? tokens.map((token) => ({ token, foreground: color.slice(1), ...(fontStyle ? { fontStyle } : {}) })) : [];
+  });
+  const name = `${base}-preset`;
+  monaco.editor.defineTheme(name, { base: dark ? 'vs-dark' : 'vs', inherit: true, rules, colors });
+  return name;
+}
+
+const releasedKeys = new Set<string>();
+const retainedModels = new Map<string, {model:monaco.editor.ITextModel;view:monaco.editor.ICodeEditorViewState|null}>();
+window.addEventListener('workspace-model-release', (event) => {
+  const key = (event as CustomEvent<string>).detail;
+  releasedKeys.add(key);
+  retainedModels.get(key)?.model.dispose(); retainedModels.delete(key);
+});
 export interface GraphWorkspaceMonacoEditorProps {
+  resourceKey?: string;
+  retainModel?: boolean;
   content: string;
   dark: boolean;
   focusLine?: number | null;
@@ -107,6 +167,8 @@ function monacoLanguage(language: string) {
 
 export default function GraphWorkspaceMonacoEditor({
   content,
+  resourceKey,
+  retainModel = false,
   dark,
   focusLine,
   language,
@@ -115,6 +177,9 @@ export default function GraphWorkspaceMonacoEditor({
   path,
   readOnly,
 }: GraphWorkspaceMonacoEditorProps) {
+  const modelKey = resourceKey ?? path;
+  const { locale } = useI18n();
+  const themeRevision = useDocumentThemeRevision();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const modelRef = useRef<monaco.editor.ITextModel | null>(null);
@@ -135,9 +200,12 @@ export default function GraphWorkspaceMonacoEditor({
     }
     const uri = monaco.Uri.from({
       scheme: 'remote-codex-workspace',
-      path: `/${path.replace(/^\/+/, '')}`,
+      path: `/${encodeURIComponent(modelKey)}`,
     });
-    const existingModel = monaco.editor.getModel(uri);
+    releasedKeys.delete(modelKey);
+    const retained = retainedModels.get(modelKey);
+    retainedModels.delete(modelKey);
+    const existingModel = retained?.model ?? monaco.editor.getModel(uri);
     const model =
       existingModel ??
       monaco.editor.createModel(
@@ -150,10 +218,8 @@ export default function GraphWorkspaceMonacoEditor({
       model,
       readOnly: initialReadOnlyRef.current,
       automaticLayout: true,
-      theme: initialDarkRef.current
-        ? 'remote-codex-dark'
-        : 'remote-codex-light',
-      ariaLabel: `Workspace editor: ${path}`,
+      theme: editorThemeFor(initialDarkRef.current, host),
+      ariaLabel: translate("files.workspaceEditor", { value1: path }),
       fontFamily:
         '"IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace',
       fontSize: 13,
@@ -174,10 +240,13 @@ export default function GraphWorkspaceMonacoEditor({
       overviewRulerBorder: false,
       stickyScroll: { enabled: true },
     });
+    if (retained?.view) editor.restoreViewState(retained.view);
     editorRef.current = editor;
     const changeSubscription = model.onDidChangeContent(() => {
       if (!applyingContentRef.current) {
-        onChangeRef.current?.(model.getValue());
+        // Document drafts use LF; the save API restores the disk's EOL.
+        // Empty Monaco models may otherwise default to CRLF on first input.
+        onChangeRef.current?.(model.getValue(monaco.editor.EndOfLinePreference.LF));
       }
     });
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
@@ -185,18 +254,19 @@ export default function GraphWorkspaceMonacoEditor({
     });
     return () => {
       changeSubscription.dispose();
+      if (retainModel && !releasedKeys.has(modelKey)) retainedModels.set(modelKey,{model,view:editor.saveViewState()});
       editor.dispose();
       editorRef.current = null;
       modelRef.current = null;
-      if (!existingModel) {
+      if (!retainModel || releasedKeys.has(modelKey)) {
         model.dispose();
       }
     };
-  }, [path]);
+  }, [path,modelKey,retainModel]);
 
   useEffect(() => {
     const model = modelRef.current;
-    if (!model || model.getValue() === content) {
+    if (!model || model.getValue(monaco.editor.EndOfLinePreference.LF) === content) {
       return;
     }
     applyingContentRef.current = true;
@@ -205,9 +275,13 @@ export default function GraphWorkspaceMonacoEditor({
   }, [content]);
 
   useEffect(() => {
-    monaco.editor.setTheme(dark ? 'remote-codex-dark' : 'remote-codex-light');
+    monaco.editor.setTheme(editorThemeFor(dark, editorRef.current?.getContainerDomNode()));
     editorRef.current?.updateOptions({ readOnly });
-  }, [dark, readOnly]);
+  }, [dark, readOnly, themeRevision]);
+
+  useEffect(() => {
+    editorRef.current?.updateOptions({ ariaLabel: translate('files.workspaceEditor', { value1: path }) });
+  }, [locale, path]);
 
   useEffect(() => {
     const editor = editorRef.current;

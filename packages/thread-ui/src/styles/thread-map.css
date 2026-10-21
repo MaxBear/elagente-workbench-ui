@@ -1,0 +1,643 @@
+/* Thread map: every thread as a treemap tile. Area follows turns, the fill the
+   run time in the last day (five light steps, like a contribution graph, so the
+   text on a tile stays readable), and running tiles breathe slowly in their own
+   color, so where agents run stands out from where they ran. Themes may set
+   --thread-map-heat (the accent by default) and --thread-map-live. */
+.thread-graph-dialog.thread-map-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(1180px, calc(100vw - 48px));
+  max-width: none;
+  height: min(820px, calc(100dvh - 48px));
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  color: var(--theme-fg);
+  --thread-map-heat: var(--theme-accent-solid);
+  --thread-map-live: #ec7a08;
+  --thread-map-tile: var(--theme-surface);
+  --thread-map-spark: color-mix(in oklab, var(--thread-map-heat) 70%, var(--theme-fg));
+  /* Age, fresh to old: cyan, blue, violet, amber, bronze. */
+  --thread-map-age-0: #1597c2;
+  --thread-map-age-1: #4a78dc;
+  --thread-map-age-2: #8a62d4;
+  --thread-map-age-3: #c47f1f;
+  --thread-map-age-4: #96653f;
+}
+.thread-graph-dialog.thread-map-dialog[data-theme-effective='dark'] {
+  --thread-map-live: #ffa64d;
+  --thread-map-age-0: #4cc3e6;
+  --thread-map-age-1: #82a3f2;
+  --thread-map-age-2: #ae91f0;
+  --thread-map-age-3: #e3a453;
+  --thread-map-age-4: #c9966b;
+}
+@media (max-width: 639px) {
+  /* The whole visible page: inset, not 100dvh, which some phones measure past
+     the bottom gesture area. */
+  .thread-graph-dialog.thread-map-dialog {
+    inset: 0;
+    translate: none;
+    width: auto;
+    height: auto;
+    border: 0;
+    border-radius: 0;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+}
+.thread-map {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.thread-map-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 10px 4px 16px;
+}
+.thread-map-title {
+  flex: none;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.thread-map-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--theme-fg-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.thread-map-summary .thread-map-running-dot { margin-right: 4px; }
+.thread-map-icon-button,
+.thread-map-goto {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--theme-fg-soft);
+}
+.thread-map-icon-button:hover:not(:disabled),
+.thread-map-goto:hover {
+  background: var(--theme-hover);
+  color: var(--theme-fg);
+}
+.thread-map-icon-button:disabled { opacity: 0.35; }
+/* Not the settings dialog's corner close button: it sits in the bar. */
+.thread-map-dialog [data-slot='dialog-close'].thread-map-close { top: auto; right: auto; width: 32px; height: 32px; border-radius: 8px; opacity: 1; }
+.thread-map-icon-button:focus-visible,
+.thread-map-goto:has(select:focus) { outline: 2px solid var(--theme-accent-solid); outline-offset: -2px; }
+.thread-map-icon-button svg,
+.thread-map-goto svg { width: 17px; height: 17px; pointer-events: none; }
+/* A native picker reaches every block, even one too small to tap. */
+.thread-map-goto select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  font-size: 16px;
+  cursor: pointer;
+}
+.thread-map-path {
+  gap: 2px;
+  padding: 0 10px 6px 8px;
+  border-bottom: 1px solid var(--theme-border);
+}
+.thread-map-crumbs {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  outline: none;
+}
+.thread-map-crumbs:focus-visible { box-shadow: 0 0 0 2px var(--theme-accent-solid); }
+.thread-map-crumb {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+}
+.thread-map-crumb svg { flex: none; width: 13px; height: 13px; color: var(--theme-fg-muted); }
+.thread-map-crumb button {
+  min-width: 0;
+  max-width: 18em;
+  height: 30px;
+  padding: 0 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--theme-fg-soft);
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.thread-map-crumb button:hover { background: var(--theme-hover); color: var(--theme-fg); }
+.thread-map-crumb button[aria-current] { color: var(--theme-fg); font-weight: 600; }
+
+.thread-map-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 8px 10px 0;
+  overflow: hidden;
+  /* Pinches and drags are the map's, not the page's. */
+  touch-action: none;
+}
+/* The current level; zooming scales it from or into a block. */
+.thread-map-stage { position: absolute; inset: 0; transform-origin: 0 0; }
+/* What is inside a block: its own blocks and tiles answer, the space between them does not. */
+.thread-map-preview { position: absolute; inset: 0; pointer-events: none; }
+.thread-map-preview > * { pointer-events: auto; }
+.thread-map-zoom {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: zoom-in;
+}
+.thread-map-zoom:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: -2px; }
+.thread-map-section[data-zoomable]:has(> :is(.thread-map-zoom, button.thread-map-section-head):hover) { border-color: color-mix(in oklab, var(--theme-accent-solid) 55%, var(--theme-border)); }
+.thread-map-section > button.thread-map-section-head { cursor: zoom-in; }
+.thread-map-section[data-zoomable] > .thread-map-section-head { color: var(--theme-fg); }
+.thread-map-dialog[data-swiped] { animation: none !important; }
+.thread-map-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  color: var(--theme-fg-muted);
+  font-size: 13px;
+}
+.thread-map-section,
+.thread-map-tile {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+  isolation: isolate;
+}
+.thread-map-section {
+  border: 1px solid var(--theme-border);
+  border-radius: 9px;
+  background: var(--theme-panel);
+}
+.thread-map-section[data-kind='device'] { background: var(--theme-bg); border-color: var(--theme-border-strong); }
+.thread-map-section-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  height: 26px;
+  padding: 0 7px;
+  border: 0;
+  background: none;
+  color: var(--theme-fg-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: left;
+}
+.thread-map-section-head:is(button) { cursor: pointer; }
+.thread-map-section[data-kind='device'] > .thread-map-section-head { color: var(--theme-fg); font-size: 12px; }
+.thread-map-section-head:is(button):hover:not(:disabled) { color: var(--theme-fg); background: color-mix(in oklab, var(--theme-hover) 60%, transparent); }
+.thread-map-section-head:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: -2px; }
+.thread-map-section-head:disabled { cursor: default; }
+.thread-map-section-head svg { flex: none; width: 13px; height: 13px; }
+.thread-map-section-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.thread-map-section-count {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  color: var(--theme-fg-muted);
+  font-size: 10.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+/* A block too small to show its threads opens them when tapped anywhere. */
+.thread-map-section[data-collapsed] > .thread-map-section-head {
+  position: absolute;
+  inset: 0;
+  height: auto;
+  align-items: flex-start;
+  padding-top: 6px;
+}
+.thread-map-section-summary {
+  position: absolute;
+  right: 9px;
+  bottom: 6px;
+  left: 9px;
+  overflow: hidden;
+  color: var(--theme-fg-soft);
+  font-size: 10.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.thread-map-section[data-state] {
+  background:
+    repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in oklab, var(--theme-border) 55%, transparent) 7px 8px),
+    var(--theme-surface);
+}
+.thread-map-section[data-state] > .thread-map-section-head { color: var(--theme-fg-muted); }
+.thread-map-section-usd { margin-left: 4px; color: var(--theme-fg-soft); font-weight: 600; }
+/* A thread opened up into its agent threads: its bar folds them back, the arrow opens it. */
+.thread-map-group { border-color: color-mix(in oklab, var(--theme-accent-solid) 45%, var(--theme-border)); background: var(--theme-panel); }
+.thread-map-group-head { display: flex; align-items: center; height: 26px; }
+.thread-map-group-head > .thread-map-section-head { flex: 1; min-width: 0; color: var(--theme-fg); }
+.thread-map-group-head .thread-map-agent { width: 15px; height: 15px; border-radius: 4px; font-size: 8px; }
+.thread-map-section-count svg { width: 11px; height: 11px; }
+.thread-map-group-open {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--theme-fg-soft);
+}
+.thread-map-group-open:hover { background: var(--theme-hover); color: var(--theme-fg); }
+.thread-map-group-open:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: -2px; }
+.thread-map-group-open svg { width: 14px; height: 14px; }
+
+.thread-map-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 7px;
+  border: 1px solid color-mix(in oklab, var(--theme-border) 75%, transparent);
+  border-radius: 7px;
+  color: var(--theme-fg);
+  text-decoration: none;
+  transition: filter 120ms ease;
+}
+.thread-map-tile[data-size='card'] { gap: 6px; padding: 10px 11px 9px; border-radius: 10px; }
+.thread-map-tile[data-size='large'] { gap: 5px; padding: 8px 9px; border-radius: 9px; }
+.thread-map-tile[data-size='named'] { justify-content: center; padding: 3px 5px; }
+.thread-map-tile[data-size='icon'] { align-items: center; justify-content: center; padding: 1px; }
+.thread-map-tile[data-size='dot'] { padding: 0; border: 0; border-radius: 2px; }
+.thread-map-tile:hover { filter: brightness(0.96); }
+.thread-map-dialog[data-theme-effective='dark'] .thread-map-tile:hover { filter: brightness(1.18); }
+/* The whole tile is one link under its content; only the price and the
+   agent-thread button take the pointer themselves. */
+.thread-map-tile-link { position: absolute; inset: 0; z-index: 0; border-radius: inherit; }
+.thread-map-tile-link:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: -2px; }
+.thread-map-tile > :not(.thread-map-tile-link) { position: relative; pointer-events: none; }
+.thread-map-tile :is(.thread-map-children, .thread-map-usage) { pointer-events: auto; }
+.thread-map-tile:has(> .thread-map-tile-link:focus-visible) { z-index: 2; }
+.thread-map-tile[data-current] { border-color: var(--theme-fg); box-shadow: inset 0 0 0 1px var(--theme-fg); }
+.thread-map-tile-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.thread-map-tile:is([data-size='card'], [data-size='large'], [data-size='medium'], [data-size='named']) .thread-map-tile-head { align-items: flex-start; }
+.thread-map-tile-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.thread-map-tile:is([data-size='card'], [data-size='large'], [data-size='medium'], [data-size='named']) .thread-map-tile-title {
+  display: -webkit-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines, 1);
+}
+.thread-map-tile[data-size='card'] .thread-map-tile-title { font-size: 14px; line-height: 19px; letter-spacing: -0.01em; }
+.thread-map-tile[data-size='large'] .thread-map-tile-title { font-size: 13px; line-height: 17px; }
+.thread-map-tile[data-size='card'] .thread-map-agent { width: 19px; height: 19px; border-radius: 5px; font-size: 9.5px; }
+.thread-map-tile:is([data-size='card'], [data-size='large']) .thread-map-agent { margin-top: 0; }
+
+/* Age: a pie that fills as the thread gets older, on a soft pill. */
+.thread-map-age {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 2px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--theme-panel) 72%, transparent);
+  color: var(--theme-fg-soft);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.thread-map-age > span { padding-right: 5px; }
+/* Agent threads this one started: opens the tile up into them. */
+.thread-map-children {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  height: 19px;
+  margin-left: auto;
+  padding: 0 6px 0 5px;
+  border: 1px solid color-mix(in oklab, var(--theme-border) 85%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--theme-panel) 78%, transparent);
+  color: var(--theme-fg-soft);
+  font-size: 10.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.thread-map-children:hover { border-color: var(--theme-border-strong); background: var(--theme-panel); color: var(--theme-fg); }
+.thread-map-children:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: 1px; }
+.thread-map-children svg { width: 12px; height: 12px; }
+.thread-map-children + .thread-map-age { margin-left: 4px; }
+.thread-map-tile-children-row { display: flex; }
+.thread-map-tile-children-row .thread-map-children { margin-left: 0; }
+.thread-map-age-glyph { flex: none; width: 13px; height: 13px; }
+.thread-map-tile[data-size='card'] .thread-map-age-glyph { width: 14px; height: 14px; }
+.thread-map-age-glyph[data-age='0'] { color: var(--thread-map-age-0); }
+.thread-map-age-glyph[data-age='1'] { color: var(--thread-map-age-1); }
+.thread-map-age-glyph[data-age='2'] { color: var(--thread-map-age-2); }
+.thread-map-age-glyph[data-age='3'] { color: var(--thread-map-age-3); }
+.thread-map-age-glyph[data-age='4'] { color: var(--thread-map-age-4); }
+
+.thread-map-tile-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--theme-fg-soft);
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+.thread-map-tile-sub > * { flex: none; }
+.thread-map-tile-sub > * + *::before { margin-right: 6px; opacity: 0.55; content: '·'; }
+.thread-map-tile-who { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.thread-map-tile-from { flex: 0 2 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-map-tile-live { display: inline-flex; align-items: center; gap: 4px; color: var(--theme-fg); font-weight: 600; }
+.thread-map-tile-live .thread-map-running-dot { margin-right: 0; }
+.thread-map-tile-failed { color: var(--theme-danger, #c2410c); font-weight: 600; }
+
+/* The latest prompt, as a quote that fades where the room ends. */
+.thread-map-tile-prompt {
+  flex: none;
+  margin-top: 1px;
+  padding-left: 8px;
+  overflow: hidden;
+  border-left: 2px solid color-mix(in oklab, var(--theme-fg) 16%, transparent);
+  color: var(--theme-fg-soft);
+  font-size: 11.5px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--prompt-lines, 3);
+}
+
+/* Figures: turns, run time in all and in the window. */
+.thread-map-stats {
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+  margin-top: auto;
+  padding-top: 2px;
+}
+.thread-map-stats > span { display: flex; flex-direction: column; min-width: 0; }
+.thread-map-stats[data-layout='column'] { flex-direction: column; gap: 2px; }
+.thread-map-stats[data-layout='column'] > span { flex-direction: row; align-items: baseline; gap: 5px; }
+.thread-map-stats[data-layout='column'] b { font-size: 13px; line-height: 17px; }
+.thread-map-stats b {
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 18px;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.thread-map-stats small {
+  overflow: hidden;
+  color: var(--theme-fg-soft);
+  font-size: 9.5px;
+  line-height: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Tokens and API price, the price opening its breakdown as on a turn. */
+.thread-map-usage {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  min-width: 0;
+  color: var(--theme-fg-soft);
+  font-size: 11px;
+  line-height: 18px;
+}
+.thread-map-usage .thread-turn-usage-price {
+  padding: 0 6px;
+  background: color-mix(in oklab, var(--theme-panel) 85%, transparent);
+  color: var(--theme-accent-strong, var(--theme-fg));
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.thread-map-usage .thread-turn-usage-price:hover { border-color: var(--theme-border-strong); }
+.thread-map-tokens { display: inline-flex; align-items: center; gap: 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.thread-map-tokens svg { width: 12px; height: 12px; }
+.thread-map-stat-usage .thread-map-usage { gap: 6px; }
+.thread-map-tile-meta {
+  margin-top: auto;
+  overflow: hidden;
+  color: var(--theme-fg-soft);
+  font-size: 10.5px;
+  line-height: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+/* Run time per hour of the window, each bar out of a full hour. */
+.thread-map-spark {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 1px;
+  height: var(--spark-h, 14px);
+}
+.thread-map-spark i {
+  flex: 1 1 0;
+  min-width: 0;
+  height: max(2px, calc(var(--h) * 100%));
+  border-radius: 1px 1px 0 0;
+  background: var(--thread-map-spark);
+}
+.thread-map-spark i[data-zero] { height: 1px; background: color-mix(in oklab, var(--theme-fg) 16%, transparent); }
+
+/* Heat: five steps toward the accent, light enough to read text on. */
+.thread-map [data-heat] { --thread-map-fill: var(--thread-map-tile); }
+.thread-map [data-heat='1'] { --thread-map-fill: color-mix(in oklab, var(--thread-map-heat) 14%, var(--thread-map-tile)); }
+.thread-map [data-heat='2'] { --thread-map-fill: color-mix(in oklab, var(--thread-map-heat) 26%, var(--thread-map-tile)); }
+.thread-map [data-heat='3'] { --thread-map-fill: color-mix(in oklab, var(--thread-map-heat) 39%, var(--thread-map-tile)); }
+.thread-map [data-heat='4'] { --thread-map-fill: color-mix(in oklab, var(--thread-map-heat) 52%, var(--thread-map-tile)); }
+.thread-map :is(.thread-map-tile, .thread-map-section[data-heat], .thread-map-scale i) { background-color: var(--thread-map-fill); }
+
+/* Running: a ring in the running color, and a pulse that rises quickly and fades
+   slowly, like a heartbeat: a halo outside the block and a glow in from its edge.
+   Both are in the running color, so they show by hue on any fill, bright or dark;
+   the fill keeps its heat. Devices and workspaces with agents running inside take
+   the color on their edge. */
+.thread-map :is(.thread-map-tile, .thread-map-section)[data-running] {
+  border-color: var(--thread-map-live);
+  animation: thread-map-halo 2.4s cubic-bezier(0.3, 0, 0.2, 1) infinite;
+}
+.thread-map .thread-map-section[data-live]:not([data-running]) { border-color: color-mix(in oklab, var(--thread-map-live) 55%, var(--theme-border)); }
+.thread-map .thread-map-section[data-live] > .thread-map-section-head .thread-map-section-count { color: var(--theme-fg-soft); }
+.thread-map .thread-map-tile-live { color: var(--thread-map-live); }
+.thread-map :is(.thread-map-tile, .thread-map-section)[data-running]::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--thread-map-live), inset 0 0 26px color-mix(in oklab, var(--thread-map-live) 70%, transparent);
+  content: '';
+  pointer-events: none;
+  animation: thread-map-glow 2.4s cubic-bezier(0.3, 0, 0.2, 1) infinite;
+}
+.thread-map-running-dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--thread-map-live);
+  vertical-align: 0.05em;
+  animation: thread-map-breathe-dot 1.8s ease-out infinite;
+}
+@keyframes thread-map-halo {
+  0%, 100% { box-shadow: 0 0 0 1px var(--thread-map-live), 0 0 0 0 transparent; }
+  22% { box-shadow: 0 0 0 1.5px var(--thread-map-live), 0 0 12px 3px color-mix(in oklab, var(--thread-map-live) 65%, transparent); }
+}
+@keyframes thread-map-glow {
+  0%, 100% { opacity: 0.12; }
+  22% { opacity: 1; }
+}
+/* The dot pings: a ring leaves it and fades, which shows on any background. */
+@keyframes thread-map-breathe-dot {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--thread-map-live) 75%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thread-map :is(.thread-map-tile, .thread-map-section)[data-running] { animation: none; box-shadow: 0 0 0 1.5px var(--thread-map-live); }
+  .thread-map :is(.thread-map-tile, .thread-map-section)[data-running]::before { animation: none; opacity: 0.7; }
+  .thread-map-running-dot { animation: none; }
+}
+
+/* An agent's mark: the theme's art for it, else a monogram in its own color. */
+.thread-map-agent {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--thread-map-agent, #64748b);
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.thread-map-agent[data-agent='claude'] { --thread-map-agent: #c96442; }
+.thread-map-agent[data-agent='codex'] { --thread-map-agent: #0f8a69; }
+.thread-map-agent[data-agent='gemini'] { --thread-map-agent: #3b78e7; }
+.thread-map-agent[data-agent='deepseek'] { --thread-map-agent: #4d6bfe; }
+.thread-map-agent[data-agent='copilot'] { --thread-map-agent: #8250df; }
+.thread-map-agent[data-agent='opencode'] { --thread-map-agent: #475569; }
+.thread-map-agent[data-agent='grok'] { --thread-map-agent: #3f3f46; }
+.thread-map-agent[data-agent='cursor'] { --thread-map-agent: #27272a; }
+.thread-map-agent[data-agent='qwen'] { --thread-map-agent: #615ced; }
+.thread-map-agent[data-agent='kimi'] { --thread-map-agent: #0b84c6; }
+.thread-map-agent[data-art] {
+  color: transparent;
+  background: var(--theme-panel) var(--theme-agent-avatar) center / cover no-repeat;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--theme-border) 80%, transparent);
+}
+
+.thread-map-tip {
+  position: absolute;
+  z-index: 10;
+  max-width: min(300px, calc(100% - 16px));
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--theme-fg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+  color: var(--theme-bg);
+  font-size: 11.5px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+.thread-map-tip[data-above] { transform: translateY(-100%); }
+.thread-map-tip > * { display: block; }
+.thread-map-tip > b { margin-bottom: 2px; font-weight: 650; }
+.thread-map-tip > span { opacity: 0.82; }
+
+.thread-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  padding: 8px 14px 10px;
+  color: var(--theme-fg-muted);
+  font-size: 11px;
+}
+.thread-map-scale { display: inline-flex; align-items: center; gap: 3px; }
+.thread-map-scale small { margin: 0 2px 0 6px; font-size: 10.5px; }
+.thread-map-scale i + small { margin: 0 0 0 2px; }
+.thread-map-scale i {
+  width: 11px;
+  height: 11px;
+  border: 1px solid color-mix(in oklab, var(--theme-border) 75%, transparent);
+  border-radius: 3px;
+}
+.thread-map-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.thread-map-ages .thread-map-age-glyph { width: 12px; height: 12px; }
+.thread-map-legend-spark { display: inline-flex; align-items: flex-end; gap: 1px; height: 11px; }
+.thread-map-legend-spark i { width: 3px; border-radius: 1px 1px 0 0; background: var(--thread-map-spark); }
+.thread-map-legend-spark i:nth-child(1) { height: 30%; }
+.thread-map-legend-spark i:nth-child(2) { height: 100%; }
+.thread-map-legend-spark i:nth-child(3) { height: 60%; }
+.thread-map-legend-spark i:nth-child(4) { height: 15%; }
+@media (max-width: 639px) {
+  .thread-map-canvas { margin: 6px 6px 0; }
+  /* Clear of the bottom gesture area, which some browsers draw the page under. */
+  .thread-map-legend { gap: 2px 10px; padding: 6px 10px calc(16px + env(safe-area-inset-bottom)); }
+}
+.thread-map-tile-head > .matter-status-dot { flex: none; position: relative; z-index: 1; }

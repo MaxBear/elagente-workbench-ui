@@ -1,3 +1,5 @@
+import { getLocale } from '../i18n';
+import { translate, useI18n } from '../i18n';
 import { ChevronRight } from 'lucide-react';
 import type { ThreadTurnDto } from '@remote-codex/shared';
 import { GraphChatMessageFrame } from './graph-chat/GraphChatMessageFrame';
@@ -53,6 +55,7 @@ export function transcriptSnapshot(title: string, turns: ThreadTurnDto[], theme:
 // The same message frame, Markdown/code renderer and usage row as the live
 // thread. No timeline adapter, command history, composer or navigation is mounted.
 export function PublicTranscript({snapshot}: {snapshot: PublicTranscriptSnapshot}) {
+  useI18n();
   const message = (item: PublicTranscriptMessage, index: number) => <GraphChatMessageFrame
     key={index} kind={item.role === 'user' ? 'userMessage' : 'agentMessage'}
     timeLabel={item.createdAt ? formatMessageTimestamp(item.createdAt) : undefined}
@@ -62,12 +65,12 @@ export function PublicTranscript({snapshot}: {snapshot: PublicTranscriptSnapshot
   </GraphChatMessageFrame>;
   return <main className="public-transcript thread-ui-shell" data-theme-effective={snapshot.theme ?? 'dark'}>
     <div className="public-transcript-content">
-      <header className="public-transcript-header"><h1>{snapshot.title}</h1><p>{snapshot.live ? 'Live read-only thread' : 'Read-only snapshot'} · {snapshot.turnCount} turns{snapshot.live && snapshot.updatedAt ? ` · Updated ${new Date(snapshot.updatedAt).toLocaleString()}` : ''}</p>{snapshot.stale && <p role="status">The device is unavailable. Showing the last published version.</p>}</header>
+      <header className="public-transcript-header"><h1>{snapshot.title}</h1><p>{snapshot.live ? translate("sharing.liveReadOnlyThread") : translate("sharing.readOnlySnapshot")} · {snapshot.turnCount} {translate("sharing.turns_7cb1b2")}{snapshot.live && snapshot.updatedAt ? translate("sharing.updated", { value1: new Date(snapshot.updatedAt).toLocaleString(getLocale()) }) : ''}</p>{snapshot.stale && <p role="status">{translate("sharing.theDeviceIsUnavailableShowingTheLast")}</p>}</header>
       {snapshot.turns.map((turn, index) => {
         const displayTurn: ThreadTurnDto = {id:`snapshot-${index}`,status:'completed',error:null,items:[],startedAt:turn.startedAt ?? null,completedAt:turn.completedAt ?? null,model:turn.model ?? null,reasoningEffort:turn.reasoningEffort ?? null,tokenUsage:turn.tokenUsage ?? null,priceEstimate:turn.priceEstimate ?? null};
         return <section key={index} className="thread-graph-turn public-transcript-turn">
           {turn.messages.filter(item => item.role === 'user').map(message)}
-          <div className="thread-graph-worked-summary flex w-full items-center gap-2 py-2 text-sm" aria-label="Turn summary">
+          <div className="thread-graph-worked-summary flex w-full items-center gap-2 py-2 text-sm" aria-label={translate("sharing.turnSummary")}>
             <span className="thread-graph-worked-label shrink-0">{formatWorkedDuration(turn.startedAt, turn.completedAt, [])}</span>
             <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
             {turn.model || turn.tokenUsage ? <TurnUsageInline turn={displayTurn} readOnly /> : null}

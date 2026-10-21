@@ -184,9 +184,9 @@ describe('ManifestArtifactExtractor', () => {
           {
             id: 'tool-1',
             kind: 'toolCall',
-            text: 'remote_codex_plugins/remote_codex_render_molecule',
+            text: 'pockymoe_plugins/remote_codex_render_molecule',
             detailText: [
-              'remote_codex_plugins/remote_codex_render_molecule',
+              'pockymoe_plugins/remote_codex_render_molecule',
               'Status: completed',
               '',
               'Result',

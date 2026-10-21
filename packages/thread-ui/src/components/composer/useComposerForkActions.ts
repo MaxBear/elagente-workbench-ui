@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { SlashPanelView } from './types';
@@ -22,6 +23,7 @@ export function useComposerForkActions({
   onForkTurn,
   closeMenu,
 }: UseComposerForkActionsInput): UseComposerForkActionsResult {
+  useI18n();
   const [forkBusy, setForkBusy] = useState(false);
   const [forkError, setForkError] = useState<string | null>(null);
   const inFlight = useRef(false);
@@ -33,7 +35,7 @@ export function useComposerForkActions({
   const forkLatest = useCallback(async () => {
     if (inFlight.current) return;
     if (!onForkLatest) {
-      setForkError('Fork is unavailable for this thread. Reload the page and try again.');
+      setForkError(translate("chat.forkIsUnavailableForThisThreadReload"));
       return;
     }
 
@@ -44,7 +46,7 @@ export function useComposerForkActions({
       await onForkLatest();
       closeMenu();
     } catch (error) {
-      setForkError(error instanceof Error ? error.message : 'Unable to fork this thread. Please try again.');
+      setForkError(error instanceof Error ? error.message : translate("chat.unableToForkThisThreadPleaseTry"));
     } finally {
       inFlight.current = false;
       setForkBusy(false);
@@ -55,7 +57,7 @@ export function useComposerForkActions({
     async (turnId: string) => {
       if (inFlight.current) return;
       if (!onForkTurn) {
-        setForkError('Fork is unavailable for this thread. Reload the page and try again.');
+        setForkError(translate("chat.forkIsUnavailableForThisThreadReload"));
         return;
       }
 
@@ -66,7 +68,7 @@ export function useComposerForkActions({
         await onForkTurn(turnId);
         closeMenu();
       } catch (error) {
-        setForkError(error instanceof Error ? error.message : 'Unable to fork this turn. Please try again.');
+        setForkError(error instanceof Error ? error.message : translate("chat.unableToForkThisTurnPleaseTry"));
       } finally {
         inFlight.current = false;
         setForkBusy(false);

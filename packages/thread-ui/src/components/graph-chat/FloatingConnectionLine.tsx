@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import type { ConnectionLineComponentProps } from '@xyflow/react';
 import { getBezierPath, Position } from '@xyflow/react';
 
@@ -10,6 +11,7 @@ export function FloatingConnectionLine({
   toPosition,
   fromNode,
 }: ConnectionLineComponentProps) {
+  useI18n();
   if (!fromNode) {
     return null;
   }
@@ -42,7 +44,7 @@ export function FloatingConnectionLine({
   return (
     <g>
       <path
-        fill="none"
+        fill={"none"}
         stroke="currentColor"
         strokeWidth={1.5}
         className="animated"

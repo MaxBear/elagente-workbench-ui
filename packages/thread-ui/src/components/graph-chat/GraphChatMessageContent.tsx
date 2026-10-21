@@ -1,8 +1,9 @@
+import { translate, useI18n } from '../../i18n';
 import { externalLinkProps } from '../externalLinkProps';
 import {
+  memo,
   createContext,
   useContext,
-  memo,
   useEffect,
   isValidElement,
   useMemo,
@@ -12,7 +13,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { CopyButton } from '../copy/CopyButton';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
@@ -22,12 +23,17 @@ import { remarkLatex } from './remarkLatex';
 import 'katex/dist/katex.min.css';
 
 import { localFileHref, relativeWorkspacePath } from '../workspacePaths';
-import { ZoomableImage } from '../ZoomableImage';
+import { ZoomableImage, MarkdownImageLinkContext } from '../ZoomableImage';
+import { markdownHtmlPlugins } from '../markdownHtml';
 import { WorkspaceFileLink } from '../WorkspaceFileLink';
-import { Button } from '../graph-ui/Button';
+import { VerifiedWorkspacePath } from '../VerifiedWorkspacePath';
+import { parseWorkspacePathText, remarkWorkspacePaths, type WorkspacePathResolver } from '../workspacePathLinks';
 import { usePlugins } from '../../plugins/usePlugins';
 import { GraphChatToolCall } from './GraphChatToolCall';
-import { getGraphChatHighlighter } from './graphChatShiki';
+import { getGraphChatHighlighter, syntaxThemeFor } from './graphChatShiki';
+import { useThemeFeature } from '../themeHooks';
+import { GraphChatMermaidDiagram } from './GraphChatMermaidDiagram';
+import { hasClosedMarkdownFence, isMermaidCode } from './graphChatMermaid';
 import {
   createEmptyGraphChatToolResultState,
   getGraphChatToolUiStatus,
@@ -40,12 +46,18 @@ import {
 type CodeRendererProps = ComponentProps<'code'> & {
   inline?: boolean | undefined;
   node?: unknown;
+  insideMarkdownLink?: boolean;
 };
-const CodeRendererContext = createContext<((props: CodeRendererProps) => ReactElement | null) | null>(null);
-function StableCodeRenderer(props: CodeRendererProps) {
-  return useContext(CodeRendererContext)?.(props) ?? null;
-}
 
+// Keep ReactMarkdown's component identity stable as streamed text, highlighting,
+// copy state and theme change, so interactive diagrams retain their state.
+const CodeRendererContext = createContext<((props: CodeRendererProps) => ReactElement | null) | null>(null);
+const MarkdownLinkContext = createContext(false);
+function StableCodeRenderer(props: CodeRendererProps) {
+  const render = useContext(CodeRendererContext);
+  const insideMarkdownLink = useContext(MarkdownLinkContext);
+  return render?.({ ...props, insideMarkdownLink }) ?? null;
+}
 
 type OpenWorkspaceFileHandler = (input: {
   path: string;
@@ -115,7 +127,10 @@ function parseWorkspaceFileHref(href: string | undefined, workspaceRootPath?: st
 }
 
 function PreRenderer({ children, ...props }: ComponentProps<'pre'>) {
-  if (isToolCodeElement(children)) {
+  const { locale: i18nLocale } = useI18n();
+  const code = isValidElement<{ className?: string; children?: ReactNode }>(children) ? children.props : undefined;
+  const language = /language-([\w-]+)/.exec(code?.className ?? '')?.[1] ?? '';
+  if (isToolCodeElement(children) || (code && isMermaidCode(language, textFromReactNode(code.children)))) {
     return <>{children}</>;
   }
 
@@ -144,27 +159,30 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
   className = 'thread-graph-markdown',
   content,
   readOnly = false,
+  streaming = false,
   onOpenWorkspaceFile,
+  resolveWorkspacePath,
   workspaceRootPath,
   resolveHref,
 }: {
   className?: string;
   content: string;
   readOnly?: boolean;
+  streaming?: boolean;
   onOpenWorkspaceFile?: OpenWorkspaceFileHandler | undefined;
+  resolveWorkspacePath?: WorkspacePathResolver | undefined;
   workspaceRootPath?: string | undefined;
   resolveHref?: ((href: string) => string) | undefined;
 }) {
+  const { locale: i18nLocale } = useI18n();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const plugins = usePlugins();
   const [highlighter, setHighlighter] = useState<Awaited<
     ReturnType<typeof getGraphChatHighlighter>
   > | null>(null);
-  const [copyState, setCopyState] = useState<
-    Record<string, 'copied' | 'failed'>
-  >({});
   const [touchCode, setTouchCode] = useState<string | null>(null);
   const [dark, setDark] = useState(false);
+  const cssSyntaxPalette = useThemeFeature('code.cssSyntaxPalette');
   const { processedContent, resultMap } = useMemo(
     () => readOnly ? { processedContent: content, resultMap: new Map() } : preprocessGraphChatToolBlocks(content),
     [content, readOnly],
@@ -213,29 +231,15 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
     return () => observer.disconnect();
   }, []);
 
-  async function copyCode(id: string, value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopyState((current) => ({ ...current, [id]: 'copied' }));
-      window.setTimeout(() => {
-        setCopyState((current) => {
-          const next = { ...current };
-          delete next[id];
-          return next;
-        });
-      }, 1200);
-    } catch {
-      setCopyState((current) => ({ ...current, [id]: 'failed' }));
-    }
-  }
-
   const CodeBlockRenderer = ({
     children,
     className: codeClassName,
     inline,
     node,
+    insideMarkdownLink,
     ...props
   }: CodeRendererProps): ReactElement | null => {
+  const { locale: i18nLocale } = useI18n();
     const match = /language-(\w+(?:-\w+)*)/.exec(codeClassName || '');
     const language = match ? (match[1] ?? '') : '';
     const textContent = textFromReactNode(children).replace(/\n$/, '');
@@ -245,6 +249,11 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
       Boolean(codeClassName) ||
       textContent.includes('\n') ||
       startLine !== endLine;
+
+    if (isFencedOrBlockCode && isMermaidCode(language, textContent)) {
+      return <GraphChatMermaidDiagram source={textContent} dark={dark}
+        pending={streaming && !hasClosedMarkdownFence(processedContent, startLine, endLine)} />;
+    }
 
     if (!readOnly && language === 'tool-merged') {
       let data: GraphChatToolMergedPayload = {
@@ -261,7 +270,7 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
       }
 
       const toolName =
-        typeof data.call.tool === 'string' ? data.call.tool : 'Unknown';
+        typeof data.call.tool === 'string' ? data.call.tool : translate("chat.unknown");
       const callId =
         typeof data.call.call_id === 'string' ? data.call.call_id : undefined;
       return (
@@ -299,7 +308,7 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
       return (
         <GraphChatToolCall
           callId={callId}
-          toolName={typeof data.tool === 'string' ? data.tool : 'Unknown'}
+          toolName={typeof data.tool === 'string' ? data.tool : translate("chat.unknown")}
           status={liveResult ? getGraphChatToolUiStatus(liveResult) : 'pending'}
           parameters={reconstructGraphChatToolArgs(data.args)}
           result={liveResult}
@@ -325,7 +334,7 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
     if (isFencedOrBlockCode) {
       const loadedLanguages = highlighter?.getLoadedLanguages?.() ?? [];
       const lang = loadedLanguages.includes(language) ? language : 'text';
-      const theme = dark ? 'ayu-dark' : 'ayu-light';
+      const theme = syntaxThemeFor(dark, cssSyntaxPalette);
       const id = `${language || 'text'}:${textContent.length}:${textContent.slice(0, 32)}`;
       let html = '';
 
@@ -342,49 +351,34 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
       }
 
       return (
-        <div className="thread-graph-code-block not-prose relative my-3 overflow-auto rounded-xl border p-3 text-sm shadow-sm"
+        // The frame holds the copy key floating over the code's corner; the code
+        // scrolls inside it, so the key never scrolls away or takes a line.
+        <div className="thread-graph-code-block not-prose"
           data-touch-actions={touchCode === id ? 'true' : 'false'}
+          onPointerEnter={(event) => { if (event.pointerType === 'mouse') setTouchCode(null); }}
           onPointerUp={(event) => {
-            if (event.pointerType !== 'mouse' && !(event.target instanceof Element && event.target.closest('button'))) {
+            if ((event.pointerType === 'touch' || event.pointerType === 'pen') && !(event.target instanceof Element && event.target.closest('button'))) {
               event.stopPropagation();
               setTouchCode((current) => current === id ? null : id);
             }
           }}
         >
-          {!readOnly && <Button
-            type="button"
-            onClick={() => void copyCode(id, textContent)}
-            variant="ghost"
-            size="sm"
-            className="thread-graph-code-copy absolute right-2 top-2 z-10 rounded-md p-1.5"
-            title={
-              copyState[id] === 'copied'
-                ? 'Copied'
-                : copyState[id] === 'failed'
-                  ? 'Copy failed'
-                  : 'Copy'
-            }
-            aria-label="Copy code"
-          >
-            {copyState[id] === 'copied' ? (
-              <Check className="h-3.5 w-3.5" />
+          {!readOnly && <CopyButton value={textContent} label={translate("chat.copyCode")} className="thread-graph-code-copy" />}
+          <div className="thread-graph-code-scroll">
+            {html ? (
+              <div dangerouslySetInnerHTML={{ __html: html }} />
             ) : (
-              <Copy className="h-3.5 w-3.5" />
+              <pre>
+                <code className="whitespace-pre">{textContent}</code>
+              </pre>
             )}
-          </Button>}
-          {html ? (
-            <div dangerouslySetInnerHTML={{ __html: html }} />
-          ) : (
-            <pre>
-              <code className="whitespace-pre">{textContent}</code>
-            </pre>
-          )}
+          </div>
         </div>
       );
     }
 
     const inlineDisplayText = textFromReactNode(children).replace(/`+/g, '');
-    return (
+    const inlineCode = (
       <code
         className={`thread-graph-inline-code rounded px-1 py-0.5 font-mono font-normal text-[0.9em] ${
           codeClassName || ''
@@ -394,16 +388,30 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
         {inlineDisplayText}
       </code>
     );
+    const target = parseWorkspacePathText(inlineDisplayText, workspaceRootPath);
+    return !readOnly && !insideMarkdownLink && target && resolveWorkspacePath && onOpenWorkspaceFile
+      ? <VerifiedWorkspacePath target={target} resolve={resolveWorkspacePath} onOpen={onOpenWorkspaceFile}>{inlineCode}</VerifiedWorkspacePath>
+      : inlineCode;
   };
 
   return (
     <div ref={rootRef} data-markdown-ready={highlighter ? 'true' : 'false'} className={`thread-graph-message-markdown ${className}`}>
-      <CodeRendererContext.Provider value={CodeBlockRenderer}><ReactMarkdown
-        urlTransform={url => !readOnly && localFileHref(url, typeof window === 'undefined' ? undefined : window.location.origin) ? url : defaultUrlTransform(url)}
-        remarkPlugins={[remarkGfm, remarkMath, remarkLatex, remarkCjkFriendly]}
-        rehypePlugins={[rehypeKatex]}
+      <CodeRendererContext.Provider value={CodeBlockRenderer}>
+      <ReactMarkdown
+        urlTransform={url => !readOnly && url.startsWith('workspace-auto:') ? url : !readOnly && localFileHref(url, typeof window === 'undefined' ? undefined : window.location.origin) ? url : defaultUrlTransform(url)}
+        remarkPlugins={[remarkGfm, remarkMath, remarkLatex, remarkCjkFriendly, ...(!readOnly && resolveWorkspacePath ? [remarkWorkspacePaths] : [])]}
+        rehypePlugins={[...markdownHtmlPlugins, rehypeKatex]}
         components={{
-          a({ href, children, ...props }) {
+          a({ href, children: originalChildren, node: _node, ...props }) {
+            const children = <MarkdownLinkContext.Provider value={true}><MarkdownImageLinkContext.Provider value={true}>{originalChildren}</MarkdownImageLinkContext.Provider></MarkdownLinkContext.Provider>;
+            if (href?.startsWith('workspace-auto:')) {
+              let value = '';
+              try { value = decodeURIComponent(href.slice('workspace-auto:'.length)); } catch { /* Invalid path remains plain text. */ }
+              const target = parseWorkspacePathText(value, workspaceRootPath);
+              return !readOnly && target && resolveWorkspacePath && onOpenWorkspaceFile
+                ? <VerifiedWorkspacePath target={target} resolve={resolveWorkspacePath} onOpen={onOpenWorkspaceFile}>{children}</VerifiedWorkspacePath>
+                : <>{children}</>;
+            }
             if (readOnly && (!href || !/^https?:\/\//i.test(href))) return <span>{children}</span>;
             const workspaceTarget = parseWorkspaceFileHref(href, workspaceRootPath);
             if (workspaceTarget && onOpenWorkspaceFile) {
@@ -423,18 +431,19 @@ export const GraphChatMessageContent = memo(function GraphChatMessageContent({
               </a>
             );
           },
-          img({src, alt}) {
+          img({src, alt, width, height}) {
             const resolved = src ? (resolveHref?.(src) ?? src) : undefined;
-            if (readOnly && !resolved?.startsWith('data:image/') && !/^https?:\/\//i.test(resolved ?? '')) return <span>{alt || 'Image unavailable'}</span>;
-            return resolved ? <ZoomableImage src={resolved} alt={alt ?? ''} /> : <span>{alt || 'Image unavailable'}</span>;
+            if (readOnly && !resolved?.startsWith('data:image/') && !/^https?:\/\//i.test(resolved ?? '')) return <span>{alt || translate("chat.imageUnavailable")}</span>;
+            return resolved ? <ZoomableImage src={resolved} alt={alt ?? ''} width={width} height={height} /> : <span>{alt || translate("chat.imageUnavailable")}</span>;
           },
           code: StableCodeRenderer,
-          table: ({children}) => <div className="thread-markdown-table-scroll" tabIndex={0} role="region" aria-label="Table"> <table>{children}</table></div>,
+          table: ({children}) => <div className="thread-markdown-table-scroll" tabIndex={0} role="region" aria-label={translate("chat.table")}><table>{children}</table></div>,
           pre: PreRenderer,
         }}
       >
         {processedContent}
-      </ReactMarkdown></CodeRendererContext.Provider>
+      </ReactMarkdown>
+      </CodeRendererContext.Provider>
     </div>
   );
 });

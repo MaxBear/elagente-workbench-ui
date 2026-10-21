@@ -1,8 +1,8 @@
 import { ThreadHistoryItemDto, ThreadArtifactDto, ThreadTurnDto, PluginManifestDto, PluginDto } from '@remote-codex/shared';
 
-type RemoteCodexPluginManifest = PluginManifestDto;
+type PockymoePluginManifest = PluginManifestDto;
 interface RegisteredPlugin {
-    manifest: RemoteCodexPluginManifest;
+    manifest: PockymoePluginManifest;
     enabledByDefault?: boolean;
     source?: 'builtin' | 'imported';
 }
@@ -55,4 +55,4 @@ declare function appendArtifactItemsToTurns(turns: ThreadTurnDto[], extractor: A
 
 declare function parsePluginManifest(value: unknown): PluginManifestDto;
 
-export { type ArtifactExtractionContext, type ArtifactExtractionResult, type ArtifactExtractor, ManifestArtifactExtractor, PluginRegistry, type PluginRegistrySnapshot, type RegisteredPlugin, type RemoteCodexPluginManifest, appendArtifactItemsToTurns, looksLikeCifMolecule, looksLikeMoleculeStructure, looksLikePdbMolecule, looksLikeXyzMolecule, parsePluginManifest };
+export { type ArtifactExtractionContext, type ArtifactExtractionResult, type ArtifactExtractor, ManifestArtifactExtractor, PluginRegistry, type PluginRegistrySnapshot, type PockymoePluginManifest, type RegisteredPlugin, appendArtifactItemsToTurns, looksLikeCifMolecule, looksLikeMoleculeStructure, looksLikePdbMolecule, looksLikeXyzMolecule, parsePluginManifest };

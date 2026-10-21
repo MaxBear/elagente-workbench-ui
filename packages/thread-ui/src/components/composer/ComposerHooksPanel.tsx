@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import type {
   AgentHookDto,
   AgentHookEventNameDto,
@@ -78,13 +79,14 @@ export function ComposerHooksPanel({
   onTrustHook,
   onUntrustHook,
 }: ComposerHooksPanelProps) {
+  useI18n();
   return (
     <div className="p-2">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs text-stone-400">Hook config sources</p>
+          <p className="text-xs text-stone-400">{translate("chat.hookConfigSources")}</p>
           <p className="truncate text-[11px] text-stone-500">
-            {hooksState.data?.projectHooksPath ?? '<workspace hooks config>'}
+            {hooksState.data?.projectHooksPath ?? translate("chat.workspaceHooksConfig")}
           </p>
         </div>
         {hooksPanelMode === 'list' && hostConfigFilesAvailable ? (
@@ -98,14 +100,12 @@ export function ComposerHooksPanel({
             }}
             className="shrink-0 rounded-full border border-sky-300/35 px-3 py-1.5 text-xs text-sky-100 transition hover:bg-sky-300/10"
           >
-            Add Hook
-          </button>
+            {translate("chat.addHook")}</button>
         ) : null}
       </div>
       {hooksState.status === 'loading' && !hooksState.data ? (
         <p className="rounded-xl border border-stone-800 bg-stone-950/70 px-3 py-3 text-sm text-stone-400">
-          Loading hooks...
-        </p>
+          {translate("chat.loadingHooks")}</p>
       ) : null}
       {hooksState.error ? (
         <p className="mb-2 rounded-xl border border-rose-500/35 bg-rose-500/10 px-3 py-3 text-sm text-rose-100/90">
@@ -126,30 +126,28 @@ export function ComposerHooksPanel({
         <div className="space-y-2 rounded-xl border border-stone-800 bg-stone-950/70 px-3 py-3">
           {hooksPanelMode === 'edit' ? (
             <p className="rounded-lg border border-stone-800 bg-stone-950 px-3 py-2 text-[11px] text-stone-400">
-              Editing{' '}
+              {translate("chat.editing")}{' '}
               {hookEventJsonKey(editingHookTarget?.eventName ?? hookEventName)}{' '}
-              in {editingHookTarget?.scope === 'global' ? 'global' : 'project'}{' '}
+              {translate("chat.in")} {editingHookTarget?.scope === 'global' ? translate("chat.global") : translate("chat.project")}{' '}
               hooks.json
             </p>
           ) : null}
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-xs text-stone-400">
-              Scope
-              <select
-                aria-label="Hook scope"
+              {translate("chat.scope")}<select
+                aria-label={translate("chat.hookScope")}
                 value={hookScope}
                 onChange={(event) => onSetHookScope(event.target.value as HookScope)}
                 disabled={hooksPanelMode === 'edit'}
                 className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-2.5 py-2 text-sm text-stone-100 outline-none focus:border-sky-300/50"
               >
-                <option value="project">Project</option>
-                <option value="global">Global</option>
+                <option value="project">{translate("chat.project_f6f4da")}</option>
+                <option value="global">{translate("chat.global_5f1184")}</option>
               </select>
             </label>
             <label className="block text-xs text-stone-400">
-              Event
-              <select
-                aria-label="Hook event"
+              {translate("chat.event")}<select
+                aria-label={translate("chat.hookEvent")}
                 value={hookEventName}
                 onChange={(event) =>
                   onSetHookEventName(event.target.value as AgentHookEventNameDto)
@@ -166,10 +164,9 @@ export function ComposerHooksPanel({
           </div>
           <div>
             <label className="mb-1 block text-xs text-stone-400">
-              Matcher
-            </label>
+              {translate("chat.matcher")}</label>
             <input
-              aria-label="Hook matcher"
+              aria-label={translate("chat.hookMatcher")}
               value={hookMatcher}
               onChange={(event) => onSetHookMatcher(event.target.value)}
               placeholder="Bash"
@@ -178,10 +175,9 @@ export function ComposerHooksPanel({
           </div>
           <div>
             <label className="mb-1 block text-xs text-stone-400">
-              Command
-            </label>
+              {translate("chat.command")}</label>
             <textarea
-              aria-label="Hook command"
+              aria-label={translate("chat.hookCommand")}
               value={hookCommand}
               onChange={(event) => onSetHookCommand(event.target.value)}
               rows={3}
@@ -190,9 +186,8 @@ export function ComposerHooksPanel({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-xs text-stone-400">
-              Timeout
-              <input
-                aria-label="Hook timeout seconds"
+              {translate("chat.timeout")}<input
+                aria-label={translate("chat.hookTimeoutSeconds")}
                 value={hookTimeoutSec}
                 onChange={(event) => onSetHookTimeoutSec(event.target.value)}
                 inputMode="numeric"
@@ -200,9 +195,8 @@ export function ComposerHooksPanel({
               />
             </label>
             <label className="block text-xs text-stone-400">
-              Status message
-              <input
-                aria-label="Hook status message"
+              {translate("chat.statusMessage")}<input
+                aria-label={translate("chat.hookStatusMessage")}
                 value={hookStatusMessage}
                 onChange={(event) => onSetHookStatusMessage(event.target.value)}
                 className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-stone-100 outline-none focus:border-sky-300/50"
@@ -218,8 +212,7 @@ export function ComposerHooksPanel({
               }}
               className={`${composerChipButtonClassName} rounded-full border border-stone-700 px-3 py-1.5 text-xs text-stone-300 transition`}
             >
-              Back
-            </button>
+              {translate("chat.back")}</button>
             <button
               type="button"
               onClick={() => void onSaveHook()}
@@ -227,10 +220,10 @@ export function ComposerHooksPanel({
               className="ui-status-info rounded-full px-3 py-1.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-60"
             >
               {hookConfigBusy
-                ? 'Saving...'
+                ? translate("chat.saving")
                 : hooksPanelMode === 'edit'
-                  ? 'Update Hook'
-                  : 'Write Hook'}
+                  ? translate("chat.updateHook")
+                  : translate("chat.writeHook")}
             </button>
           </div>
         </div>
@@ -293,8 +286,7 @@ export function ComposerHooksPanel({
                     }}
                     className={`${composerChipButtonClassName} rounded-full border border-stone-700 px-2 py-0.5 text-[10px] normal-case tracking-normal text-sky-100 transition hover:border-sky-300/35 hover:bg-sky-300/10`}
                   >
-                    Edit
-                  </button>
+                    {translate("chat.edit")}</button>
                 ) : null}
                 {hookTrustAvailable &&
                 hook.trustStatus === 'trusted' &&
@@ -308,8 +300,7 @@ export function ComposerHooksPanel({
                     }}
                     className={`${composerChipButtonClassName} rounded-full border border-stone-700 px-2 py-0.5 text-[10px] normal-case tracking-normal text-amber-100 transition hover:border-amber-300/35 hover:bg-amber-300/10 disabled:cursor-not-allowed disabled:opacity-50`}
                   >
-                    Untrust
-                  </button>
+                    {translate("chat.untrust")}</button>
                 ) : null}
                 {(hook.trustStatus === 'untrusted' ||
                   hook.trustStatus === 'modified') &&
@@ -324,8 +315,7 @@ export function ComposerHooksPanel({
                     }}
                     className={`${composerChipButtonClassName} rounded-full border border-stone-700 px-2 py-0.5 text-[10px] normal-case tracking-normal text-sky-100 transition hover:border-sky-300/35 hover:bg-sky-300/10 disabled:cursor-not-allowed disabled:opacity-50`}
                   >
-                    Trust
-                  </button>
+                    {translate("chat.trust")}</button>
                 ) : null}
                 <span className="rounded-full border border-stone-700 px-2 py-0.5 text-stone-300">
                   {hookTrustLabel(hook.trustStatus)}
@@ -336,11 +326,10 @@ export function ComposerHooksPanel({
                   {hookSourceLabel(hook.source)}
                 </span>
                 <span className="rounded-full border border-stone-700 px-2 py-1">
-                  {hook.enabled ? 'Enabled' : 'Disabled'}
+                  {hook.enabled ? translate("chat.enabled") : translate("chat.disabled")}
                 </span>
                 <span className="rounded-full border border-stone-700 px-2 py-1">
-                  {hook.timeoutSec}s
-                </span>
+                  {hook.timeoutSec}{translate("chat.s")}</span>
               </div>
             </div>
           ))}
@@ -351,8 +340,7 @@ export function ComposerHooksPanel({
       !hooksState.error &&
       (hooksState.data?.hooks.length ?? 0) === 0 ? (
         <p className="rounded-xl border border-stone-800 bg-stone-950/70 px-3 py-3 text-sm text-stone-400">
-          No hooks configured for this workspace.
-        </p>
+          {translate("chat.noHooksConfiguredForThisWorkspace")}</p>
       ) : null}
     </div>
   );
