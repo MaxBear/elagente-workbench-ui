@@ -33,9 +33,15 @@ export function ThreadToolsMenu({ id, open, anchorRef, path, title, favorite, fa
   useI18n();
   const menuRef = useRef<HTMLDivElement>(null);
   const [place, setPlace] = useState<{ top: number; left: number } | null>(null);
-  // Found once: a portal that changed its host would remount the controls.
+  // Found once its toggle is there, then kept: a portal that changed its host
+  // would remount the controls. A host may mount the toggle after the menu (once
+  // its thread loads); placed in the body before then, the menu would lose the
+  // shell's styles and sit in the page flow under the workbench.
   const [host, setHost] = useState<Element | null>(null);
-  useLayoutEffect(() => { setHost(anchorRef.current?.closest('.thread-ui-shell') ?? document.body); }, [anchorRef]);
+  useLayoutEffect(() => {
+    if (host || !anchorRef.current) return;
+    setHost(anchorRef.current.closest('.thread-ui-shell') ?? document.body);
+  });
   const close = useRef(onClose);
   close.current = onClose;
   // Keyboard once it is placed and rendered: focus moves in, arrows move, Esc closes.

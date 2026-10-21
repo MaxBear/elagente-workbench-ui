@@ -8465,8 +8465,9 @@ function ThreadToolsMenu({ id, open, anchorRef, path, title, favorite, favoriteB
   const [place, setPlace] = useState24(null);
   const [host, setHost] = useState24(null);
   useLayoutEffect9(() => {
-    setHost(anchorRef.current?.closest(".thread-ui-shell") ?? document.body);
-  }, [anchorRef]);
+    if (host || !anchorRef.current) return;
+    setHost(anchorRef.current.closest(".thread-ui-shell") ?? document.body);
+  });
   const close = useRef17(onClose);
   close.current = onClose;
   useMenuKeyboard(menuRef, open && place !== null, (restore) => close.current(restore), "button:not([disabled]), a[href]");
