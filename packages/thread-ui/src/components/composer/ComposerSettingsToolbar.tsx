@@ -125,7 +125,9 @@ export function ComposerSettingsToolbar({
   const policyLabel = !modelPolicy ? null : !policyView
     ? translate(modelPolicy.error ? 'chat.policyUnavailable' : 'chat.policyLoading')
     : policyCustom ? translate('chat.policyCustom') : presetLabel(policyView);
-  const policyDetail = policyView && policyCustom
+  const policyDetail = policyView && modelPolicy?.confirmationRequired
+    ? translate('chat.policyConfirm')
+    : policyView && policyCustom
     ? policyOverrides ? translate('chat.policyOverrideCount', { count: policyOverrides }) : translate('chat.policyNoOverrides')
     : null;
   const policyTitle = policyView && policyCustom
@@ -180,7 +182,8 @@ export function ComposerSettingsToolbar({
           ) : null}
           <span className="composer-model-name">{policyLabel ?? selectedModelLabel}</span>
           {policyLabel != null ? (
-            policyDetail ? <span className="composer-model-effort composer-model-policy-detail">{policyDetail}</span> : null
+            policyDetail ? <span className="composer-model-effort composer-model-policy-detail"
+              data-tone={modelPolicy?.confirmationRequired ? 'warning' : undefined}>{policyDetail}</span> : null
           ) : supportsEffort && (
             <span className="composer-model-effort" data-effort={reasoningEffort ?? undefined}
               style={{ '--effort-color': reasoningEffortColor(reasoningEffort) } as CSSProperties}>{effortLabel}</span>

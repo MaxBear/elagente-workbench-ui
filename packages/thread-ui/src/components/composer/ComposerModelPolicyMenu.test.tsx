@@ -207,6 +207,14 @@ describe('ComposerModelPolicyMenu', () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
+  it('asks for an explicit confirmation and treats choosing the current preset as one', () => {
+    const { onUpdate } = render({ view: policyView(), confirmationRequired: 'Confirm a preset or group selection before running.' });
+    expect(chip().textContent).toBe('Preset AConfirm models');
+    expect(document.querySelector('.composer-model-policy [data-tone="warning"]')?.textContent).toContain('Confirm a preset');
+    act(() => rows()[0]!.click());
+    expect(onUpdate).toHaveBeenCalledWith({ presetId: 'preset-a', overrides: {} });
+  });
+
   it('disables every change while locked and names the reason', () => {
     render({ view: policyView({ presetId: null }), display: 'groups', lockedReason: 'Wait for the current turn to finish.' });
     expect(document.querySelector('.composer-model-policy')?.textContent).toContain('Wait for the current turn to finish.');

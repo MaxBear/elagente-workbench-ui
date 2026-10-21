@@ -615,4 +615,5 @@ export const chatEn = {
   "chat.policyNoModels": "No compatible models are available for this group.",
   "chat.policyDone": "Done",
   "chat.policyChip": "Models: {{value1}}",
+  "chat.policyConfirm": "Confirm models",
 } as const;

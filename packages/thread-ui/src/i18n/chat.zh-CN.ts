@@ -615,4 +615,5 @@ export const chatZhCN = {
   "chat.policyNoModels": "此分组没有可用的兼容模型。",
   "chat.policyDone": "完成",
   "chat.policyChip": "模型：{{value1}}",
+  "chat.policyConfirm": "请确认模型",
 } as const;

@@ -179,6 +179,8 @@
 /* The chip's second line is a count, not an effort: no effort colour. */
 [data-composer-layout] .composer-model-effort.composer-model-policy-detail,
 :root[data-theme-effective='light'] [data-composer-layout] .composer-model-effort.composer-model-policy-detail { color: var(--theme-fg-muted); }
+[data-composer-layout] .composer-model-effort.composer-model-policy-detail[data-tone='warning'],
+:root[data-theme-effective='light'] [data-composer-layout] .composer-model-effort.composer-model-policy-detail[data-tone='warning'] { color: var(--status-warning-fg); }
 /* A long group list scrolls inside the menu; presets, search and reset stay put. */
 .thread-ui-shell .composer-model-policy-menu[data-composer-menu-surface]:has(> .composer-model-policy[data-level='list']) {
   display: flex;

@@ -59,6 +59,10 @@ export interface ComposerModelPolicyProps {
   error?: string | null;
   /** Why changes cannot be made now, for example while a turn runs. */
   lockedReason?: string | null;
+  /** The host needs an explicit preset or group choice before the next turn
+      (for example a conversation that still carries a single-model selection).
+      Choosing the current preset again then counts as that confirmation. */
+  confirmationRequired?: string | null;
   onUpdate: (selection: ModelPolicyUpdateSelection) => void;
   onRetry: () => void;
 }

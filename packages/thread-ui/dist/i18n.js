@@ -19,7 +19,7 @@ import {
   translate,
   useI18n,
   zhCN
-} from "./chunk-PRYBAR3V.js";
+} from "./chunk-T32Z7APR.js";
 export {
   DEFAULT_LOCALE,
   I18nProvider,

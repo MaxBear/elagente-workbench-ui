@@ -1349,7 +1349,8 @@ var chatEn = {
   "chat.policySaving": "Saving\u2026",
   "chat.policyNoModels": "No compatible models are available for this group.",
   "chat.policyDone": "Done",
-  "chat.policyChip": "Models: {{value1}}"
+  "chat.policyChip": "Models: {{value1}}",
+  "chat.policyConfirm": "Confirm models"
 };
 
 // src/i18n/common.en.ts
@@ -5340,7 +5341,8 @@ var chatZhCN = {
   "chat.policySaving": "\u6B63\u5728\u4FDD\u5B58\u2026",
   "chat.policyNoModels": "\u6B64\u5206\u7EC4\u6CA1\u6709\u53EF\u7528\u7684\u517C\u5BB9\u6A21\u578B\u3002",
   "chat.policyDone": "\u5B8C\u6210",
-  "chat.policyChip": "\u6A21\u578B\uFF1A{{value1}}"
+  "chat.policyChip": "\u6A21\u578B\uFF1A{{value1}}",
+  "chat.policyConfirm": "\u8BF7\u786E\u8BA4\u6A21\u578B"
 };
 
 // src/i18n/common.zh-CN.ts

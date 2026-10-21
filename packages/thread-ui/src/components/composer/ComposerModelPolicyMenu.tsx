@@ -75,9 +75,12 @@ function PolicyHeading({ title, queueing, liveModelSwitch, saving }: {
 }
 
 function PolicyNotices({ policy }: { policy: ComposerModelPolicyProps }) {
-  const { view, error, lockedReason } = policy;
+  const { view, error, lockedReason, confirmationRequired } = policy;
   return (
     <>
+      {confirmationRequired ? (
+        <p className="composer-policy-notice" data-tone="warning" role="status">{confirmationRequired}</p>
+      ) : null}
       {view?.recovery ? (
         <p className="composer-policy-notice" data-tone="warning" role="status">{view.recovery.message}</p>
       ) : null}
@@ -94,9 +97,11 @@ function PolicyNotices({ policy }: { policy: ComposerModelPolicyProps }) {
   );
 }
 
-function PresetRows({ view, disabled, onUpdate, withCustom }: {
+function PresetRows({ view, disabled, onUpdate, withCustom, confirm }: {
   view: ModelPolicyViewDto; disabled: boolean; withCustom: boolean;
   onUpdate: ComposerModelPolicyProps['onUpdate'];
+  /** Re-choosing the current selection is an explicit confirmation. */
+  confirm: boolean;
 }) {
   const saved = overrideCount(view);
   const custom = isCustomSelection(view);
@@ -105,7 +110,7 @@ function PresetRows({ view, disabled, onUpdate, withCustom }: {
       {view.presets.map((preset) => (
         <button key={preset.id} type="button" role="menuitemradio" data-policy-row
           aria-checked={view.presetId === preset.id} disabled={disabled}
-          onClick={() => { if (view.presetId !== preset.id) onUpdate(selectPreset(view, preset.id)); }}
+          onClick={() => { if (confirm || view.presetId !== preset.id) onUpdate(selectPreset(view, preset.id)); }}
           className={ROW}>
           <span className="composer-policy-row-copy">
             <span className="composer-policy-row-title">{preset.label}</span>
@@ -116,7 +121,7 @@ function PresetRows({ view, disabled, onUpdate, withCustom }: {
       ))}
       {withCustom && (custom || saved > 0) ? (
         <button type="button" role="menuitemradio" data-policy-row aria-checked={custom} disabled={disabled}
-          onClick={() => { if (!custom) onUpdate(selectCustom(view)); }} className={ROW}>
+          onClick={() => { if (confirm || !custom) onUpdate(selectCustom(view)); }} className={ROW}>
           <span className="composer-policy-row-copy">
             <span className="composer-policy-row-title">{translate('chat.policyCustom')}</span>
             <span className="composer-policy-row-detail">
@@ -344,7 +349,7 @@ export function ComposerModelPolicyMenu({ policy, queueing, liveModelSwitch, onC
       <div className="composer-model-policy" data-display="presets" onKeyDown={moveFocus}>
         <PolicyHeading title={translate('chat.policyPresets')} queueing={queueing} liveModelSwitch={liveModelSwitch} saving={saving} />
         <PolicyNotices policy={policy} />
-        <PresetRows view={view} disabled={disabled} onUpdate={policy.onUpdate} withCustom={false} />
+        <PresetRows view={view} disabled={disabled} onUpdate={policy.onUpdate} withCustom={false} confirm={Boolean(policy.confirmationRequired)} />
         {custom ? (
           <div className="composer-policy-notice" data-tone="info" role="status">
             <strong>{translate('chat.policyCustomActive')}</strong>
@@ -360,7 +365,7 @@ export function ComposerModelPolicyMenu({ policy, queueing, liveModelSwitch, onC
     <div ref={listRef} className="composer-model-policy" data-display="groups" data-level="list" onKeyDown={moveFocus}>
       <PolicyHeading title={translate('chat.policyGroups')} queueing={queueing} liveModelSwitch={liveModelSwitch} saving={saving} />
       <PolicyNotices policy={policy} />
-      <PresetRows view={view} disabled={disabled} onUpdate={policy.onUpdate} withCustom />
+      <PresetRows view={view} disabled={disabled} onUpdate={policy.onUpdate} withCustom confirm={Boolean(policy.confirmationRequired)} />
       {searchable ? (
         <div className="composer-policy-search">
           <label>
