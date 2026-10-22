@@ -405,6 +405,8 @@ export function PlaygroundApp() {
             onTailVisibilityChange: setFollowTail,
           }}
           composerProps={{
+            // Hosts hand the composer their capabilities (plan mode enables the slash toolbox).
+            capabilities: mockCapabilities,
             disabled: false,
             draftPrompt: '',
             model: mockDetail.thread.model,

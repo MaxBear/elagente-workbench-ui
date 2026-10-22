@@ -11,7 +11,7 @@ import type { ThreadTurnDto } from '@remote-codex/shared';
 
 import { ThreadTimeline } from './ThreadTimeline';
 import { WorkbenchContext } from './WorkbenchContext';
-const shellSettings = vi.hoisted(() => ({ showReasoningSummaries: true }));
+const shellSettings = vi.hoisted(() => ({ showReasoningSummaries: true, autoCollapseCompletedTurns: undefined as boolean | undefined }));
 vi.mock('../app-shell/AppShellNavContext', () => ({ useAppShellNav: () => shellSettings }));
 import {
   formatLongTimestamp,
@@ -33,6 +33,7 @@ function render(node: ReactNode) {
 
 afterEach(() => {
   shellSettings.showReasoningSummaries = true;
+  shellSettings.autoCollapseCompletedTurns = undefined;
   if (root) {
     flushSync(() => {
       root?.unmount();
@@ -844,6 +845,27 @@ describe('ThreadTimeline', () => {
         button.getAttribute('aria-label')?.includes('Expand turn 1'),
       ),
     ).toBe(true);
+  });
+
+  it.each([true, false])("follows the host's auto-collapse setting when no prop overrides it (host %s)", (hostSetting) => {
+    // No Workbench preference may override the host: the host's choice decides.
+    shellSettings.autoCollapseCompletedTurns = hostSetting;
+    const element = render(
+      <ThreadTimeline
+        liveOutput=""
+        turns={[
+          completedTurn([
+            { id: 'user-1', kind: 'userMessage', text: 'reply me a 3', createdAt: new Date(Date.UTC(2026, 6, 3, 20, 10, 59)).toISOString() },
+            { id: 'reasoning-1', kind: 'reasoning', text: 'The user asked for the exact number 3.', createdAt: new Date(Date.UTC(2026, 6, 3, 20, 10, 59)).toISOString() },
+            { id: 'agent-1', kind: 'agentMessage', text: '3', createdAt: new Date(Date.UTC(2026, 6, 3, 20, 10, 59)).toISOString() },
+          ]),
+        ]}
+      />,
+    );
+    const collapsed = Array.from(element.querySelectorAll('button')).some((button) =>
+      button.getAttribute('aria-label')?.includes('Expand turn 1'));
+    expect(collapsed).toBe(hostSetting);
+    if (hostSetting) expect(element.textContent).not.toContain('The user asked for the exact number 3.');
   });
 
   it('shows Worked when an actual middle message bubble is collapsed', () => {

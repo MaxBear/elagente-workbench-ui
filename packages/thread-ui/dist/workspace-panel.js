@@ -54,7 +54,7 @@ import {
 } from "./chunk-K6KITLCU.js";
 import {
   GraphMoleculeViewer
-} from "./chunk-LZ3NSCIV.js";
+} from "./chunk-G22YUBNA.js";
 import "./chunk-5LLLXMOS.js";
 import {
   shellThemeProps,
