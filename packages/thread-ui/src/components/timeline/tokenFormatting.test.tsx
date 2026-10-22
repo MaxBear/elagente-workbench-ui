@@ -35,6 +35,7 @@ describe('timeline token formatting', () => {
     expect(formatCompactTokenCount(1_250)).toBe('1.3k');
     expect(formatCompactTokenCount(12_500)).toBe('13k');
     expect(formatCompactTokenCount(1_250_000)).toBe('1.3m');
+    expect(formatCompactTokenCount(4_207_000_000)).toBe('4.2b');
     expect(formatCompactTokenCount(12_500_000)).toBe('13m');
   });
 
@@ -94,7 +95,7 @@ describe('timeline token formatting', () => {
     expect(presentableDetails).toEqual([
       {
         id: 'in',
-        label: 'Input',
+        label: 'Uncached input',
         tokenCompactValue: '1k',
         tokenRawValue: 1_000,
         usdCompactValue: '$0.0300',
@@ -103,7 +104,7 @@ describe('timeline token formatting', () => {
       },
       {
         id: 'cache',
-        label: 'Cached input',
+        label: 'Cache read',
         tokenCompactValue: '500',
         tokenRawValue: 500,
         usdCompactValue: '$0.0020',
@@ -232,7 +233,7 @@ describe('timeline token formatting', () => {
     });
 
     expect(buildTurnTokenBadges(currentTurn).map((badge) => badge.title)).toEqual([
-      'Input: 1 tokens',
+      'Uncached input: 1 tokens',
     ]);
     expect(buildTurnPriceBadge(currentTurn)).toEqual({
       label: '--',

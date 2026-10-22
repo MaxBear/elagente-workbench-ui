@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { setLocale } from '../../i18n';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,16 +20,20 @@ vi.mock('./GraphWorkspacePreviewPane', () => ({
   ) => (node ? { kind: node.kind, node } : null),
   GraphWorkspacePreviewPane: ({
     focusLine,
+    mobileNavigation,
     onCollapse,
     onExpandExplorer,
+    pdfUrl,
     previewFile,
   }: {
+    pdfUrl?: string | null;
     focusLine?: number | null;
+    mobileNavigation?: boolean;
     onCollapse?: () => void;
     onExpandExplorer?: () => void;
     previewFile?: ThreadWorkspaceFilePreview | null;
   }) => (
-    <div data-testid="preview-file" data-focus-line={focusLine ?? undefined}>
+    <div data-testid="preview-file" data-focus-line={focusLine ?? undefined} data-pdf-url={pdfUrl ?? undefined}>
       {previewFile?.path ?? 'none'}
       {onCollapse ? (
         <button type="button" aria-label="Hide Editor" onClick={onCollapse} />
@@ -36,7 +41,7 @@ vi.mock('./GraphWorkspacePreviewPane', () => ({
       {onExpandExplorer ? (
         <button
           type="button"
-          aria-label="Show Explorer"
+          aria-label={mobileNavigation ? "Back to files" : "Show Explorer"}
           onClick={onExpandExplorer}
         />
       ) : null}
@@ -164,6 +169,7 @@ function buttonNamed(name: string) {
 
 describe('GraphWorkspaceExplorer', () => {
   beforeEach(() => {
+    setLocale('en', false);
     mobileViewport = false;
     (
       globalThis as typeof globalThis & {
@@ -199,9 +205,78 @@ describe('GraphWorkspaceExplorer', () => {
     root = null;
     host?.remove();
     host = null;
+    setLocale('en', false);
     window.localStorage.clear();
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it('offers Show hidden files only when the host can list them, and relists root and open folders with showHidden', async () => {
+    const { adapter, listTree } = createAdapter();
+    await renderExplorer(adapter);
+    await vi.waitFor(() => expect(listTree).toHaveBeenCalled());
+    const more = () => host?.querySelector<HTMLButtonElement>('button[aria-label="More Explorer actions"]');
+    // Without the host capability there is no toggle, and here no other action either.
+    expect(more()).toBeNull();
+
+    act(() => root?.unmount());
+    root = createRoot(host!);
+    listTree.mockClear();
+    await renderExplorer({ ...adapter, hiddenFiles: true }, { path: 'src/index.ts', requestId: 1 });
+    await vi.waitFor(() => expect(listTree.mock.calls.some(([input]) => input.path === 'src')).toBe(true));
+    expect(listTree.mock.calls.every(([input]) => input.showHidden === undefined)).toBe(true);
+
+    listTree.mockClear();
+    act(() => more()!.click());
+    const toggle = host!.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]')!;
+    expect(toggle.textContent).toContain('Show hidden files');
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    await act(async () => toggle.click());
+    await vi.waitFor(() => {
+      expect(listTree.mock.calls.some(([input]) => input.path === '' && input.showHidden === true)).toBe(true);
+      expect(listTree.mock.calls.some(([input]) => input.path === 'src' && input.showHidden === true)).toBe(true);
+    });
+    expect(window.localStorage.getItem('workbench.explorer.showHidden')).toBe('true');
+    act(() => more()!.click());
+    expect(host!.querySelector('[role="menuitemcheckbox"]')?.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('lists an external linked file under its real parent directory, not a virtual folder', async () => {
+    const { adapter, listTree } = createAdapter();
+    const statLinkedFile = vi.fn(async () => file('/outside/docs/notes.txt'));
+    await renderExplorer({ ...adapter, statLinkedFile }, { path: '/outside/docs/notes.txt', requestId: 1 });
+    const parent = () => host?.querySelector('[data-explorer-path="/outside/docs"]');
+    await vi.waitFor(() => expect(parent()?.getAttribute('aria-expanded')).toBe('true'));
+    expect(parent()?.textContent).toContain('/outside/docs');
+    expect(host?.querySelector('[data-explorer-path="/outside/docs/notes.txt"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(host?.textContent).not.toContain('Linked files');
+    const calls = listTree.mock.calls.length;
+    act(() => setLocale('zh-CN', false));
+    expect(host?.textContent).not.toContain('链接文件');
+    expect(host?.textContent).toContain('notes.txt');
+    // Locale changes neither refetch nor list the host directory.
+    expect(listTree).toHaveBeenCalledTimes(calls);
+    expect(listTree.mock.calls.some(([input]) => String(input.path).startsWith('/outside'))).toBe(false);
+    expect(statLinkedFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('previews a PDF from bytes read through the adapter, not from a navigable URL', async () => {
+    const { adapter } = createAdapter();
+    const pdf = new Blob(['%PDF-1.4'], { type: 'application/octet-stream' });
+    const readRawFile = vi.fn<NonNullable<ThreadWorkspaceAdapter['readRawFile']>>(async () => pdf);
+    const getRawFileUrl = vi.fn(() => 'https://relay.example/relay/devices/d/api/raw');
+    const created: Blob[] = [];
+    const createObjectURL = vi.fn((blob: Blob) => { created.push(blob); return `blob:test/${created.length}`; });
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    await renderExplorer({ ...adapter, readRawFile, getRawFileUrl, listTree: async () => directory('', [file('report.pdf')]) }, { path: 'report.pdf', requestId: 1 });
+    const preview = () => host?.querySelector('[data-testid="preview-file"]');
+    await vi.waitFor(() => expect(preview()?.getAttribute('data-pdf-url')).toBe('blob:test/1'));
+    expect(readRawFile).toHaveBeenCalledWith(expect.objectContaining({ threadId: 'thread-1', workspaceId: 'workspace-1', path: 'report.pdf' }));
+    expect(created[0]?.type).toBe('application/pdf');
+    act(() => root?.unmount());
+    root = null;
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:test/1');
   });
 
   it('loads the root, previews the first file, and preserves expanded directories on refresh', async () => {
@@ -384,11 +459,12 @@ describe('GraphWorkspaceExplorer', () => {
     await renderExplorer(capableAdapter);
     await vi.waitFor(() => expect(listTree).toHaveBeenCalled());
 
-    await act(async () => {
-      host
-        ?.querySelector<HTMLButtonElement>('[aria-label="Download README.md"]')
-        ?.click();
-    });
+    const more = host!.querySelector<HTMLButtonElement>('[aria-label="More actions for README.md"]');
+    expect(more).not.toBeNull();
+    await act(async () => { more!.click(); });
+    const download = document.querySelector<HTMLButtonElement>('[role="menuitem"]');
+    expect(download?.textContent).toBe('Download file');
+    await act(async () => { download!.click(); });
     expect(downloadNode).toHaveBeenCalledWith({
       threadId: 'thread-1',
       workspaceId: 'workspace-1',
@@ -432,6 +508,11 @@ describe('GraphWorkspaceExplorer', () => {
     expect(
       host?.querySelector('[data-testid="preview-file"]')?.textContent,
     ).toBe('README.md');
+    expect(host?.querySelector('[role="tree"]')).toBeNull();
+    await act(async () => host!.querySelector<HTMLButtonElement>('[aria-label="Back to files"]')!.click());
+    expect(host?.querySelector('[role="tree"]')).toBeTruthy();
+    expect(host?.querySelector('[data-testid="preview-file"]')).toBeNull();
+    expect(host?.querySelector('[data-testid="workspace-upload-file-input"]')).toBeTruthy();
   });
 
   it('restores split view after either pane is hidden', async () => {

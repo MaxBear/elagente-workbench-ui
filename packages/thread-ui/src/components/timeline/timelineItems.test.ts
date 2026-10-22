@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ThreadHistoryItemDto } from "@remote-codex/shared";
 import {
+  countTurnSteps,
   getLiveOutputTailForTurn,
   groupTimelineHistoryItems,
   isRunningHistoryStatus,
@@ -25,6 +26,55 @@ function item(
 }
 
 describe("timeline item utilities", () => {
+  it('places a prompt added mid-turn by its time while live items arrive after it', () => {
+    const at = (second: number) => `2026-10-17T16:45:${String(second).padStart(2, '0')}.000Z`;
+    const persisted = [
+      item('first', 'userMessage', { createdAt: at(0) }),
+      item('reply', 'agentMessage', { sequence: 12, createdAt: at(14) }),
+      item('search', 'commandExecution', { sequence: 14, createdAt: at(25) }),
+    ];
+    // Live: the steered prompt (no sequence) is appended after the work it preceded.
+    const live = [
+      item('read', 'commandExecution', { sequence: 15, createdAt: at(34) }),
+      item('answer', 'agentMessage', { sequence: 17, createdAt: at(50) }),
+      item('added', 'userMessage', { createdAt: at(26) }),
+    ];
+    const merged = mergeLiveTurnItems(persisted, live);
+    expect(merged.map(entry => entry.id)).toEqual(['first', 'reply', 'search', 'added', 'read', 'answer']);
+    // With work after it, the added prompt is not left awaiting a response.
+    expect(prepareTurnItemsForRendering(merged, true).find(entry => entry.id === 'added')?.status).toBeUndefined();
+  });
+
+  it('counts loaded work plus deferred operations in a running summary', () => {
+    const items = [item('prompt','userMessage'), item('progress','agentMessage'), item('checkpoint','agentMessage')];
+    expect(countTurnSteps({hasDeferredItems:true,deferredItemCount:4},items)).toBe(5);
+    expect(countTurnSteps({hasDeferredItems:false,deferredItemCount:0},[
+      items[0]!, items[1]!, item('command-1','commandExecution'), item('command-2','commandExecution'),
+      item('read','fileRead'), item('thought','reasoning'), items[2]!,
+    ])).toBe(5);
+  });
+
+  it('ignores stale deferred counts and duplicate live item updates when counting work', () => {
+    const items = [item('prompt','userMessage'), item('command','commandExecution'),
+      item('command','commandExecution',{status:'completed'}), item('empty','reasoning',{text:' '}), item('answer','agentMessage')];
+    expect(countTurnSteps({hasDeferredItems:false,deferredItemCount:9},items)).toBe(1);
+  });
+
+  it('does not add live operations already covered by a deferred summary', () => {
+    const summary = [item('prompt', 'userMessage'), item('reply', 'agentMessage')];
+    const live = [item('command', 'commandExecution')];
+    expect(countTurnSteps({hasDeferredItems:true,deferredItemCount:1}, mergeLiveTurnItems(summary, live), summary)).toBe(1);
+    live.push(item('another-command', 'commandExecution'));
+    expect(countTurnSteps({hasDeferredItems:true,deferredItemCount:1}, mergeLiveTurnItems(summary, live), summary)).toBe(2);
+    expect(countTurnSteps({hasDeferredItems:true,deferredItemCount:2}, mergeLiveTurnItems(summary, live), summary)).toBe(2);
+    expect(countTurnSteps({hasDeferredItems:false,deferredItemCount:0}, mergeLiveTurnItems([...summary, ...live], live))).toBe(2);
+  });
+
+  it('counts a former reply as a checkpoint when the live overlay adds a new reply', () => {
+    const summary = [item('prompt', 'userMessage'), item('checkpoint', 'agentMessage')];
+    const live = [item('command', 'commandExecution'), item('reply', 'agentMessage')];
+    expect(countTurnSteps({hasDeferredItems:true,deferredItemCount:4}, mergeLiveTurnItems(summary, live), summary)).toBe(5);
+  });
   it("keeps leading unsequenced user messages before sequenced history", () => {
     const leadingUser = item("user-1", "userMessage");
     const later = item("later", "agentMessage", { sequence: 20 });
@@ -120,6 +170,24 @@ describe("timeline item utilities", () => {
     });
   });
 
+  it('folds wakes with adjacent work but keeps pending waits separate', () => {
+    const wait = item('wait', 'other', { origin: 'nativeBackgroundWait', status: 'waiting', text: '' });
+    const wake = item('wake', 'other', { origin: 'nativeTaskNotification', taskStatus: 'completed' });
+    const rows = groupTimelineHistoryItems([
+      item('cmd-before', 'commandExecution'), wait, wake,
+      item('cmd-after', 'commandExecution'), item('final', 'agentMessage'),
+    ]);
+    expect(rows.map(row => row.kind)).toEqual(['item', 'item', 'agentActivityGroup', 'item']);
+    expect(rows[1]).toMatchObject({ item: { id: 'wait' } });
+    expect(rows[2]).toMatchObject({ itemCount: 2, entries: [{ item: { id: 'wake' } }, { item: { id: 'cmd-after' } }] });
+    expect(countTurnSteps({}, [wait, wake, item('cmd', 'commandExecution'), item('final', 'agentMessage')])).toBe(2);
+  });
+
+  it.each(['completed', 'failed', 'cancelled', 'running'])('folds a standalone %s wake into one step', taskStatus => {
+    const entries = groupTimelineHistoryItems([item('wake', 'other', { origin: 'nativeTaskNotification', taskStatus })]);
+    expect(entries).toMatchObject([{ kind: 'agentActivityGroup', itemCount: 1, entries: [{ item: { id: 'wake' } }] }]);
+  });
+
   it("groups consecutive tool-like history items and folds reasoning into activity", () => {
     const entries = groupTimelineHistoryItems([
       item("reason-before", "reasoning"),
@@ -135,9 +203,7 @@ describe("timeline item utilities", () => {
     expect(entries.map((entry) => entry.kind)).toEqual([
       "agentActivityGroup",
       "item",
-      "commandGroup",
-      "fileReadGroup",
-      "item",
+      "agentActivityGroup",
       "item",
     ]);
     expect(entries[0]).toMatchObject({
@@ -149,7 +215,7 @@ describe("timeline item utilities", () => {
       kind: "item",
       item: { id: "agent" },
     });
-    const commandGroup = entries[2];
+    const commandGroup = entries[2]?.kind === "agentActivityGroup" ? entries[2].entries[0] : undefined;
     expect(commandGroup?.kind).toBe("commandGroup");
     if (commandGroup?.kind === "commandGroup") {
       expect(commandGroup.items.map((entry) => entry.id)).toEqual([
@@ -157,6 +223,19 @@ describe("timeline item utilities", () => {
         "cmd-2",
       ]);
     }
+  });
+
+  it("groups mixed trailing operations before any next assistant reply exists", () => {
+    const entries = groupTimelineHistoryItems([
+      item("intro", "agentMessage", { text: "I will check the code." }),
+      item("command", "commandExecution"),
+      item("read", "fileRead"),
+      item("search", "webSearch"),
+    ]);
+    expect(entries).toMatchObject([
+      { kind: "item", item: { id: "intro" } },
+      { kind: "agentActivityGroup", itemCount: 3 },
+    ]);
   });
 
   it("batches Claude tool calls and folds a completed operation run before agent prose", () => {
@@ -227,7 +306,7 @@ describe("timeline item utilities", () => {
     expect(updated[2]?.key).not.toBe(updated[0]?.key);
   });
 
-  it("does not wrap a single command batch in agent activity", () => {
+  it("uses a command batch directly without a redundant activity wrapper", () => {
     const entries = groupTimelineHistoryItems([
       item("cmd-1", "commandExecution"),
       item("cmd-2", "commandExecution"),
@@ -248,7 +327,24 @@ describe("timeline item utilities", () => {
     });
   });
 
-  it("keeps in-progress activity visible until a completed agent narrative arrives", () => {
+  it.each([
+    ["commandExecution", "commandGroup"],
+    ["fileRead", "fileReadGroup"],
+    ["fileChange", "fileChangeGroup"],
+    ["webSearch", "searchGroup"],
+    ["toolCall", "toolCallGroup"],
+    ["agentToolCall", "agentToolCallGroup"],
+    ["skillToolCall", "skillToolCallGroup"],
+  ] as const)("keeps homogeneous %s batches at one disclosure level", (kind, groupKind) => {
+    const entries = groupTimelineHistoryItems(Array.from({ length: 14 }, (_, i) => item(`op-${i}`, kind)));
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ kind: groupKind, items: expect.any(Array) });
+    if (entries[0]?.kind !== "item" && entries[0]?.kind !== "agentActivityGroup") {
+      expect(entries[0]?.items).toHaveLength(14);
+    }
+  });
+
+  it("groups operations while keeping a streaming narrative visible", () => {
     const entries = groupTimelineHistoryItems([
       item("tool-1", "toolCall"),
       item("tool-2", "toolCall"),
@@ -264,7 +360,7 @@ describe("timeline item utilities", () => {
     ]);
   });
 
-  it("keeps a final activity sequence visible when no following narrative exists", () => {
+  it("groups trailing operations without waiting for a narrative", () => {
     const entries = groupTimelineHistoryItems([
       item("tool-1", "toolCall"),
       item("tool-2", "toolCall"),

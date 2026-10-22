@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { ThreadHistoryItemDto } from '@remote-codex/shared';
@@ -34,6 +35,7 @@ function formatValue(value: unknown): string {
 }
 
 function CallSection({ label, value }: { label: string; value: unknown }) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <div>
       <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--theme-fg-muted)]">
@@ -47,6 +49,7 @@ function CallSection({ label, value }: { label: string; value: unknown }) {
 }
 
 function ToolEventAccordion({ event }: { event: GraphToolEventSummary }) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <AccordionItem
       value={event.id}
@@ -74,8 +77,8 @@ function ToolEventAccordion({ event }: { event: GraphToolEventSummary }) {
       </AccordionTrigger>
       <AccordionContent className="px-3 pb-3">
         <div className="space-y-2 px-3 pb-3 pt-1">
-          <CallSection label="Input" value={event.preview} />
-          <CallSection label="Output" value={event.detail} />
+          <CallSection label={translate("files.input")} value={event.preview} />
+          <CallSection label={translate("files.output")} value={event.detail} />
         </div>
       </AccordionContent>
     </AccordionItem>
@@ -93,6 +96,7 @@ export function GraphToolUsagePanel({
   toolEvents: GraphToolEventSummary[];
   maxToolCount: number;
 }) {
+  const { locale: i18nLocale } = useI18n();
   const [expandedEventId, setExpandedEventId] = useState<string | null>(
     () => toolEvents.at(-1)?.id ?? null,
   );
@@ -109,11 +113,10 @@ export function GraphToolUsagePanel({
   if (!toolCounts.length) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-[var(--theme-fg-muted)]">
-        <span>No tool calls yet. Run the agent to see usage.</span>
+        <span>{translate("files.noToolCallsYetRunTheAgent")}</span>
         <span className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs">
           <RefreshCw className="h-3 w-3" />
-          Reload from workspace
-        </span>
+          {translate("files.reloadFromWorkspace")}</span>
       </div>
     );
   }
@@ -123,17 +126,15 @@ export function GraphToolUsagePanel({
       <div className="shrink-0 border-b border-[var(--theme-border)] p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-fg-muted)]">
-            Calls this session
-          </h2>
+            {translate("files.callsThisSession")}</h2>
           <button
             type="button"
             className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-[var(--theme-fg-muted)] opacity-60"
             disabled
-            title="Remote Codex streams tool history from thread events"
+            title={translate("files.pockymoeStreamsToolHistoryFromThread")}
           >
             <RefreshCw className="h-3 w-3" />
-            Reload
-          </button>
+            {translate("files.reload")}</button>
         </div>
         <div className="space-y-2">
           {toolCounts.map(([kind, count]) => (
@@ -162,8 +163,7 @@ export function GraphToolUsagePanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--theme-fg-muted)]">
-          Call log
-        </h2>
+          {translate("files.callLog")}</h2>
         <Accordion
           type="single"
           collapsible

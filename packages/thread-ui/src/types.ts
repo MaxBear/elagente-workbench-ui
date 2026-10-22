@@ -10,6 +10,7 @@ export interface PromptAttachmentUpload
 export type SendPromptInput = {
   prompt: string;
   attachments?: PromptAttachmentUpload[];
+  delivery?: 'steer';
 };
 
 export interface ThreadShellControlState {

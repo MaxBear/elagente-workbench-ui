@@ -1,3 +1,4 @@
+import { translate, useI18n, type TranslationKey } from '../../i18n';
 import { ComposerMenuSurface } from './ComposerMenuSurface';
 import type {
   AgentBackendToolboxItemSchemaDto,
@@ -13,7 +14,22 @@ import type {
   UpdateThreadGoalInput,
   UpdateThreadSettingsInput,
 } from '@remote-codex/shared';
-import type { MouseEvent } from 'react';
+import type { ComponentType, MouseEvent, SVGProps } from 'react';
+import {
+  CircleSlash,
+  GitFork,
+  History,
+  ListChecks,
+  MessageSquarePlus,
+  Plug,
+  Shrink,
+  SlidersHorizontal,
+  Sparkles,
+  Target,
+  Webhook,
+  Zap,
+} from 'lucide-react';
+import { useThemeFeature } from '../themeHooks';
 
 import { InputGroupButton } from '../graph-ui/InputGroup';
 import { SlashIcon } from './composerPresentation';
@@ -33,9 +49,56 @@ import type {
   SlashPanelView,
 } from './types';
 
+// With rich menus every toolbox row gets an icon tile and its description.
+const toolboxIcons: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
+  plan: ListChecks,
+  goal: Target,
+  fast: Zap,
+  compact: Shrink,
+  fork: GitFork,
+  skills: Sparkles,
+  mcp: Plug,
+  hooks: Webhook,
+  harness: SlidersHorizontal,
+  prompt: MessageSquarePlus,
+  unsupported: CircleSlash,
+};
+
+// The Supervisor's built-in toolbox describes its commands in English; show
+// those in the reader's language. Other descriptions come from the harness.
+const BUILTIN_DESCRIPTIONS: Record<string, TranslationKey> = {
+  'Toggle fast / performance mode.': 'chat.toolboxFastDescription',
+  'Compact the current session.': 'chat.toolboxCompactDescription',
+  'Set or pause the session goal.': 'chat.toolboxGoalDescription',
+  'Fork this session.': 'chat.toolboxForkDescription',
+};
+
+function ToolboxLabel({ rich, action, command, description: rawDescription }: {
+  rich: boolean;
+  action: string;
+  command: string;
+  description?: string | null | undefined;
+}) {
+  if (!rich) return <span>{command}</span>;
+  const Icon = toolboxIcons[action] ?? MessageSquarePlus;
+  const builtin = rawDescription ? BUILTIN_DESCRIPTIONS[rawDescription] : undefined;
+  const description = builtin ? translate(builtin) : rawDescription;
+  return (
+    <>
+      <span className="composer-toolbox-icon" aria-hidden="true"><Icon data-icon={toolboxIcons[action] ? action : 'prompt'} /></span>
+      <span className="composer-toolbox-text">
+        <span className="composer-toolbox-command">{command}</span>
+        {description ? <span className="composer-toolbox-description">{description}</span> : null}
+      </span>
+    </>
+  );
+}
+
 export function ComposerSlashToolboxMenu({
   open,
   slashPanelView,
+  slashQuery = null,
+  slashActive = 0,
   availableToolboxItems,
   planModeAvailable,
   forkFromTurnAvailable,
@@ -117,6 +180,10 @@ export function ComposerSlashToolboxMenu({
 }: {
   open: boolean;
   slashPanelView: SlashPanelView;
+  /** What follows a typed `/`: rows not starting with it are hidden. */
+  slashQuery?: string | null;
+  /** The row Enter would run, among the shown ones. */
+  slashActive?: number;
   availableToolboxItems: AgentBackendToolboxItemSchemaDto[];
   planModeAvailable: boolean;
   forkFromTurnAvailable: boolean;
@@ -201,6 +268,18 @@ export function ComposerSlashToolboxMenu({
   onSaveHttpMcp: () => Promise<void> | void;
   onSaveRawMcpBlock: () => Promise<void> | void;
 }) {
+  useI18n();
+  const rich = useThemeFeature('composer.richMenus');
+  const matches = (command: string) => slashQuery === null || command.slice(1).toLowerCase().startsWith(slashQuery.toLowerCase());
+  const planShown = planModeAvailable && matches('/plan');
+  const shownItems = availableToolboxItems.filter(item => matches(item.command));
+  // Rows in the order Enter cycles through them.
+  const activeCommand = [...(planShown ? ['/plan'] : []), ...shownItems.map(item => item.command)][slashActive];
+  const activeProps = (command: string) => ({
+    'data-slash-row': true,
+    'data-active': slashQuery !== null && command === activeCommand ? true : undefined,
+  });
+  const panelCommand: Partial<Record<SlashPanelView, string>> = { fork: '/fork', forkTurns: '/fork', skills: '/skills', hooks: '/hooks', mcp: '/mcp' };
   return (
     <div className="relative">
       <InputGroupButton
@@ -208,12 +287,12 @@ export function ComposerSlashToolboxMenu({
         variant="ghost"
         size="icon-xs"
         data-composer-menu-trigger="true"
-        aria-label="Open slash toolbox"
-        title="Open slash toolbox"
+        aria-label={translate("chat.openSlashToolbox")}
+        title={translate("chat.openSlashToolbox")}
         onClick={onToggle}
         className={`${iconButtonClassName} h-9 w-9 rounded-full sm:h-8 sm:w-8`}
       >
-        <SlashIcon />
+        {rich ? <span aria-hidden="true" className="composer-slash-glyph">/</span> : <SlashIcon />}
       </InputGroupButton>
 
       {open && (
@@ -235,9 +314,11 @@ export function ComposerSlashToolboxMenu({
         >
           {slashPanelView === 'root' ? (
             <div className="p-2">
-              {planModeAvailable ? (
+              {planShown ? (
                 <button
                   type="button"
+                  {...activeProps('/plan')}
+                  data-toolbox-action="plan"
                   aria-pressed={displayedCollaborationMode === 'plan'}
                   disabled={settingsBusy}
                   onClick={() =>
@@ -253,23 +334,41 @@ export function ComposerSlashToolboxMenu({
                       ? 'ui-status-warning'
                       : menuItemClassName
                   } block w-full rounded-xl px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-60`}
-                  title="Toggle plan mode"
+                  title={translate("chat.togglePlanMode")}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span>/plan</span>
-                    <span className="text-[11px] uppercase tracking-[0.16em] text-stone-400">
-                      {displayedCollaborationMode === 'plan' ? 'On' : 'Off'}
+                    <ToolboxLabel rich={rich} action="plan" command="/plan" />
+                    <span className="composer-toolbox-status text-[11px] uppercase tracking-[0.16em] text-stone-400">
+                      {displayedCollaborationMode === 'plan' ? translate("chat.on") : translate("chat.off")}
                     </span>
                   </div>
                 </button>
               ) : null}
-              {availableToolboxItems.map((item, index) =>
+              {shownItems.map((item, index) =>
                 item.action === 'goal' ? (
+                  // The row sets a goal like the others run their tool; the history
+                  // of earlier goals is the button at its end.
                   <div
                     key={`${item.action}:${item.command}`}
-                    className={`mt-1 flex min-h-11 overflow-hidden rounded-xl border border-[var(--theme-border)] ${index === 0 && !planModeAvailable ? 'mt-0' : ''}`}
+                    data-toolbox-action={item.action}
+                    className={`composer-toolbox-split mt-1 flex min-h-11 overflow-hidden rounded-xl ${index === 0 && !planShown ? 'mt-0' : ''}`}
                     title={item.description ?? item.label}
                   >
+                    <button
+                      type="button"
+                      {...activeProps(item.command)}
+                      disabled={toolboxItemDisabled(item)}
+                      onClick={(event) => onToolboxItemClick(item, event)}
+                      className={`${toolboxItemClassName(item)} mt-0 min-w-0 flex-1`}
+                      aria-label={translate("chat.openGoalComposer")}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <ToolboxLabel rich={rich} action={item.action} command={item.command} description={item.description} />
+                        <span className="composer-toolbox-status text-[11px] uppercase tracking-[0.16em] text-stone-400">
+                          {toolboxItemStatus(item)}
+                        </span>
+                      </div>
+                    </button>
                     <button
                       type="button"
                       disabled={toolboxItemDisabled(item)}
@@ -277,33 +376,27 @@ export function ComposerSlashToolboxMenu({
                         onSetSlashPanelView('goals');
                         void onViewGoals?.();
                       }}
-                      className="min-w-0 flex-1 px-3 py-2.5 text-left text-sm text-[var(--theme-fg)] transition hover:bg-[var(--theme-hover)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-accent-border)] disabled:cursor-not-allowed disabled:opacity-45"
-                      aria-label="View goals"
+                      className="grid w-11 shrink-0 place-items-center rounded-xl text-[var(--theme-fg-muted)] transition hover:bg-[var(--theme-hover)] hover:text-[var(--theme-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-accent-border)] disabled:cursor-not-allowed disabled:opacity-45"
+                      aria-label={translate("chat.viewGoals")}
+                      title={translate("chat.viewGoals")}
                     >
-                      <span>{item.command}</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={toolboxItemDisabled(item)}
-                      onClick={(event) => onToolboxItemClick(item, event)}
-                      className="min-w-14 border-l border-[var(--theme-border)] px-3 text-xs font-semibold text-[var(--theme-fg-muted)] transition hover:bg-[var(--theme-hover)] hover:text-[var(--theme-fg)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-accent-border)] disabled:cursor-not-allowed disabled:opacity-45"
-                      aria-label="Open goal composer"
-                    >
-                      Open
+                      <History aria-hidden="true" className="h-4 w-4" />
                     </button>
                   </div>
                 ) : (
                   <button
                     key={`${item.action}:${item.command}`}
                     type="button"
+                    {...activeProps(item.command)}
+                    data-toolbox-action={item.action}
                     disabled={toolboxItemDisabled(item)}
                     onClick={(event) => onToolboxItemClick(item, event)}
-                    className={`${toolboxItemClassName(item)} ${index === 0 && !planModeAvailable ? 'mt-0' : ''}`}
+                    className={`${toolboxItemClassName(item)} ${index === 0 && !planShown ? 'mt-0' : ''}`}
                     title={item.description ?? item.label}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span>{item.command}</span>
-                      <span className="text-[11px] uppercase tracking-[0.16em] text-stone-400">
+                      <ToolboxLabel rich={rich} action={item.action} command={item.command} description={item.description} />
+                      <span className="composer-toolbox-status text-[11px] uppercase tracking-[0.16em] text-stone-400">
                         {toolboxItemStatus(item)}
                       </span>
                     </div>
@@ -312,17 +405,33 @@ export function ComposerSlashToolboxMenu({
               )}
               {availableToolboxItems.length === 0 && !planModeAvailable ? (
                 <p className="px-3 py-2 text-sm text-stone-400">
-                  No backend tools are available for this thread.
-                </p>
+                  {translate("chat.noBackendToolsAreAvailableForThis")}</p>
               ) : null}
             </div>
           ) : (
-            <div className="max-h-80 overflow-auto">
+            <div className="flex min-h-0 max-h-80 flex-col">
+              {forkBusy && (slashPanelView === 'fork' || slashPanelView === 'forkTurns') ? (
+                <p role="status" className="shrink-0 px-3 py-2 text-sm text-[var(--theme-fg-muted)]">
+                  {translate("chat.creatingForkYouWillBeTakenTo")}</p>
+              ) : null}
               {forkError && (slashPanelView === 'fork' || slashPanelView === 'forkTurns') ? (
-                <p role="alert" className="m-2 rounded-xl border border-rose-500/35 bg-rose-500/10 px-3 py-3 text-sm text-rose-100/90">
+                <p role="alert" className="m-2 shrink-0 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] px-3 py-3 text-sm text-[var(--status-danger-fg)]">
                   {forkError}
                 </p>
               ) : null}
+              {/* Every second-level panel leads back to the toolbox; goals has its own header. */}
+              {panelCommand[slashPanelView] ? (
+                <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b border-[var(--theme-border)] px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => onSetSlashPanelView('root')}
+                    className="min-h-9 rounded-lg px-2 text-xs font-medium text-[var(--theme-fg-muted)] transition hover:bg-[var(--theme-hover)] hover:text-[var(--theme-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent-border)]"
+                  >
+                    {translate("chat.back")}</button>
+                  <span className="text-xs font-semibold text-[var(--theme-fg)]">{panelCommand[slashPanelView]}</span>
+                </div>
+              ) : null}
+              <div className="min-h-0 overflow-auto">
               {slashPanelView === 'goals' ? (
                 <ComposerGoalsPanel
                   goalState={goalState}
@@ -413,6 +522,7 @@ export function ComposerSlashToolboxMenu({
                   onSaveRawMcpBlock={onSaveRawMcpBlock}
                 />
               )}
+              </div>
             </div>
           )}
         </ComposerMenuSurface>

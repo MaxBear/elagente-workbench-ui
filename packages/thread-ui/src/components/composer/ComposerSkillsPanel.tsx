@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import type { ThreadSkillsDto } from '@remote-codex/shared';
 
 import { ClipboardIcon, skillScopeLabel } from './composerPresentation';
@@ -16,12 +17,12 @@ export function ComposerSkillsPanel({
   composerChipButtonClassName,
   onCopySkillInvokeName,
 }: ComposerSkillsPanelProps) {
+  useI18n();
   return (
     <div className="p-2">
       {skillsState.status === 'loading' && !skillsState.data ? (
         <p className="rounded-xl border border-stone-800 bg-stone-950/70 px-3 py-3 text-sm text-stone-400">
-          Loading skills...
-        </p>
+          {translate("chat.loadingSkills")}</p>
       ) : null}
       {skillsState.error ? (
         <p className="mb-2 rounded-xl border border-rose-500/35 bg-rose-500/10 px-3 py-3 text-sm text-rose-100/90">
@@ -47,12 +48,12 @@ export function ComposerSkillsPanel({
                     type="button"
                     className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 normal-case tracking-normal transition ${
                       copiedSkillName === skill.name
-                        ? 'border-emerald-400/45 bg-emerald-400/12 text-emerald-100'
+                        ? 'border-sky-400/45 bg-sky-400/12 text-sky-100'
                         : `${composerChipButtonClassName} border-stone-700 text-stone-300 hover:border-stone-500`
                     }`}
                     onClick={() => void onCopySkillInvokeName(skill.name)}
-                    title={`Copy $${skill.name}`}
-                    aria-label={`Copy $${skill.name}`}
+                    title={translate("chat.copy_fad8c8", { value1: skill.name })}
+                    aria-label={translate("chat.copy_fad8c8", { value1: skill.name })}
                   >
                     <ClipboardIcon />${skill.name}
                   </button>
@@ -87,8 +88,7 @@ export function ComposerSkillsPanel({
       (skillsState.data?.skills.length ?? 0) === 0 &&
       (skillsState.data?.errors.length ?? 0) === 0 ? (
         <p className="rounded-xl border border-stone-800 bg-stone-950/70 px-3 py-3 text-sm text-stone-400">
-          No skills available right now.
-        </p>
+          {translate("chat.noSkillsAvailableRightNow")}</p>
       ) : null}
     </div>
   );

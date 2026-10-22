@@ -1,27 +1,32 @@
+import { translate, useI18n } from '../../i18n';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { XIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { cn } from './utils';
 
 function Dialog({ ...props }: ComponentProps<typeof DialogPrimitive.Root>) {
+  const { locale: i18nLocale } = useI18n();
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
 function DialogTrigger({
   ...props
 }: ComponentProps<typeof DialogPrimitive.Trigger>) {
+  const { locale: i18nLocale } = useI18n();
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
 function DialogPortal({
   ...props
 }: ComponentProps<typeof DialogPrimitive.Portal>) {
+  const { locale: i18nLocale } = useI18n();
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 
 function DialogClose({
   ...props
 }: ComponentProps<typeof DialogPrimitive.Close>) {
+  const { locale: i18nLocale } = useI18n();
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
@@ -29,6 +34,7 @@ function DialogOverlay({
   className,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Overlay>) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
@@ -51,6 +57,7 @@ function DialogContent({
   showCloseButton?: boolean;
   overlayClassName?: string;
 }) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay className={overlayClassName} />
@@ -66,10 +73,10 @@ function DialogContent({
         {showCloseButton ? (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute right-4 top-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            className="absolute right-4 top-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
-            <XIcon />
-            <span className="sr-only">Close</span>
+            <XIcon data-icon="close" />
+            <span className="sr-only">{translate("workbench.close")}</span>
           </DialogPrimitive.Close>
         ) : null}
       </DialogPrimitive.Content>
@@ -78,6 +85,7 @@ function DialogContent({
 }
 
 function DialogHeader({ className, ...props }: ComponentProps<'div'>) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <div
       data-slot="dialog-header"
@@ -88,6 +96,7 @@ function DialogHeader({ className, ...props }: ComponentProps<'div'>) {
 }
 
 function DialogFooter({ className, ...props }: ComponentProps<'div'>) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <div
       data-slot="dialog-footer"
@@ -104,6 +113,7 @@ function DialogTitle({
   className,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Title>) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
@@ -117,6 +127,7 @@ function DialogDescription({
   className,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Description>) {
+  const { locale: i18nLocale } = useI18n();
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"

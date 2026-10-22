@@ -1,0 +1,259 @@
+import { translate, useI18n } from '../../../i18n';
+import {
+  Copy,
+  Check,
+  Download,
+  FileArchive,
+  Info,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { RenameDialog } from '../../RenameDialog';
+import { ConfirmDialog } from '../../ConfirmDialog';
+import type { WorkspaceTreeNode } from '../workspaceTree';
+import { WorkspaceNodeProperties } from './WorkspaceNodeProperties';
+import { shellThemeProps } from '../../themeHooks';
+import { useMenuKeyboard } from '../../menu/useMenuKeyboard';
+
+export interface WorkspaceNodeActionProps {
+  /** Resolves whether the path was copied, for the menu's feedback. */
+  onCopyPath?: (
+    node: WorkspaceTreeNode,
+    kind?: 'relative' | 'absolute',
+  ) => void | Promise<boolean>;
+  onDownload?: (node: WorkspaceTreeNode) => void;
+  /** ElAgente: a folder as a ZIP archive, when the host advertises it. */
+  onDownloadZip?: (node: WorkspaceTreeNode) => void;
+  /** ElAgente: whether the host allows downloading this node. */
+  canDownload?: (node: WorkspaceTreeNode) => boolean;
+  onRename?: (node: WorkspaceTreeNode, name: string) => Promise<void>;
+  onDelete?: (node: WorkspaceTreeNode) => Promise<void>;
+}
+
+export function WorkspaceNodeActions({
+  node,
+  onCopyPath,
+  onDownload,
+  onDownloadZip,
+  onRename,
+  onDelete,
+}: WorkspaceNodeActionProps & { node: WorkspaceTreeNode }) {
+  useI18n();
+  const [menu, setMenu] = useState<{ left: number; top: number } | null>(null);
+  const [copied, setCopied] = useState<{ kind: 'relative' | 'absolute'; state: 'copied' | 'failed' } | null>(null);
+  useEffect(() => { if (!menu) setCopied(null); }, [menu]);
+  const [dialog, setDialog] = useState<'rename' | 'delete' | 'properties' | null>(null);
+  const [name, setName] = useState(node.name);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const popup = useRef<HTMLDivElement>(null);
+  const close = () => {
+    setMenu(null);
+    trigger.current?.focus();
+  };
+  // ↑/↓/Home/End move between items; Esc closes and returns to the ⋯ button.
+  useMenuKeyboard(popup, Boolean(menu), (restore) => restore ? close() : setMenu(null));
+  useEffect(() => {
+    if (!menu) return;
+    const outside = (event: PointerEvent) => {
+      if (
+        !popup.current?.contains(event.target as Node) &&
+        !trigger.current?.contains(event.target as Node)
+      )
+        setMenu(null);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    const resize = () => setMenu(null);
+    document.addEventListener('pointerdown', outside);
+    // Capture: the row stops key events from bubbling past the actions.
+    document.addEventListener('keydown', escape, true);
+    window.addEventListener('resize', resize);
+    popup.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', escape, true);
+      window.removeEventListener('resize', resize);
+    };
+  }, [menu]);
+  const actionClass =
+    'thread-graph-tree-action flex shrink-0 items-center justify-center rounded transition';
+  const mutate = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (dialog === 'rename') await onRename?.(node, name);
+      else await onDelete?.(node);
+      setDialog(null);
+      trigger.current?.focus();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : translate("files.fileOperationFailed"),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div
+      className="thread-graph-tree-actions flex shrink-0 items-center gap-0.5"
+      onDoubleClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      {onCopyPath && (
+        <>
+          <button
+            type="button"
+            onClick={() => onCopyPath(node, 'relative')}
+            className={`${actionClass} workspace-node-quick-action`}
+            title={translate("files.copyRelativePathFor", { value1: node.name })}
+            aria-label={translate("files.copyRelativePathFor", { value1: node.name })}
+          >
+            <Copy data-icon="copy-path" size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onCopyPath(node, 'absolute')}
+            className={`${actionClass} workspace-node-quick-action`}
+            title={translate("files.copyAbsolutePathFor", { value1: node.name })}
+            aria-label={translate("files.copyAbsolutePathFor", { value1: node.name })}
+          >
+            <Copy data-icon="copy-absolute-path" size={14} />
+          </button>
+        </>
+      )}
+      {(onRename || onDelete || onCopyPath || onDownload || onDownloadZip) && (
+        <button
+          ref={trigger}
+          type="button"
+          aria-label={translate("files.moreActionsFor", { value1: node.name })}
+          aria-haspopup="menu"
+          aria-expanded={!!menu}
+          className={actionClass}
+          onClick={() => {
+            const box = trigger.current!.getBoundingClientRect();
+            setMenu(
+              menu
+                ? null
+                : {
+                    left: Math.max(
+                      8,
+                      Math.min(box.right - 208, window.innerWidth - 216),
+                    ),
+                    top: Math.max(
+                      8,
+                      Math.min(box.bottom + 4, window.innerHeight - 260),
+                    ),
+                  },
+            );
+          }}
+        >
+          <MoreHorizontal data-icon="more" size={14} />
+        </button>
+      )}
+      {menu &&
+        createPortal(
+          <div
+            ref={popup}
+            role="menu"
+            aria-label={translate("files.actionsFor", { value1: node.name })}
+            className={`thread-ui-shell workspace-node-menu ${shellThemeProps(trigger.current).themeClass}`}
+            data-theme-effective={shellThemeProps(trigger.current)['data-theme-effective']}
+            data-theme-mode={shellThemeProps(trigger.current)['data-theme-mode']}
+            style={{
+              position: 'fixed',
+              left: menu.left,
+              top: menu.top,
+              zIndex: 1000,
+              minWidth: 176,
+              maxWidth: 260,
+              maxHeight: 'calc(100dvh - 16px)',
+              overflowX: 'hidden',
+              overflowY: 'auto',
+              background: 'var(--theme-panel)',
+              color: 'var(--theme-fg)',
+              border: '1px solid var(--theme-border)',
+              borderRadius: 8,
+              padding: 4,
+              boxShadow: '0 8px 24px #0004',
+            }}
+          >
+            {/* Short one-line labels; the node's name stays in each accessible name. */}
+            {onDownload && <button role="menuitem" type="button" onClick={() => { onDownload(node); close(); }}><Download data-icon="download" size={14} />{translate('files.downloadFile')}</button>}
+            {onDownloadZip && <button role="menuitem" type="button" onClick={() => { onDownloadZip(node); close(); }}><FileArchive data-icon="download-zip" size={14} />{translate('files.downloadZip')}</button>}
+            {onCopyPath && <>
+              {(['relative', 'absolute'] as const).map(kind => (
+                <button key={kind} role="menuitem" type="button" data-copy-state={copied?.kind === kind ? copied.state : undefined}
+                  aria-label={translate(kind === 'relative' ? 'files.copyRelativePathFor' : 'files.copyAbsolutePathFor', { value1: node.name })}
+                  onClick={async () => {
+                    // The item shows the result, then the menu closes; a failure stays to be read.
+                    const ok = (await onCopyPath(node, kind)) !== false;
+                    setCopied({ kind, state: ok ? 'copied' : 'failed' });
+                    if (ok) window.setTimeout(() => { setCopied(null); close(); }, 700);
+                  }}>
+                  {copied?.kind === kind ? (copied.state === 'copied' ? <Check size={14} /> : <TriangleAlert size={14} />) : <Copy data-icon={kind === 'relative' ? 'copy-path' : 'copy-absolute-path'} size={14} />}
+                  {copied?.kind === kind ? translate(copied.state === 'copied' ? 'common.copied' : 'common.copyFailed') : translate(kind === 'relative' ? 'files.copyRelativePath' : 'files.copyAbsolutePath')}
+                </button>
+              ))}
+            </>}
+            {onRename && (
+              <button
+                role="menuitem"
+                type="button"
+                onClick={() => {
+                  setName(node.name);
+                  setError(null);
+                  setDialog('rename');
+                  setMenu(null);
+                }}
+              >
+                <Pencil data-icon="rename" size={14} /> {translate("files.rename_d3f4cb")}</button>
+            )}
+            {onDelete && (
+              <button
+                role="menuitem"
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setDialog('delete');
+                  setMenu(null);
+                }}
+              >
+                <Trash2 data-icon="delete" size={14} /> {translate("files.delete")}</button>
+            )}
+            <div role="separator" className="workspace-node-menu-separator" />
+            <button role="menuitem" type="button" onClick={() => { setDialog('properties'); setMenu(null); }}>
+              <Info data-icon="properties" size={14} />{translate('files.propertiesMenu')}</button>
+          </div>,
+          document.body,
+        )}
+      <WorkspaceNodeProperties node={node} open={dialog === 'properties'} onOpenChange={(next) => { if (!next) { setDialog(null); trigger.current?.focus(); } }} />
+      <RenameDialog
+        open={dialog === 'rename'}
+        title={translate("files.rename", { value1: translate(node.kind === 'directory' ? 'files.kindFolder' : 'files.kindFile') })}
+        label={translate("files.name")}
+        value={name}
+        onChange={setName}
+        onCancel={() => setDialog(null)}
+        onSubmit={mutate}
+        busy={busy}
+        error={error}
+      />
+      <ConfirmDialog
+        open={dialog === 'delete'}
+        title={translate("files.delete_c93ae0", { value1: translate(node.kind === 'directory' ? 'files.kindFolder' : 'files.kindFile') })}
+        description={translate("files.permanentlyDelete", { value1: node.path, value2: node.kind === 'directory' ? translate("files.andItsContents") : '' })}
+        onCancel={() => setDialog(null)}
+        onConfirm={mutate}
+        busy={busy}
+        error={error}
+      />
+    </div>
+  );
+}

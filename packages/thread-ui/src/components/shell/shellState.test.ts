@@ -102,7 +102,7 @@ describe('shell state helpers', () => {
       disabled: false,
       label: 'Disconnect shell',
     });
-    expect(connected.className).toContain('emerald');
+    expect(connected.className).toContain('sky');
 
     const missingWorkspace = buildConnectionButtonState({
       activeRuntime: EMPTY_SHELL_PANE_RUNTIME_STATE,

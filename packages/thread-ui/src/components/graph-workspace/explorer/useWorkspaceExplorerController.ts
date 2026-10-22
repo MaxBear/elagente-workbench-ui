@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../../i18n';
 import { relativeWorkspacePath } from '../../workspacePaths';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -26,15 +27,26 @@ import {
   mergeWorkspaceExplorerSubtree,
   workspaceExplorerModelToTree,
 } from './workspaceExplorerModel';
-import type { WorkspaceExplorerModel } from './workspaceExplorerTypes';
+import type {
+  WorkspaceExplorerModel,
+  WorkspaceExplorerAdapter,
+  WorkspaceExplorerCapabilities,
+} from './workspaceExplorerTypes';
 import { useWorkspaceExplorerPersistence } from './useWorkspaceExplorerPersistence';
+import { validateWorkspaceOperationCapabilities } from './workspaceOperationCapabilities';
+import { linkedDirectoryNodes, linkedParentDirectory } from './workspaceLinkedFiles';
 
 export interface UseWorkspaceExplorerControllerInput {
   activeView: 'chat' | 'shell';
   detail: ThreadDetailDto;
   artifacts: ThreadArtifactDto[];
   status: AgentRuntimeStatusDto | null;
-  focusPathRequest?: { path: string; line?: number; requestId: number } | null;
+  focusPathRequest?: {
+    path: string;
+    line?: number;
+    requestId: number;
+    artifactId?: string;
+  } | null;
   workspaceAdapter?: ThreadWorkspaceAdapter | null;
 }
 
@@ -62,6 +74,7 @@ export function useWorkspaceExplorerController({
   focusPathRequest = null,
   workspaceAdapter,
 }: UseWorkspaceExplorerControllerInput) {
+  const { locale } = useI18n();
   const workspaceIdentity = useMemo(
     () => ({
       threadId: detail.thread.id,
@@ -69,10 +82,78 @@ export function useWorkspaceExplorerController({
     }),
     [detail.thread.id, detail.thread.workspaceId, detail.workspace.id],
   );
+  // Show hidden files: a browser preference, offered only by hosts that can list them.
+  const hiddenFilesAvailable = workspaceAdapter?.hiddenFiles === true;
+  const [showHiddenPreference, setShowHiddenPreference] = useState(() => {
+    try { return localStorage.getItem(SHOW_HIDDEN_KEY) === 'true'; } catch { return false; }
+  });
+  const showHidden = hiddenFilesAvailable && showHiddenPreference;
+  const listIdentity = useMemo(
+    () => (showHidden ? { ...workspaceIdentity, showHidden: true } : workspaceIdentity),
+    [showHidden, workspaceIdentity],
+  );
+  const capabilityAdapter = workspaceAdapter as
+    | WorkspaceExplorerAdapter
+    | null
+    | undefined;
+  const [capabilityState, setCapabilityState] = useState<{
+    adapter: WorkspaceExplorerAdapter;
+    threadId: string;
+    capabilities: WorkspaceExplorerCapabilities;
+  } | null>(null);
+  const discoveredCapabilities =
+    capabilityState?.adapter === capabilityAdapter &&
+    capabilityState?.threadId === workspaceIdentity.threadId
+      ? capabilityState.capabilities
+      : capabilityAdapter?.getCapabilities
+        ? null
+        : (capabilityAdapter?.capabilities ?? null);
+  const capabilities = useMemo(() => {
+    if (!discoveredCapabilities) return null;
+    try { return validateWorkspaceOperationCapabilities(discoveredCapabilities); }
+    catch { return null; }
+  }, [discoveredCapabilities]);
+  const [capabilityEpoch, setCapabilityEpoch] = useState(0);
+  const [capabilityError, setCapabilityError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setCapabilityState(null);
+    setCapabilityError(null);
+    if (!capabilityAdapter?.getCapabilities && capabilityAdapter?.capabilities) {
+      try { validateWorkspaceOperationCapabilities(capabilityAdapter.capabilities); }
+      catch (error) { setCapabilityError(error instanceof Error ? error.message : 'Unsupported workspace capabilities.'); }
+    }
+    if (capabilityAdapter?.getCapabilities) {
+      void (async () => {
+        try {
+          const result = await capabilityAdapter.getCapabilities!(
+            workspaceIdentity.threadId,
+          );
+          validateWorkspaceOperationCapabilities(result);
+          if (!cancelled)
+            setCapabilityState({
+              adapter: capabilityAdapter,
+              threadId: workspaceIdentity.threadId,
+              capabilities: result,
+            });
+        } catch (error) {
+          if (!cancelled)
+            setCapabilityError(
+              error instanceof Error
+                ? error.message
+                : 'Failed to discover file operations. Refresh the workspace to retry.',
+            );
+        }
+      })();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [capabilityAdapter, workspaceIdentity.threadId, capabilityEpoch]);
   const persistence = useWorkspaceExplorerPersistence(workspaceIdentity);
   const fallbackTree = useMemo(
     () => collectWorkspaceItems(detail, artifacts, status, activeView),
-    [activeView, artifacts, detail, status],
+    [activeView, artifacts, detail, status, locale],
   );
   const fallbackFirstSelectableNode = findFirstPreviewNode(fallbackTree);
   const initialPersistedState = useRef(persistence.read());
@@ -84,26 +165,42 @@ export function useWorkspaceExplorerController({
   );
   const [linkedFiles, setLinkedFiles] = useState<WorkspaceTreeNode[]>([]);
   const tree = useMemo(() => {
-    const root = adapterTree ?? fallbackTree;
-    return linkedFiles.length ? {...root, children: [...root.children, {
-      id: 'linked-files', path: 'linked-files:', name: 'Linked files', kind: 'directory' as const,
-      children: linkedFiles, childrenLoaded: true, hasChildren: true,
-    }]} : root;
-  }, [adapterTree, fallbackTree, linkedFiles]);
+    // ElAgente: immutable artifacts stay inspectable beside the native workspace files.
+    const root = adapterTree
+      ? { ...adapterTree, children: [...adapterTree.children, ...fallbackTree.children] }
+      : fallbackTree;
+    return linkedFiles.length
+      ? { ...root, children: [...root.children, ...linkedDirectoryNodes(linkedFiles)] }
+      : root;
+  }, [adapterTree, fallbackTree, linkedFiles, locale]);
   const nodeMap = useMemo(() => flattenWorkspaceNodes(tree), [tree]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(() => {
-    const selectedPath = focusPathRequest ? workspaceRelativeFocusPath(focusPathRequest.path, detail.workspace.absPath) : initialPersistedState.current.selectedPath;
-    return selectedPath
-      ? `workspace:${selectedPath}`
-      : (fallbackFirstSelectableNode?.id ?? null);
+    const selectedPath = focusPathRequest
+      ? workspaceRelativeFocusPath(
+          focusPathRequest.path,
+          detail.workspace.absPath,
+        )
+      : initialPersistedState.current.selectedPath;
+    const virtualNode = [...flattenWorkspaceNodes(fallbackTree).values()].find(
+      (node) =>
+        focusPathRequest?.artifactId !== undefined
+          ? node.artifact?.id === focusPathRequest.artifactId
+          : node.path === selectedPath,
+    );
+    return focusPathRequest?.artifactId !== undefined
+      ? (virtualNode?.id ?? null)
+      : (virtualNode?.id ??
+          (selectedPath
+            ? `workspace:${selectedPath}`
+            : (fallbackFirstSelectableNode?.id ?? null)));
   });
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
     () =>
       new Set([
         '',
-        'artifacts',
-        'thread-events',
-        'live',
+        'artifacts:',
+        'thread-events:',
+        'live:',
         ...initialPersistedState.current.expandedPaths,
         ...collectAncestorPaths(fallbackFirstSelectableNode?.path ?? ''),
       ]),
@@ -120,13 +217,14 @@ export function useWorkspaceExplorerController({
     () => new Map(),
   );
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  // A link whose file or folder is not on this device: shown calmly in the
+  // viewer with its path, not as a raw error.
+  const [missingPath, setMissingPath] = useState<string | null>(null);
 
   const activeNode =
-    selectedNodeId === null
-      ? null
-      : (nodeMap.get(selectedNodeId) ?? null);
+    selectedNodeId === null ? null : (nodeMap.get(selectedNodeId) ?? null);
   const liveNodes = useMemo(
-    () => tree.children.find((node) => node.path === 'live')?.children ?? [],
+    () => tree.children.find((node) => node.id === 'live')?.children ?? [],
     [tree],
   );
 
@@ -137,6 +235,8 @@ export function useWorkspaceExplorerController({
   const expandedPathsRef = useRef(expandedPaths);
   const loadingDirectoryPathsRef = useRef(loadingDirectoryPaths);
   const fallbackFirstSelectableNodeRef = useRef(fallbackFirstSelectableNode);
+  const fallbackTreeRef = useRef(fallbackTree);
+  const artifactFocusRef = useRef<string | null>(null);
   adapterModelRef.current = adapterModel;
   nodeMapRef.current = nodeMap;
   treeRef.current = tree;
@@ -144,6 +244,7 @@ export function useWorkspaceExplorerController({
   expandedPathsRef.current = expandedPaths;
   loadingDirectoryPathsRef.current = loadingDirectoryPaths;
   fallbackFirstSelectableNodeRef.current = fallbackFirstSelectableNode;
+  fallbackTreeRef.current = fallbackTree;
 
   const refreshGenerationRef = useRef(0);
   const focusGenerationRef = useRef(0);
@@ -167,7 +268,7 @@ export function useWorkspaceExplorerController({
       setWorkspaceError(null);
       try {
         const refreshedTree = workspaceTreeNodeToGraphNode(
-          await workspaceAdapter.listTree({ ...workspaceIdentity, path: '' }),
+          await workspaceAdapter.listTree({ ...listIdentity, path: '' }),
         );
         if (
           workspaceGenerationRef.current !== workspaceGeneration ||
@@ -198,7 +299,7 @@ export function useWorkspaceExplorerController({
               continue;
             }
             const refreshedNode = workspaceTreeNodeToGraphNode(
-              await workspaceAdapter.listTree({ ...workspaceIdentity, path }),
+              await workspaceAdapter.listTree({ ...listIdentity, path }),
             );
             if (
               workspaceGenerationRef.current !== workspaceGeneration ||
@@ -214,9 +315,16 @@ export function useWorkspaceExplorerController({
         setAdapterModel(nextModel);
         const firstFile = findFirstWorkspaceFile(nextTree);
         setSelectedNodeId((current) => {
+          const virtualNodes = flattenWorkspaceNodes(fallbackTreeRef.current);
+          if (current && virtualNodes.has(current)) return current;
+          if (artifactFocusRef.current) return null;
           const fallbackPath =
             currentSelectedPath ??
             selectedPathForId(current, nodeMapRef.current);
+          const virtualNode = [...virtualNodes.values()].find(
+            (node) => node.path === fallbackPath,
+          );
+          if (virtualNode) return virtualNode.id;
           if (
             fallbackPath !== null &&
             hasWorkspaceExplorerPath(nextModel, fallbackPath)
@@ -233,7 +341,7 @@ export function useWorkspaceExplorerController({
           return;
         }
         setWorkspaceError(
-          error instanceof Error ? error.message : 'Failed to load workspace',
+          error instanceof Error ? error.message : translate("files.failedToLoadWorkspace"),
         );
         setAdapterModel(null);
       } finally {
@@ -245,7 +353,7 @@ export function useWorkspaceExplorerController({
         }
       }
     },
-    [workspaceAdapter, workspaceIdentity],
+    [listIdentity, workspaceAdapter, workspaceIdentity],
   );
 
   const loadDirectoryChildren = useCallback(
@@ -276,7 +384,7 @@ export function useWorkspaceExplorerController({
       });
       try {
         const loadedNode = workspaceTreeNodeToGraphNode(
-          await workspaceAdapter.listTree({ ...workspaceIdentity, path }),
+          await workspaceAdapter.listTree({ ...listIdentity, path }),
         );
         if (
           workspaceGenerationRef.current !== workspaceGeneration ||
@@ -305,7 +413,7 @@ export function useWorkspaceExplorerController({
           return;
         }
         const message =
-          error instanceof Error ? error.message : 'Failed to load directory';
+          error instanceof Error ? error.message : translate("files.failedToLoadDirectory");
         setWorkspaceError(message);
         setDirectoryErrors((current) => new Map(current).set(path, message));
       } finally {
@@ -324,11 +432,27 @@ export function useWorkspaceExplorerController({
         }
       }
     },
-    [workspaceAdapter, workspaceIdentity],
+    [listIdentity, workspaceAdapter, workspaceIdentity],
   );
 
   const focusWorkspacePath = useCallback(
     async (path: string) => {
+      artifactFocusRef.current = null;
+      const virtualNode = [
+        ...flattenWorkspaceNodes(fallbackTreeRef.current).values(),
+      ].find((node) => node.path === path && node.kind !== 'directory');
+      if (virtualNode) {
+        ++focusGenerationRef.current;
+        focusPendingRef.current = false;
+        setSelectedNodeId(virtualNode.id);
+        setFilterQuery('');
+        setWorkspaceError(null);
+        setExpandedPaths(
+          (current) =>
+            new Set([...current, ...collectAncestorPaths(virtualNode.path)]),
+        );
+        return;
+      }
       const targetPath = workspaceRelativeFocusPath(
         path,
         detail.workspace.absPath,
@@ -340,11 +464,14 @@ export function useWorkspaceExplorerController({
       const generation = ++focusGenerationRef.current;
       ++refreshGenerationRef.current;
       focusPendingRef.current = true;
-      const isCurrent = () => workspaceGenerationRef.current === workspaceGeneration && focusGenerationRef.current === generation;
+      const isCurrent = () =>
+        workspaceGenerationRef.current === workspaceGeneration &&
+        focusGenerationRef.current === generation;
       setSelectedNodeId(`workspace:${targetPath}`);
       setFilterQuery('');
+      setMissingPath(null);
       const external = relativeWorkspacePath(path, detail.workspace.absPath) === null;
-      const ancestors = external ? ['linked-files:'] : ancestorDirectoryPaths(targetPath);
+      const ancestors = external ? [linkedParentDirectory(targetPath)] : ancestorDirectoryPaths(targetPath);
       setExpandedPaths((current) => {
         const next = new Set(current);
         next.add('');
@@ -369,7 +496,7 @@ export function useWorkspaceExplorerController({
           createWorkspaceExplorerModel(
             workspaceTreeNodeToGraphNode(
               await workspaceAdapter.listTree({
-                ...workspaceIdentity,
+                ...listIdentity,
                 path: '',
               }),
             ),
@@ -378,11 +505,17 @@ export function useWorkspaceExplorerController({
           return;
         }
         if (external) {
-          if (!workspaceAdapter.statLinkedFile) throw new Error('Only the device owner can preview files outside this workspace.');
+          if (!workspaceAdapter.statLinkedFile) throw new Error(translate("files.onlyTheDeviceOwnerCanPreviewFiles"));
           const node = await workspaceAdapter.statLinkedFile({...workspaceIdentity, path: targetPath});
           if (!isCurrent()) return;
-          const linked = workspaceTreeNodeToGraphNode({...node, path: targetPath});
-          setLinkedFiles(current => [...current.filter(item => item.path !== targetPath), linked]);
+          const linked = workspaceTreeNodeToGraphNode({
+            ...node,
+            path: targetPath,
+          });
+          setLinkedFiles((current) => [
+            ...current.filter((item) => item.path !== targetPath),
+            linked,
+          ]);
           adapterModelRef.current = nextModel;
           setAdapterModel(nextModel);
           return;
@@ -397,7 +530,7 @@ export function useWorkspaceExplorerController({
           }
           const loadedNode = workspaceTreeNodeToGraphNode(
             await workspaceAdapter.listTree({
-              ...workspaceIdentity,
+              ...listIdentity,
               path: ancestor,
             }),
           );
@@ -406,20 +539,31 @@ export function useWorkspaceExplorerController({
           }
           nextModel = mergeWorkspaceExplorerSubtree(nextModel, loadedNode);
         }
+        const target = findWorkspaceExplorerNodeByPath(nextModel, targetPath);
+        if (target?.kind === 'directory') {
+          const loadedNode = workspaceTreeNodeToGraphNode(await workspaceAdapter.listTree({ ...listIdentity, path: targetPath }));
+          if (!isCurrent()) return;
+          nextModel = mergeWorkspaceExplorerSubtree(nextModel, loadedNode);
+          setExpandedPaths(current => new Set(current).add(targetPath));
+        }
         adapterModelRef.current = nextModel;
         setAdapterModel(nextModel);
         if (!hasWorkspaceExplorerPath(nextModel, targetPath)) {
-          throw new Error(`File not found: ./${targetPath}`);
+          throw new MissingTargetError(translate("files.fileNotFound", { value1: targetPath }));
         }
         setSelectedNodeId(`workspace:${targetPath}`);
       } catch (error) {
         if (!isCurrent()) {
           return;
         }
+        if (isMissingTarget(error)) {
+          setMissingPath(external ? path : targetPath);
+          return;
+        }
         setWorkspaceError(
           error instanceof Error
             ? error.message
-            : `Failed to open ${targetPath}`,
+            : translate("files.failedToOpen", { value1: targetPath }),
         );
       } finally {
         if (isCurrent()) {
@@ -428,8 +572,25 @@ export function useWorkspaceExplorerController({
         }
       }
     },
-    [detail.workspace.absPath, workspaceAdapter, workspaceIdentity],
+    [detail.workspace.absPath, listIdentity, workspaceAdapter, workspaceIdentity],
   );
+
+  const focusArtifact = useCallback((artifactId: string) => {
+    artifactFocusRef.current = artifactId;
+    ++focusGenerationRef.current;
+    focusPendingRef.current = false;
+    const node = [
+      ...flattenWorkspaceNodes(fallbackTreeRef.current).values(),
+    ].find((value) => value.artifact?.id === artifactId);
+    setSelectedNodeId(node?.id ?? null);
+    setLoadingTree(false);
+    setFilterQuery('');
+    setWorkspaceError(node ? null : `Artifact unavailable: ${artifactId}`);
+    if (node)
+      setExpandedPaths(
+        (current) => new Set([...current, ...collectAncestorPaths(node.path)]),
+      );
+  }, []);
 
   const toggleDirectory = useCallback(
     (path: string) => {
@@ -465,19 +626,36 @@ export function useWorkspaceExplorerController({
 
   useEffect(() => {
     setLinkedFiles([]);
+    artifactFocusRef.current = null;
     skipPersistenceWriteRef.current = true;
     const persisted = persistence.read();
     const fallbackNode = fallbackFirstSelectableNodeRef.current;
-    const selectedPath = focusPathRequest ? workspaceRelativeFocusPath(focusPathRequest.path, detail.workspace.absPath) : persisted.selectedPath;
-    const nextSelectedId = selectedPath
-      ? `workspace:${selectedPath}`
-      : (fallbackNode?.id ?? null);
+    const selectedPath = focusPathRequest
+      ? workspaceRelativeFocusPath(
+          focusPathRequest.path,
+          detail.workspace.absPath,
+        )
+      : persisted.selectedPath;
+    const virtualNode = [
+      ...flattenWorkspaceNodes(fallbackTreeRef.current).values(),
+    ].find((node) =>
+      focusPathRequest?.artifactId !== undefined
+        ? node.artifact?.id === focusPathRequest.artifactId
+        : node.path === selectedPath,
+    );
+    const nextSelectedId =
+      focusPathRequest?.artifactId !== undefined
+        ? (virtualNode?.id ?? null)
+        : (virtualNode?.id ??
+          (selectedPath
+            ? `workspace:${selectedPath}`
+            : (fallbackNode?.id ?? null)));
     setExpandedPaths(
       new Set([
         '',
-        'artifacts',
-        'thread-events',
-        'live',
+        'artifacts:',
+        'thread-events:',
+        'live:',
         ...persisted.expandedPaths,
         ...collectAncestorPaths(fallbackNode?.path ?? ''),
       ]),
@@ -538,10 +716,15 @@ export function useWorkspaceExplorerController({
     setDirectoryErrors(new Map());
     setWorkspaceError(null);
     handledFocusRequestRef.current = null;
-    if (!focusPathRequest) {
+    if (!focusPathRequest || focusPathRequest.artifactId !== undefined) {
       const persistedPath = persistence.read().selectedPath;
-      if (persistedPath) void focusWorkspacePath(persistedPath);
-      else void refreshWorkspaceTree();
+      if (persistedPath && !focusPathRequest) {
+        const virtual = [
+          ...flattenWorkspaceNodes(fallbackTreeRef.current).values(),
+        ].some((node) => node.path === persistedPath);
+        void focusWorkspacePath(persistedPath);
+        if (virtual) void refreshWorkspaceTree();
+      } else void refreshWorkspaceTree();
     }
   }, [refreshWorkspaceTree]);
 
@@ -550,9 +733,11 @@ export function useWorkspaceExplorerController({
       const key = `${workspaceIdentity.threadId}:${focusPathRequest.requestId}`;
       if (handledFocusRequestRef.current === key) return;
       handledFocusRequestRef.current = key;
-      void focusWorkspacePath(focusPathRequest.path);
+      if (focusPathRequest.artifactId !== undefined)
+        focusArtifact(focusPathRequest.artifactId);
+      else void focusWorkspacePath(focusPathRequest.path);
     }
-  }, [focusPathRequest, focusWorkspacePath]);
+  }, [focusPathRequest, focusWorkspacePath, focusArtifact]);
 
   useEffect(() => {
     if (!workspaceAdapter?.subscribeWorkspaceChanged) {
@@ -580,6 +765,9 @@ export function useWorkspaceExplorerController({
   }, [refreshWorkspaceTree, workspaceAdapter, workspaceIdentity]);
 
   return {
+    capabilities,
+    capabilityError,
+    refreshCapabilities: () => setCapabilityEpoch((current) => current + 1),
     activeNode,
     adapterModel,
     collapseAll,
@@ -591,6 +779,7 @@ export function useWorkspaceExplorerController({
     liveNodes,
     loadingDirectoryPaths,
     loadingTree,
+    missingPath,
     nodeMap,
     refreshWorkspaceTree,
     retryDirectory: loadDirectoryChildren,
@@ -599,11 +788,13 @@ export function useWorkspaceExplorerController({
     setFilterQuery,
     setLoadingTree,
     setSelectedNodeId: (id: string | null) => {
+      artifactFocusRef.current = null;
       ++focusGenerationRef.current;
       ++refreshGenerationRef.current;
       focusPendingRef.current = false;
       setLoadingTree(false);
       setWorkspaceError(null);
+      setMissingPath(null);
       setSelectedNodeId(id);
     },
     setWorkspaceError,
@@ -611,5 +802,22 @@ export function useWorkspaceExplorerController({
     tree,
     workspaceError,
     workspaceIdentity,
+    showHidden: hiddenFilesAvailable ? showHidden : undefined,
+    setShowHidden: hiddenFilesAvailable ? (value: boolean) => {
+      setShowHiddenPreference(value);
+      try { localStorage.setItem(SHOW_HIDDEN_KEY, String(value)); } catch { /* Applies to this page only. */ }
+    } : undefined,
   };
+}
+
+const SHOW_HIDDEN_KEY = 'workbench.explorer.showHidden';
+
+class MissingTargetError extends Error {}
+
+/** A linked target that is not there: a workspace path absent from the tree,
+    or a file outside it that the Supervisor cannot find. */
+function isMissingTarget(error: unknown) {
+  if (error instanceof MissingTargetError) return true;
+  const code = (error as { code?: unknown; payload?: { code?: unknown } } | null)?.payload?.code ?? (error as { code?: unknown } | null)?.code;
+  return code === 'file_unavailable' || (error instanceof Error && /no such file|not found|cannot find/i.test(error.message));
 }

@@ -1,0 +1,69 @@
+body:has(.molecule-demo) {
+  overflow: auto;
+}
+.molecule-demo {
+  min-height: 100dvh;
+  padding: 24px;
+  font-family: "DM Sans", system-ui, sans-serif;
+  background: #fff;
+  color: #0a0a0a;
+  --theme-bg: #fff;
+  --theme-surface: #fafafa;
+  --theme-fg: #0a0a0a;
+  --theme-fg-soft: #525252;
+  --theme-fg-muted: #737373;
+  --theme-border: #e5e5e5;
+  --theme-hover: #f3f4f6;
+  --theme-accent-solid: #171717;
+  --theme-accent-solid-fg: #fff;
+  --theme-focus-ring: #28377a;
+}
+.molecule-demo[data-theme="dark"] {
+  background: #0a0f1f;
+  color: #f0f1f5;
+  --theme-bg: #0a0f1f;
+  --theme-surface: #171f36;
+  --theme-fg: #f0f1f5;
+  --theme-fg-soft: #c2c4ca;
+  --theme-fg-muted: #7b879d;
+  --theme-border: #242b42;
+  --theme-hover: #20273c;
+  --theme-accent-solid: #f0f1f5;
+  --theme-accent-solid-fg: #0a0f1f;
+  --theme-focus-ring: #e64c7f;
+}
+.molecule-demo > header,
+.molecule-demo > article {
+  max-width: 760px;
+  margin: auto;
+}
+.molecule-demo > header h1 {
+  font-size: 18px;
+  margin: 0;
+}
+.molecule-demo p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.molecule-demo > header > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.molecule-demo > header button {
+  padding: 6px 10px;
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  background: var(--theme-surface);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}
+.molecule-demo > header button:disabled {
+  opacity: 0.4;
+}
+@media (max-width: 720px) {
+  .molecule-demo {
+    padding: 16px;
+  }
+}

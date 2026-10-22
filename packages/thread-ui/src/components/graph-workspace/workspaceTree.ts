@@ -1,4 +1,6 @@
+import { translate, useI18n } from '../../i18n';
 import { normalizeFileSystemPath, relativeWorkspacePath } from '../workspacePaths';
+import { validateArtifactMetadata } from '@remote-codex/shared';
 import type {
   AgentRuntimeStatusDto,
   ThreadArtifactDto,
@@ -42,7 +44,14 @@ export interface WorkspaceTreeNode {
   workspaceNode?: ThreadWorkspaceTreeNode;
 }
 
-export const MOLECULAR_EXTENSIONS = new Set(['xyz', 'extxyz', 'cif', 'pdb']);
+export const MOLECULAR_EXTENSIONS = new Set([
+  'xyz',
+  'extxyz',
+  'cif',
+  'pdb',
+  'sdf',
+  'mol',
+]);
 export const IMAGE_EXTENSIONS = new Set([
   'png',
   'jpg',
@@ -99,9 +108,10 @@ export function workspaceTreeNodeToGraphNode(
   // Explorer lookups and link focus must use the same path representation.
   // Keep absolute linked-file paths intact, including Windows and UNC paths.
   const normalized = normalizeFileSystemPath(node.path);
-  const path = normalized.startsWith('/') || /^[a-z]:\//i.test(normalized)
-    ? normalized
-    : relativeWorkspacePath(normalized, '') ?? normalized;
+  const path =
+    normalized.startsWith('/') || /^[a-z]:\//i.test(normalized)
+      ? normalized
+      : (relativeWorkspacePath(normalized, '') ?? normalized);
   const children = (node.children ?? []).map(workspaceTreeNodeToGraphNode);
   return {
     id: `workspace:${path}`,
@@ -204,8 +214,14 @@ export function normalizeWorkspacePath(path: string) {
     .replace(/^\/+/, '');
 }
 
-export function workspaceRelativeFocusPath(path: string, workspaceRootPath: string) {
-  return relativeWorkspacePath(path, workspaceRootPath) ?? normalizeFileSystemPath(path);
+export function workspaceRelativeFocusPath(
+  path: string,
+  workspaceRootPath: string,
+) {
+  return (
+    relativeWorkspacePath(path, workspaceRootPath) ??
+    normalizeFileSystemPath(path)
+  );
 }
 
 export function ancestorDirectoryPaths(path: string) {
@@ -302,12 +318,9 @@ export function languageForPath(path: string) {
   return extension || 'text';
 }
 
-export function ensureDirectory(
-  root: WorkspaceTreeNode,
-  segments: string[],
-) {
+export function ensureDirectory(root: WorkspaceTreeNode, segments: string[]) {
   let current = root;
-  let path = '';
+  let path = root.path;
   for (const segment of segments) {
     path = path ? `${path}/${segment}` : segment;
     let child = current.children.find(
@@ -339,7 +352,7 @@ export function addPathNode(
   parent.children.push({
     ...node,
     name: node.name || fileName,
-    path,
+    path: root.path ? `${root.path}/${path}` : path,
   });
 }
 
@@ -364,6 +377,22 @@ export function sortWorkspaceTree(node: WorkspaceTreeNode) {
   return node;
 }
 
+/** Personal inspector state follows a validated object stream, never an arbitrary file path. */
+function artifactNodeIdentity(artifact: ThreadArtifactDto) {
+  try {
+    const metadata = validateArtifactMetadata(artifact.metadata);
+    if (
+      metadata.stream &&
+      !(artifact as ThreadArtifactDto & { extensionError?: string })
+        .extensionError
+    )
+      return JSON.stringify(['stream', artifact.type, metadata.objectId, metadata.stream.id]);
+  } catch {
+    /* Invalid metadata stays isolated by immutable artifact identity. */
+  }
+  return JSON.stringify(['artifact', artifact.id]);
+}
+
 export function collectWorkspaceItems(
   detail: ThreadDetailDto,
   artifacts: ThreadArtifactDto[],
@@ -372,7 +401,7 @@ export function collectWorkspaceItems(
 ) {
   const root: WorkspaceTreeNode = {
     id: 'root',
-    name: detail.workspace.label ?? 'Workspace',
+    name: detail.workspace.label ?? translate("files.workspace"),
     path: '',
     kind: 'directory',
     children: [],
@@ -381,7 +410,7 @@ export function collectWorkspaceItems(
   const artifactRoot: WorkspaceTreeNode = {
     id: 'artifacts',
     name: 'artifacts',
-    path: 'artifacts',
+    path: 'artifacts:',
     kind: 'directory',
     children: [],
   };
@@ -389,22 +418,28 @@ export function collectWorkspaceItems(
   for (const artifact of artifacts) {
     const title = artifact.title || artifact.id;
     const safeName = sanitizePathSegment(title) || artifact.id;
-    artifactRoot.children.push({
-      id: `artifact:${artifact.id}`,
+    const identity = artifactNodeIdentity(artifact);
+    const existing = artifactRoot.children.findIndex(
+      (node) => node.id === `artifact:${identity}`,
+    );
+    const node: WorkspaceTreeNode = {
+      id: `artifact:${identity}`,
       name: `${safeName}.artifact`,
-      path: `artifacts/${safeName}.artifact`,
+      path: `artifacts:/${encodeURIComponent(identity)}.artifact`,
       kind: 'artifact',
       artifact,
       preview: artifact.summaryText ?? artifact.type,
       detail: JSON.stringify(artifact.payload, null, 2),
       children: [],
-    });
+    };
+    if (existing < 0) artifactRoot.children.push(node);
+    else artifactRoot.children[existing] = node;
   }
 
   const eventRoot: WorkspaceTreeNode = {
     id: 'thread-events',
     name: 'thread-events',
-    path: 'thread-events',
+    path: 'thread-events:',
     kind: 'directory',
     children: [],
   };
@@ -412,7 +447,7 @@ export function collectWorkspaceItems(
   const liveRoot: WorkspaceTreeNode = {
     id: 'live',
     name: 'live',
-    path: 'live',
+    path: 'live:',
     kind: 'directory',
     children: [],
   };
@@ -425,7 +460,7 @@ export function collectWorkspaceItems(
   ) => {
     sequence += 1;
     const label = item.kind.replace(/([A-Z])/g, '-$1').toLowerCase();
-    const eventPath = `${live ? 'live' : `thread-events/${turnId}`}/${String(
+    const eventPath = `${live ? 'live:' : `thread-events:/${turnId}`}/${String(
       sequence,
     ).padStart(3, '0')}-${label}.json`;
     const preview =
@@ -434,33 +469,38 @@ export function collectWorkspaceItems(
         : item.kind;
     const artifact =
       item.kind === 'artifact' && item.artifact ? item.artifact : null;
-    const node: WorkspaceTreeNode = artifact && live
-      ? {
-          id: `live-artifact:${artifact.id}`,
-          name: artifact.title || artifact.id,
-          path: eventPath,
-          kind: 'live-artifact',
-          artifact,
-          item,
-          preview: artifact.summaryText ?? artifact.type,
-          detail: JSON.stringify(artifact.payload, null, 2),
-          children: [],
-        }
-      : {
-      id: `event:${item.id}`,
-      name: fileNameFromPath(eventPath),
-      path: eventPath,
-      kind: 'event',
-      item,
-      preview,
-      detail: JSON.stringify(item, null, 2),
-      children: [],
-    };
+    const node: WorkspaceTreeNode =
+      artifact && live
+        ? {
+            id: `live-artifact:${artifactNodeIdentity(artifact)}`,
+            name: artifact.title || artifact.id,
+            path: `live:/${encodeURIComponent(artifactNodeIdentity(artifact))}.artifact`,
+            kind: 'live-artifact',
+            artifact,
+            item,
+            preview: artifact.summaryText ?? artifact.type,
+            detail: JSON.stringify(artifact.payload, null, 2),
+            children: [],
+          }
+        : {
+            id: `event:${item.id}`,
+            name: fileNameFromPath(eventPath),
+            path: eventPath,
+            kind: 'event',
+            item,
+            preview,
+            detail: JSON.stringify(item, null, 2),
+            children: [],
+          };
     if (live) {
-      liveRoot.children.push(node);
+      const existing = liveRoot.children.findIndex(
+        (value) => value.id === node.id,
+      );
+      if (existing < 0) liveRoot.children.push(node);
+      else liveRoot.children[existing] = node;
       return;
     }
-    addPathNode(eventRoot, eventPath.replace(/^thread-events\//, ''), node);
+    addPathNode(eventRoot, eventPath.replace(/^thread-events:\//, ''), node);
   };
 
   for (const turn of detail.turns) {

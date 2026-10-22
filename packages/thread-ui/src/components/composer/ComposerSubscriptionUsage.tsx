@@ -1,12 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
+import { getLocale } from '../../i18n';
+import { translate, useI18n } from '../../i18n';
+import { useEffect, useId, useRef, useState } from 'react';
+import { ComposerMenuSurface } from './ComposerMenuSurface';
 import type { AgentSubscriptionUsageDto } from '@remote-codex/shared';
 
-function resetLabel(value: string | null) {
-  if (!value) return 'reset time unavailable';
+/** When a window resets: by default how long from now (days and hours, or
+    hours and minutes within a day); `absolute` gives the date and time. */
+export function resetLabel(value: string | null, absolute = false, now = Date.now()) {
+  if (!value) return translate("chat.resetTimeUnavailable");
   const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? 'reset time unavailable'
-    : `resets ${date.toLocaleString()}`;
+  if (Number.isNaN(date.getTime())) return translate("chat.resetTimeUnavailable");
+  if (absolute) return translate("chat.resets", { value1: date.toLocaleString(getLocale()) });
+  const minutes = Math.max(0, Math.ceil((date.getTime() - now) / 60_000));
+  const days = Math.floor(minutes / 1440), hours = Math.floor((minutes % 1440) / 60), rest = minutes % 60;
+  if (days > 0) return translate("chat.resetsInDays", { days, hours });
+  if (hours > 0) return translate("chat.resetsInHours", { hours, minutes: rest });
+  return translate("chat.resetsInMinutes", { minutes: rest });
+}
+
+/** The (at most two) usage windows the composer badge shows. */
+export function visibleSubscriptionWindows(usage?: AgentSubscriptionUsageDto | null) {
+  if (!usage || usage.authKind !== 'subscription') return [];
+  return usage.windows.filter(window => Number.isFinite(window.usedPercent) && window.usedPercent >= 0 && (!window.resetsAt || new Date(window.resetsAt).getTime() > Date.now())).slice(0, 2);
 }
 
 export function ComposerSubscriptionUsage({
@@ -14,51 +29,69 @@ export function ComposerSubscriptionUsage({
 }: {
   usage?: AgentSubscriptionUsageDto | null;
 }) {
+  useI18n();
   const [detailsVisible, setDetailsVisible] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [keyboardFocused, setKeyboardFocused] = useState(false);
+  // Reset times read as "in 2 days 5 hours"; a tap on one shows the date instead.
+  const [absoluteReset, setAbsoluteReset] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const open = detailsVisible || hovered || keyboardFocused;
+  useEffect(() => {
+    if (!open) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [open]);
+  const detailsId = useId();
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (!detailsVisible) return;
-    const outside = (event: PointerEvent) => {if (!ref.current?.contains(event.target as Node)) setDetailsVisible(false);};
-    const escape = (event: KeyboardEvent) => {if (event.key === 'Escape') setDetailsVisible(false);};
+    if (!open) return;
+    const close = () => { setDetailsVisible(false); setHovered(false); setKeyboardFocused(false); };
+    const outside = (event: PointerEvent) => { if (!ref.current?.parentElement?.contains(event.target as Node)) close(); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
     document.addEventListener('pointerdown', outside);document.addEventListener('keydown', escape);
     return () => {document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);};
-  },[detailsVisible]);
+  },[open]);
 
-  if (
-    !usage ||
-    usage.authKind !== 'subscription' ||
-    usage.windows.length === 0 || usage.stale
-  ) {
-    return null;
-  }
-
-  const windows = usage.windows.filter(window => Number.isFinite(window.usedPercent) && window.usedPercent >= 0 && (!window.resetsAt || new Date(window.resetsAt).getTime() > Date.now())).slice(0, 2);
-  if (!windows.length) return null;
+  const windows = visibleSubscriptionWindows(usage);
+  if (!usage || !windows.length) return null;
   const description = windows
     .map((window) => {
-      const remaining = Math.max(0, 100 - window.usedPercent);
-      return `${window.label}: ${remaining}% remaining, ${resetLabel(window.resetsAt)}`;
+      const remaining = Math.max(0, Math.round(100 - window.usedPercent));
+      return `${window.label}: ${translate("chat.remainingPercentage", { value1: remaining })}, ${resetLabel(window.resetsAt, false, now)}`;
     })
-    .join('. ');
+    .join(translate("chat.listSeparator"));
+  const observed = new Date(usage.observedAt);
+  const updated = Number.isNaN(observed.getTime()) ? translate("chat.updateTimeUnavailable") : translate("chat.updated", { value1: observed.toLocaleString(getLocale()) });
+  const freshness = `${usage.stale ? translate("chat.lastKnown") : ''}${updated}`;
 
   return (
+    <>
     <button
       ref={ref}
       type="button"
-      className={`thread-subscription-usage group pointer-events-auto absolute bottom-0 right-2 inline-flex h-4 items-center gap-1 rounded-t-md border border-b-0 border-stone-500/50 bg-stone-950 px-1 text-[9px] font-normal leading-none text-stone-200 shadow-sm transition-[border-color,background-color,opacity] duration-200 hover:border-stone-400/75 hover:bg-stone-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sky-200/70 sm:right-3 sm:text-[9px] ${usage.stale ? 'opacity-70' : 'opacity-95'}`}
-      aria-label={`${usage.provider} subscription usage. ${description}`}
-      aria-expanded={detailsVisible}
-      onClick={() => setDetailsVisible((current) => !current)}
+      className="thread-subscription-usage"
+      data-usage-stale={usage.stale ? 'true' : undefined}
+      aria-label={translate("chat.subscriptionUsage", { value1: usage.provider, value2: description, value3: freshness })}
+      data-composer-menu-trigger="true"
+      aria-describedby={open ? detailsId : undefined}
+      aria-expanded={open}
+      onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHovered(true); }}
+      onPointerLeave={() => setHovered(false)}
+      onFocus={(event) => setKeyboardFocused(event.currentTarget.matches(':focus-visible'))}
+      onBlur={() => setKeyboardFocused(false)}
+      onClick={() => { setHovered(false); setKeyboardFocused(false); setDetailsVisible((current) => !current); }}
     >
       {windows.map((window) => {
         const remaining = Math.max(0, Math.min(100, 100 - window.usedPercent));
         const hue = Math.round(18 + (remaining / 100) * 190);
         return (
-          <span key={window.id} className="inline-flex items-center gap-0.5">
+          <span key={window.id} className="thread-subscription-usage-window inline-flex items-center gap-0.5">
             <span className="font-normal tracking-[-0.01em]">{window.label}</span>
             <span
               data-subscription-window-track="true"
-              className="h-0.5 w-7 overflow-hidden rounded-full bg-stone-600/55 sm:w-9"
+              className="h-0.5 w-6 overflow-hidden rounded-full bg-stone-600/55 sm:w-9"
             >
               <span
                 className="block h-full rounded-full transition-[width] duration-500 ease-out"
@@ -71,18 +104,25 @@ export function ComposerSubscriptionUsage({
           </span>
         );
       })}
-      <span
-        role="tooltip"
-        aria-hidden={!detailsVisible}
-        className={`pointer-events-none absolute right-0 bottom-full mb-1 max-w-[calc(100vw-2rem)] rounded-md border border-stone-600/65 bg-stone-950/95 px-1.5 py-1 text-[9px] font-normal leading-4 text-stone-100 shadow-lg transition-[opacity,transform] duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 ${detailsVisible ? 'translate-y-0 opacity-100' : 'translate-y-0.5 opacity-0'}`}
-      >
-        {windows.map((window) => (
-          <span key={window.id} className="block">
-            {window.label} · {Math.max(0, Math.round(100 - window.usedPercent))}% remaining · {resetLabel(window.resetsAt)}
-          </span>
-        ))}
-        {usage.stale ? ' · last known' : ''}
-      </span>
+      {usage.stale ? <span aria-hidden="true">~</span> : null}
     </button>
+    {open ? (
+      <ComposerMenuSurface id={detailsId} role="group" aria-label={translate("chat.subscriptionUsageDetails")} align="end" anchorSelector=".thread-graph-composer-shell" className="thread-subscription-usage-details">
+        {windows.map((window) => (
+          <div key={window.id} className="thread-subscription-usage-detail-window">
+            <div className="thread-subscription-usage-detail-heading">
+              <span>{window.label}</span>
+              <strong>{translate("chat.remainingPercentage", { value1: Math.max(0, Math.round(100 - window.usedPercent)) })}</strong>
+            </div>
+            <button type="button" className="thread-subscription-usage-detail-reset" aria-pressed={absoluteReset}
+              title={resetLabel(window.resetsAt, !absoluteReset, now)} onClick={() => setAbsoluteReset(value => !value)}>
+              {resetLabel(window.resetsAt, absoluteReset, now)}
+            </button>
+          </div>
+        ))}
+        <div className="thread-subscription-usage-detail-freshness">{freshness}</div>
+      </ComposerMenuSurface>
+    ) : null}
+    </>
   );
 }

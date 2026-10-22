@@ -1,4 +1,4 @@
-# Remote Codex Thread UI Code Review And Optimization Plan
+# Pockymoe Thread UI Code Review And Optimization Plan
 
 Date: 2026-06-10
 

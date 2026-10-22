@@ -2,12 +2,15 @@ import { useLayoutEffect, useRef, type ComponentPropsWithoutRef } from 'react';
 
 type ComposerMenuSurfaceProps = ComponentPropsWithoutRef<'div'> & {
   align?: 'start' | 'end';
+  /** Optional surrounding surface to keep a detail panel clear of the controls. */
+  anchorSelector?: string;
 };
 
 // Keep the menu in its themed DOM subtree, but paint it above the composer,
 // stop button and timeline navigation using the browser's top layer.
 export function ComposerMenuSurface({
   align = 'start',
+  anchorSelector,
   children,
   className = '',
   ...props
@@ -21,10 +24,14 @@ export function ComposerMenuSurface({
     );
     if (!menu || !trigger) return;
 
-    if (typeof menu.showPopover === 'function') {
+    const topLayer = typeof menu.showPopover === 'function';
+    if (topLayer) {
       menu.showPopover();
     } else {
       menu.removeAttribute('popover');
+      // A blurred composer is a containing block for fixed descendants.
+      // Older WebViews without the top layer therefore need local coordinates.
+      menu.style.position = 'absolute';
     }
 
     const updatePosition = () => {
@@ -36,7 +43,7 @@ export function ComposerMenuSurface({
       const height = viewport?.height ?? window.innerHeight;
       const right = left + width - gutter * 2;
       const bottom = top + height - gutter * 2;
-      const anchor = trigger.getBoundingClientRect();
+      const anchor = (anchorSelector ? trigger.closest(anchorSelector) ?? trigger : trigger).getBoundingClientRect();
 
       menu.style.maxWidth = `${Math.max(0, right - left)}px`;
       const above = Math.max(0, anchor.top - gutter - top);
@@ -48,8 +55,10 @@ export function ComposerMenuSurface({
       const bounds = menu.getBoundingClientRect();
       const preferredLeft = align === 'end' ? anchor.right - bounds.width : anchor.left;
       const preferredTop = openAbove ? anchor.top - gutter - bounds.height : anchor.bottom + gutter;
-      menu.style.left = `${Math.max(left, Math.min(preferredLeft, right - bounds.width))}px`;
-      menu.style.top = `${Math.max(top, Math.min(preferredTop, bottom - bounds.height))}px`;
+      const parent = !topLayer ? menu.offsetParent as HTMLElement | null : null;
+      const origin = parent?.getBoundingClientRect();
+      menu.style.left = `${Math.max(left, Math.min(preferredLeft, right - bounds.width)) - (origin?.left ?? 0) - (parent?.clientLeft ?? 0) + (parent?.scrollLeft ?? 0)}px`;
+      menu.style.top = `${Math.max(top, Math.min(preferredTop, bottom - bounds.height)) - (origin?.top ?? 0) - (parent?.clientTop ?? 0) + (parent?.scrollTop ?? 0)}px`;
     };
 
     let frame = 0;
@@ -83,7 +92,7 @@ export function ComposerMenuSurface({
       window.visualViewport?.removeEventListener('scroll', schedulePosition);
       menu.hidePopover?.();
     };
-  }, [align]);
+  }, [align, anchorSelector]);
 
   return (
     <div

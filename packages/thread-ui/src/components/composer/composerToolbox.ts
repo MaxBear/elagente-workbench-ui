@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import type {
   AgentBackendToolboxItemSchemaDto,
   ThreadGoalStatusDto,
@@ -110,26 +111,26 @@ export function toolboxItemStatus(
 ) {
   switch (item.action) {
     case 'fast':
-      return fastMode ? 'On' : 'Off';
+      return fastMode ? translate("chat.on") : translate("chat.off");
     case 'compact':
-      return compactBusy ? 'Busy' : 'Run';
+      return compactBusy ? translate("chat.busy") : translate("chat.run");
     case 'goal':
       return goalComposeMode
-        ? 'Composing'
+        ? translate("chat.composing")
         : goalStatus
           ? goalStatusLabel(goalStatus)
-          : 'Open';
+          : translate("chat.open");
     case 'fork':
-      return busy ? 'Idle only' : 'Open';
+      return busy ? translate("chat.idleOnly") : translate("chat.open");
     case 'skills':
     case 'mcp':
     case 'hooks':
     case 'harness':
-      return 'View';
+      return translate("chat.view");
     case 'prompt':
-      return 'Compose';
+      return translate("chat.compose");
     case 'unsupported':
-      return 'Unavailable';
+      return translate("chat.unavailable_2c9c1f");
     default:
       return '';
   }

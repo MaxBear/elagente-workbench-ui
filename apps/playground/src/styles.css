@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @source "../../../packages/thread-ui/src";
 @source "../../../packages/plugin-terminal/src";
 
@@ -6,7 +6,12 @@ html,
 body,
 #root {
   min-height: 100%;
+  height: 100%;
   margin: 0;
+}
+
+html {
+  background: #0a0f1f;
 }
 
 button,
@@ -19,8 +24,17 @@ select {
 body {
   min-width: 320px;
   overflow: hidden;
-  background: oklch(0.978 0.009 255);
-  color: oklch(0.22 0.024 255);
+  background: #0a0f1f;
+  color: #f0f1f5;
+}
+
+html[data-theme-effective='light'] {
+  background: #fff;
+}
+
+html[data-theme-effective='light'] body {
+  background: #fff;
+  color: #171717;
 }
 
 * {

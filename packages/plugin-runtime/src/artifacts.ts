@@ -11,7 +11,7 @@ import type {
 } from './types';
 
 const artifactFenceLanguages = new Set(['artifact', 'remote-codex-artifact']);
-const remoteCodexMoleculeMcpToolName = 'remote_codex_render_molecule';
+const pockymoeMoleculeMcpToolName = 'remote_codex_render_molecule';
 
 interface FencedBlock {
   language: string;
@@ -268,7 +268,7 @@ function extractArtifactCandidateTexts(item: ThreadHistoryItemDto, text: string)
     ![item.text, item.previewText, text].some(
       (value) =>
         typeof value === 'string' &&
-        value.includes(remoteCodexMoleculeMcpToolName),
+        value.includes(pockymoeMoleculeMcpToolName),
     )
   ) {
     return values;

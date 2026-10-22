@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import { ComposerMenuSurface } from './ComposerMenuSurface';
 import type { ThreadShellControlState } from '../../types';
 import { ClipboardIcon, ToolPill } from './composerPresentation';
@@ -19,6 +20,7 @@ export function ComposerShellToolsPanel({
     action: 'ctrl_c' | 'ctrl_d' | 'esc' | 'tab' | 'up' | 'down',
   ) => void;
 }) {
+  useI18n();
   const shellInputEnabled = Boolean(shellControlState?.shellInputEnabled);
   const commandRunning = Boolean(shellControlState?.isCommandRunning);
 
@@ -45,8 +47,7 @@ export function ComposerShellToolsPanel({
           <span className="inline-flex items-center gap-1.5">
             <ClipboardIcon />
             <span className="text-[10px] font-medium tracking-[0.12em]">
-              Paste
-            </span>
+              {translate("chat.paste")}</span>
           </span>
         </button>
         <button
@@ -57,8 +58,7 @@ export function ComposerShellToolsPanel({
           <span className="inline-flex items-center gap-1.5">
             <ClipboardIcon />
             <span className="text-[10px] font-medium tracking-[0.12em]">
-              Copy
-            </span>
+              {translate("chat.copy")}</span>
           </span>
         </button>
         <button
@@ -67,7 +67,7 @@ export function ComposerShellToolsPanel({
           onClick={onClear}
           className="disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <ToolPill label="CLEAR" tone="sky" />
+          <ToolPill label={translate("chat.cLEAR")} tone="sky" />
         </button>
         <button
           type="button"
@@ -107,7 +107,7 @@ export function ComposerShellToolsPanel({
           onClick={() => onShellControl('up')}
           className="disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <ToolPill label="UP" />
+          <ToolPill label={translate("chat.uP")} />
         </button>
         <button
           type="button"
@@ -115,7 +115,7 @@ export function ComposerShellToolsPanel({
           onClick={() => onShellControl('down')}
           className="disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <ToolPill label="DOWN" />
+          <ToolPill label={translate("chat.dOWN")} />
         </button>
       </div>
     </ComposerMenuSurface>

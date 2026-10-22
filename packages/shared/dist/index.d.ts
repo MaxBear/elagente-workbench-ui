@@ -1,4 +1,87 @@
-declare const agentBackendIds: readonly ["codex", "claude", "opencode"];
+/** Additive extension data contract. Transport/feature support must be advertised separately. */
+declare const EXTENSION_VERSION: 1;
+declare const EXTENSION_TYPES: Readonly<Record<string, string>>;
+type JsonValue = null | boolean | number | string | JsonValue[] | {[key: string]: JsonValue};
+interface ExtensionEnvelope<T = JsonValue> {version: 1; type: string; data: T; [field: string]: unknown}
+/** A deliberately bounded declarative schema; no refs, code, URLs or dynamic imports. */
+type ValueSchema =
+  | {type: 'string'; enum?: string[]; maxLength?: number}
+  | {type: 'number' | 'integer'; minimum?: number; maximum?: number}
+  | {type: 'boolean' | 'null'}
+  | {type: 'array'; items: ValueSchema; maxItems: number}
+  | {type: 'object'; properties: Record<string, ValueSchema>; required?: string[]; additionalProperties: false};
+interface OptionDefinition {
+  id: string; label: string; description?: string; schema: ValueSchema; default?: JsonValue;
+  scope: 'thread' | 'turn'; apply: 'nextTurn' | 'restart'; mutable: boolean;
+}
+interface ActionDefinition {
+  id: string; label: string; inputSchema: ValueSchema; resultSchema: ValueSchema;
+  execution: 'browser' | 'native'; completion: 'applied';
+}
+interface ContributionDefinition {
+  id: string; type: string; version: 1; minContractVersion: 1;
+  rendererIds: string[]; panelIds: string[]; actionIds: string[]; optionIds: string[];
+}
+interface ExtensionDiscovery {
+  contractVersion: 1; capabilities: Record<string, boolean>;
+  contributions: ContributionDefinition[]; options: OptionDefinition[]; actions: ActionDefinition[];
+  viewerState: 'personal-transient'; submission: 'explicit';
+}
+interface ScientificTarget {
+  artifactId: string; objectId: string; sourceRevision: string; checksum: string;
+  streamId?: string; frameId?: string; frameIndex?: number;
+}
+interface ArtifactMetadata {
+  version: 1; objectId: string; sourceRevision: string; checksum: string; format: string;
+  stream?: {id: string; frameId: string; frameIndex: number};
+  atoms?: {id: string; element: string}[];
+  bonds?: {atomIds: [string, string]; order: number}[];
+  cell?: {vectors: [[number, number, number], [number, number, number], [number, number, number]]; periodic: [boolean, boolean, boolean]; unit: 'angstrom' | 'bohr'};
+  render?: {coordinateUnit: 'angstrom' | 'bohr'; bonding: 'provided' | 'infer' | 'none'; style?: 'ball-stick' | 'stick' | 'spacefill'; background?: string};
+  [field: string]: unknown;
+}
+interface ViewerRequest {
+  version: 1; requestId: string; operationId: string; actionId: string;
+  target: ScientificTarget; payload: JsonValue;
+}
+interface ViewerInput extends ViewerRequest {
+  kind: 'selection' | 'screenshot' | 'action'; submission: 'explicit';
+}
+interface ViewerAcknowledgement {
+  version: 1; requestId: string; operationId: string; actionId: string;
+  target: ScientificTarget; status: 'accepted' | 'applied' | 'rejected';
+  result?: JsonValue; error?: {code: string; message: string};
+}
+interface StructuredProgress {
+  version: 1; callId: string; status: 'queued' | 'running' | 'waitingForInput' | 'completed' | 'failed' | 'interrupted';
+  label: string; arguments?: JsonValue; startedAt?: string; completedAt?: string;
+  resultSummary?: string; logSummary?: string; artifactIds?: string[];
+  completed?: number; total?: number; unit?: string; parentCallId?: string;
+}
+interface StructuredUsage {
+  version: 1; scope: 'turn' | 'room' | 'tool'; availability: 'available' | 'unavailable';
+  scopeId: string; observedAt: string;
+  tokens?: {input?: number; output?: number; reasoning?: number; cacheRead?: number; cacheWrite?: number; total?: number};
+  cost?: {amount: number; currency: string};
+}
+declare class ExtensionValidationError extends Error {code: string; path: string}
+declare function validateValueSchema(value: unknown): asserts value is ValueSchema;
+declare function validatePayload(schema: ValueSchema, value: unknown): asserts value is JsonValue;
+declare function validateDiscovery(value: unknown): ExtensionDiscovery;
+declare function hasCapability(discovery: ExtensionDiscovery | undefined, id: string): boolean;
+declare function validateOptionValues(discovery: ExtensionDiscovery, values: unknown, scope?: 'thread' | 'turn'): Record<string, JsonValue>;
+declare function validateArtifactMetadata(value: unknown): ArtifactMetadata;
+declare function validateScientificTarget(value: unknown): ScientificTarget;
+declare function validateViewerRequest(value: unknown, discovery: ExtensionDiscovery): ViewerRequest;
+declare function validateViewerInput(value: unknown, discovery: ExtensionDiscovery): ViewerInput;
+declare function validateViewerAcknowledgement(value: unknown, request: ViewerRequest, discovery: ExtensionDiscovery): ViewerAcknowledgement;
+declare function validateProgress(value: unknown): StructuredProgress;
+declare function validateUsage(value: unknown): StructuredUsage;
+declare function validateExtension(value: unknown, discovery?: ExtensionDiscovery, originatingRequest?: ViewerRequest): ExtensionEnvelope<unknown>;
+/** Unknown types retain data but never select executable UI. */
+declare function extensionFallback(value: unknown): {kind: 'metadata-text-download'; type: string; text: string; metadata: unknown};
+
+declare const agentBackendIds: readonly ["codex", "claude", "opencode", "elagente"];
 type AgentBackendIdDto = (typeof agentBackendIds)[number];
 declare const defaultAgentBackendId: AgentBackendIdDto;
 interface AgentBackendMetadata {
@@ -13,6 +96,9 @@ interface AgentBackendMetadata {
 declare const agentBackendMetadata: Record<AgentBackendIdDto, AgentBackendMetadata>;
 declare function isAgentBackendId(value: unknown): value is AgentBackendIdDto;
 declare function normalizeAgentBackendId(value: unknown): AgentBackendIdDto | null;
+
+interface ExtensionFixture {agentId: string; discovery: ExtensionDiscovery; artifacts: Array<{id: string; checksum: string; size: number; fixtureBytes: string; metadata: ArtifactMetadata; [key: string]: unknown}>; input: ViewerInput; acknowledgements: ViewerAcknowledgement[]; progress: StructuredProgress; usage: StructuredUsage; unavailableUsage: StructuredUsage; unknownItem: {extension: ExtensionEnvelope; [key: string]: unknown}}
+declare const EXTENSION_FIXTURES: Readonly<Record<'grafico' | 'cuantico', ExtensionFixture>>;
 
 type ApiErrorCode = 'bad_request' | 'not_found' | 'conflict' | 'provider_goal_error' | 'forbidden' | 'goal_feature_disabled' | 'internal_error' | 'service_unavailable';
 interface ApiErrorShape {
@@ -77,6 +163,8 @@ interface AgentProviderCapabilitiesDto {
         sandboxMode: boolean;
         performanceMode: boolean;
         goals: boolean;
+        /** A model or effort changed during a turn applies from its next model call; otherwise from the next turn. */
+        liveModelSwitch?: boolean;
     };
     management: {
         models: boolean;
@@ -277,8 +365,41 @@ interface ThreadDto {
     lastTurnStartedAt: string | null;
     lastTurnCompletedAt: string | null;
     contextUsage?: ThreadContextUsageDto;
+    /** Immediate creator. Absent when a person started this thread. */
+    parentThreadId?: string | null;
+    /** Top-level ancestor; every thread in one delegation chain shares it. */
+    rootThreadId?: string | null;
+}
+interface ThreadPeerWorkDto {
+    taskTurnId: string;
+    messages: Array<{
+        id: string;
+        fromThreadId?: string | null;
+        fromDeviceId?: string | null;
+        name?: string | null;
+        kind: 'question' | 'result';
+        subject?: string | null;
+        text?: string | null;
+        createdAt?: string | null;
+    }>;
+}
+/** Who sent a prompt when it was not the device owner, as the device recorded it. */
+interface MessageSenderDto {
+    /** The sender's relay account ID. */
+    userId: string;
+    /** The account name the owner shared with, when the device knows it. */
+    name?: string | null;
 }
 interface ThreadHistoryItemDto {
+    /** Set when storage cleanup removed this command's output or this edit's diff. */
+    outputPrunedAt?: string | null;
+    outputPrunedBytes?: number | null;
+    /** Set when storage cleanup shortened or removed this command's text. */
+    textPruned?: 'truncated' | 'removed' | null;
+    polishedReply?: PolishedReplyDto | null;
+    peerWork?: ThreadPeerWorkDto | null;
+    /** Set on prompts that someone other than the device owner sent. */
+    sender?: MessageSenderDto | null;
     id: string;
     kind: 'userMessage' | 'agentMessage' | 'artifact' | 'image' | 'plan' | 'contextCompaction' | 'reasoning' | 'commandExecution' | 'webSearch' | 'fileRead' | 'fileChange' | 'hook' | 'agentToolCall' | 'skillToolCall' | 'toolCall' | 'other';
     text: string;
@@ -288,7 +409,17 @@ interface ThreadHistoryItemDto {
     sequence?: number | null;
     transcriptOrder?: number | null;
     sourceTurnId?: string | null;
+    origin?: string | null;
+    /** A harness notice's level (`origin: 'sessionNotice'`). */
+    severity?: 'info' | 'warning' | 'error' | null;
+    taskStatus?: string | null;
+    taskId?: string | null;
+    waitingStartedAt?: string | null;
+    awakenedAt?: string | null;
+    backgroundTaskCount?: number | null;
+    responsePhase?: 'commentary' | 'final' | null;
     createdAt?: string | null;
+    updatedAt?: string | null;
     status?: string | null;
     assetPath?: string | null;
     changedFiles?: number | null;
@@ -306,6 +437,17 @@ interface ThreadHistoryItemDto {
         text: string;
     }> | null;
     artifact?: ThreadArtifactDto | null;
+    extension?: ExtensionEnvelope<unknown>;
+    progress?: StructuredProgress;
+    usage?: StructuredUsage;
+}
+interface PolishedReplyDto {
+    text: string;
+    preset: string;
+    language: string;
+    model: string;
+    sourceHash: string;
+    createdAt: string;
 }
 interface ThreadHistoryItemDetailDto {
     id: string;
@@ -314,10 +456,14 @@ interface ThreadHistoryItemDetailDto {
     text: string;
 }
 interface ThreadArtifactDto {
+    metadata?: ArtifactMetadata;
+    extension?: ExtensionEnvelope<unknown>;
     id: string;
     pluginId: string;
     type: string;
     title: string;
+    /** Relative workspace file backing this artifact, when available. */
+    workspacePath?: string;
     summaryText?: string | null;
     payload: unknown;
     assets?: Array<{
@@ -353,6 +499,7 @@ interface PluginMcpServerDto {
     env?: Record<string, string>;
 }
 interface PluginCapabilitiesDto {
+    actions?: string[];
     artifactTypes: PluginArtifactTypeDto[];
     timelineRenderers: string[];
     threadPanels: PluginThreadPanelDto[];
@@ -367,6 +514,7 @@ interface PluginCapabilitiesDto {
     };
 }
 interface PluginManifestDto {
+    contribution?: ContributionDefinition;
     id: string;
     name: string;
     version: string;
@@ -377,9 +525,16 @@ interface PluginManifestDto {
 interface PluginDto extends PluginManifestDto {
     enabled: boolean;
     source?: 'builtin' | 'imported' | null;
+    available?: boolean;
+    unavailableReasonCode?: string | null;
+    unavailableReason?: string | null;
+    /** Whether a conversation that follows the device has it on (absent from older Supervisors). */
+    defaultEnabled?: boolean;
 }
 interface UpdatePluginInput {
-    enabled: boolean;
+    enabled?: boolean;
+    /** Whether conversations that follow the device have the plugin on. */
+    defaultEnabled?: boolean;
 }
 interface ImportPluginInput {
     manifest?: unknown;
@@ -391,6 +546,8 @@ interface ThreadTurnTokenBreakdownDto {
     inputTokens: number;
     cachedInputTokens: number;
     cacheWriteInputTokens?: number;
+    /** One-hour subset of cacheWriteInputTokens. */
+    cacheWriteOneHourInputTokens?: number;
     outputTokens: number;
     reasoningOutputTokens: number;
 }
@@ -398,6 +555,48 @@ interface ThreadTurnTokenUsageDto {
     total: ThreadTurnTokenBreakdownDto;
     last: ThreadTurnTokenBreakdownDto;
     modelContextWindow: number | null;
+    /** The models the turn's own agent called, in order; consecutive calls to
+        one model form a run, so a switch mid-turn shows as a second run. */
+    models?: {
+        model: string;
+        calls: number;
+    }[];
+    generationSpeed?: {
+        outputTokens: number;
+        llmTimeMs: number;
+        averageTokensPerSecond: number | null;
+        recentTokensPerSecond: number | null;
+        windowSeconds: number;
+        active: boolean;
+        state: 'llm' | 'tool';
+        measurement: 'usageIntervals';
+        outputTimeMs?: number;
+        averageOutputTokensPerSecond?: number | null;
+        latestOutputTokensPerSecond?: number | null;
+        latestOutputTimeMs?: number;
+        latestOutputMeasuredAt?: string | null;
+        /** How the split below was measured. Snapshots without it timed every
+            request, bursts included, and are not shown. */
+        splitMethod?: 'streamedRequests';
+        /** Model requests that produced output in the turn, streamed or not. */
+        llmRequests?: number;
+        /** Per model request that visibly streamed: the average wait for its first
+            output, including queueing, prefill and thinking that does not stream. */
+        firstTokenMs?: number | null;
+        firstTokenRequests?: number;
+        /** Requests whose reply arrived in one piece, left out of the split. */
+        burstRequests?: number;
+        /** Uncached input prefilled before the first output, and the cached rest. */
+        prefillTokens?: number;
+        prefillCachedTokens?: number;
+        prefillTokensPerSecond?: number | null;
+        /** Each request's own answer tokens (reasoning left out), over the time its
+            answer streamed. */
+        decodeTokens?: number;
+        decodeMs?: number;
+        decodeTokensPerSecond?: number | null;
+        updatedAt: string;
+    } | null;
 }
 type ThreadTurnPricingTierDto = 'standard' | 'fast';
 interface ThreadTurnPriceEstimateDto {
@@ -423,7 +622,39 @@ interface ThreadTurnDto {
     priceEstimate?: ThreadTurnPriceEstimateDto | null;
     hasDeferredItems?: boolean | null;
     deferredItemCount?: number | null;
+    /** Operation counts of a summarized turn; present only with deferred items. */
+    activity?: ThreadTurnActivityDto | null;
     items: ThreadHistoryItemDto[];
+}
+interface ThreadTurnActivityDto {
+    commands?: number;
+    fileChanges?: number;
+    changedFiles?: number;
+    addedLines?: number;
+    removedLines?: number;
+    reads?: number;
+    searches?: number;
+    tools?: number;
+    agents?: number;
+    reasoning?: number;
+    failed?: number;
+    /** Distinct changed paths. */
+    fileCount?: number;
+    /** Up to forty changed files, with the latest edit's item id. */
+    files?: ThreadTurnChangedFileDto[];
+    /** The same counts per stretch of operations, keyed by the conversation item after it. */
+    segments?: ThreadTurnActivitySegmentDto[];
+}
+type ThreadTurnActivitySegmentDto = Omit<ThreadTurnActivityDto, 'files' | 'segments' | 'fileCount'> & {
+    before: string | null;
+    startedAt?: string;
+    endedAt?: string;
+};
+interface ThreadTurnChangedFileDto {
+    path: string;
+    itemId: string;
+    addedLines?: number;
+    removedLines?: number;
 }
 interface ThreadActionQuestionOptionDto {
     label: string;
@@ -599,6 +830,17 @@ interface ThreadPendingSteerDto {
     prompt: string;
     delivery: "steer" | "continuation";
     createdAt: string;
+    /** Set when someone other than the device owner sent it. */
+    sender?: MessageSenderDto | null;
+}
+interface ThreadSubagentDto {
+    id: string;
+    name: string | null;
+    status: string;
+    startedAt: string | null;
+    completedAt: string | null;
+    parentToolCallId: string | null;
+    isBackground?: boolean;
 }
 interface ThreadLiveItemsDto {
     turnId: string;
@@ -613,6 +855,7 @@ interface ThreadDetailDto {
     totalTurnCount?: number;
     pendingRequests: ThreadActionRequestDto[];
     pendingSteers: ThreadPendingSteerDto[];
+    activeSubagents?: ThreadSubagentDto[];
     answeredRequestNotes?: ThreadAnsweredRequestNoteDto[];
     activityNotes?: ThreadActivityNoteDto[];
     goal?: ThreadGoalDto | null;
@@ -773,6 +1016,10 @@ interface ThreadEventPayloadMap {
     'thread.context.updated': {
         contextUsage: ThreadContextUsageDto;
     };
+    'thread.subagents.updated': {
+        turnId: string;
+        activeSubagents: ThreadSubagentDto[];
+    };
     'thread.goal.updated': {
         turnId?: string | null;
         goal: ThreadGoalDto | null;
@@ -918,4 +1165,4 @@ type SupervisorSocketClientEnvelope = {
 /** Text can arrive as a shorter summary; operation lifecycle must still advance. */
 declare function mergeThreadHistoryItem(current: ThreadHistoryItemDto | undefined, incoming: ThreadHistoryItemDto): ThreadHistoryItemDto;
 
-export { type AgentBackendConfigFileSchemaDto, type AgentBackendDto, type AgentBackendHookCommandTemplateDto, type AgentBackendIdDto, type AgentBackendInstallationDto, type AgentBackendManagementSchemaDto, type AgentBackendMetadata, type AgentBackendToolboxActionDto, type AgentBackendToolboxItemSchemaDto, type AgentHookDto, type AgentHookErrorDto, type AgentHookEventNameDto, type AgentHookHandlerTypeDto, type AgentHookSourceDto, type AgentHookTrustStatusDto, type AgentMcpAuthStatusDto, type AgentMcpServerDto, type AgentMcpToolDto, type AgentProviderCapabilitiesDto, type AgentRuntimeStatusDto, type AgentSkillDto, type AgentSkillErrorDto, type AgentSkillInterfaceDto, type AgentSkillScopeDto, type AgentSubscriptionUsageDto, type AgentSubscriptionUsageWindowDto, type ApiErrorCode, type ApiErrorShape, type ApplyProviderHostConfigArchiveResultDto, type ApprovalMode, type CollaborationModeDto, type CreateProviderHostConfigArchiveInput, type CreateThreadHookInput, type CreateThreadInput, type CreateWorkspaceFromGitInput, type CreateWorkspaceFromPathInput, type CreateWorkspaceInput, type ExportThreadTranscriptInput, type ForkThreadInput, type HealthDto, type ImportPluginInput, type ImportThreadInput, type InterruptTurnInput, type ModelOptionDto, type PluginArtifactTypeDto, type PluginCapabilitiesDto, type PluginDto, type PluginManifestDto, type PluginMcpServerDto, type PluginModelHintDto, type PluginThreadPanelDto, type PromptAttachmentKindDto, type PromptAttachmentManifestEntryDto, type ProviderHostConfigArchiveDto, type ProviderHostConfigArchiveFileDto, type ProviderHostFileDto, type ProviderHostFileNameDto, type ReasoningEffortDto, type ReasoningEffortOptionDto, type RenameProviderHostConfigArchiveInput, type RespondThreadActionRequestInput, type ResumeThreadInput, type RuntimeConfigDto, type SandboxModeDto, type SendThreadPromptInput, type ShellAttachInput, type ShellCreateInput, type ShellDetachInput, type ShellEventEnvelope, type ShellEventPayloadMap, type ShellInputInput, type ShellResizeInput, type ShellSessionDto, type ShellStatusDto, type SupervisorConnectedEnvelope, type SupervisorPongEnvelope, type SupervisorSocketClientEnvelope, type SupervisorSocketServerEnvelope, type ThreadActionQuestionDto, type ThreadActionQuestionOptionDto, type ThreadActionRequestAnswerDto, type ThreadActionRequestDto, type ThreadActivityNoteDto, type ThreadAnsweredRequestNoteDto, type ThreadArtifactDto, type ThreadContextUsageDto, type ThreadDetailDto, type ThreadDto, type ThreadEventEnvelope, type ThreadEventPayloadMap, type ThreadExportFormatDto, type ThreadExportPdfModeDto, type ThreadExportPdfProfileDto, type ThreadExportTurnOptionDto, type ThreadExportTurnOptionsDto, type ThreadForkResultDto, type ThreadForkTurnOptionDto, type ThreadGoalDto, type ThreadGoalStatusDto, type ThreadHistoryItemDetailDto, type ThreadHistoryItemDto, type ThreadHookTargetInput, type ThreadHooksDto, type ThreadLiveItemsDto, type ThreadLivePlanDto, type ThreadMcpServersDto, type ThreadPendingSteerDto, type ThreadShellStateDto, type ThreadSkillsDto, type ThreadSourceDto, type ThreadStatusDto, type ThreadTurnDto, type ThreadTurnPriceEstimateDto, type ThreadTurnPricingTierDto, type ThreadTurnTokenBreakdownDto, type ThreadTurnTokenUsageDto, type TrustThreadHookInput, type UntrustThreadHookInput, type UpdatePluginInput, type UpdateProviderHostFileInput, type UpdateShellInput, type UpdateThreadGoalInput, type UpdateThreadHookInput, type UpdateThreadInput, type UpdateThreadSettingsInput, type UpdateWorkspaceFavoriteInput, type UpdateWorkspaceInput, type UpdateWorkspaceSettingsInput, type VersionDto, type WorkspaceDto, type WorkspaceSettingsDto, type WorkspaceTreeDto, type WorkspaceTreeNodeDto, agentBackendIds, agentBackendMetadata, defaultAgentBackendId, isAgentBackendId, mergeThreadHistoryItem, normalizeAgentBackendId, truncateAutoThreadTitle };
+export { type ActionDefinition, type AgentBackendConfigFileSchemaDto, type AgentBackendDto, type AgentBackendHookCommandTemplateDto, type AgentBackendIdDto, type AgentBackendInstallationDto, type AgentBackendManagementSchemaDto, type AgentBackendMetadata, type AgentBackendToolboxActionDto, type AgentBackendToolboxItemSchemaDto, type AgentHookDto, type AgentHookErrorDto, type AgentHookEventNameDto, type AgentHookHandlerTypeDto, type AgentHookSourceDto, type AgentHookTrustStatusDto, type AgentMcpAuthStatusDto, type AgentMcpServerDto, type AgentMcpToolDto, type AgentProviderCapabilitiesDto, type AgentRuntimeStatusDto, type AgentSkillDto, type AgentSkillErrorDto, type AgentSkillInterfaceDto, type AgentSkillScopeDto, type AgentSubscriptionUsageDto, type AgentSubscriptionUsageWindowDto, type ApiErrorCode, type ApiErrorShape, type ApplyProviderHostConfigArchiveResultDto, type ApprovalMode, type ArtifactMetadata, type CollaborationModeDto, type ContributionDefinition, type CreateProviderHostConfigArchiveInput, type CreateThreadHookInput, type CreateThreadInput, type CreateWorkspaceFromGitInput, type CreateWorkspaceFromPathInput, type CreateWorkspaceInput, EXTENSION_FIXTURES, EXTENSION_TYPES, EXTENSION_VERSION, type ExportThreadTranscriptInput, type ExtensionDiscovery, type ExtensionEnvelope, ExtensionValidationError, type ForkThreadInput, type HealthDto, type ImportPluginInput, type ImportThreadInput, type InterruptTurnInput, type JsonValue, type MessageSenderDto, type ModelOptionDto, type OptionDefinition, type PluginArtifactTypeDto, type PluginCapabilitiesDto, type PluginDto, type PluginManifestDto, type PluginMcpServerDto, type PluginModelHintDto, type PluginThreadPanelDto, type PolishedReplyDto, type PromptAttachmentKindDto, type PromptAttachmentManifestEntryDto, type ProviderHostConfigArchiveDto, type ProviderHostConfigArchiveFileDto, type ProviderHostFileDto, type ProviderHostFileNameDto, type ReasoningEffortDto, type ReasoningEffortOptionDto, type RenameProviderHostConfigArchiveInput, type RespondThreadActionRequestInput, type ResumeThreadInput, type RuntimeConfigDto, type SandboxModeDto, type ScientificTarget, type SendThreadPromptInput, type ShellAttachInput, type ShellCreateInput, type ShellDetachInput, type ShellEventEnvelope, type ShellEventPayloadMap, type ShellInputInput, type ShellResizeInput, type ShellSessionDto, type ShellStatusDto, type StructuredProgress, type StructuredUsage, type SupervisorConnectedEnvelope, type SupervisorPongEnvelope, type SupervisorSocketClientEnvelope, type SupervisorSocketServerEnvelope, type ThreadActionQuestionDto, type ThreadActionQuestionOptionDto, type ThreadActionRequestAnswerDto, type ThreadActionRequestDto, type ThreadActivityNoteDto, type ThreadAnsweredRequestNoteDto, type ThreadArtifactDto, type ThreadContextUsageDto, type ThreadDetailDto, type ThreadDto, type ThreadEventEnvelope, type ThreadEventPayloadMap, type ThreadExportFormatDto, type ThreadExportPdfModeDto, type ThreadExportPdfProfileDto, type ThreadExportTurnOptionDto, type ThreadExportTurnOptionsDto, type ThreadForkResultDto, type ThreadForkTurnOptionDto, type ThreadGoalDto, type ThreadGoalStatusDto, type ThreadHistoryItemDetailDto, type ThreadHistoryItemDto, type ThreadHookTargetInput, type ThreadHooksDto, type ThreadLiveItemsDto, type ThreadLivePlanDto, type ThreadMcpServersDto, type ThreadPeerWorkDto, type ThreadPendingSteerDto, type ThreadShellStateDto, type ThreadSkillsDto, type ThreadSourceDto, type ThreadStatusDto, type ThreadSubagentDto, type ThreadTurnActivityDto, type ThreadTurnActivitySegmentDto, type ThreadTurnChangedFileDto, type ThreadTurnDto, type ThreadTurnPriceEstimateDto, type ThreadTurnPricingTierDto, type ThreadTurnTokenBreakdownDto, type ThreadTurnTokenUsageDto, type TrustThreadHookInput, type UntrustThreadHookInput, type UpdatePluginInput, type UpdateProviderHostFileInput, type UpdateShellInput, type UpdateThreadGoalInput, type UpdateThreadHookInput, type UpdateThreadInput, type UpdateThreadSettingsInput, type UpdateWorkspaceFavoriteInput, type UpdateWorkspaceInput, type UpdateWorkspaceSettingsInput, type ValueSchema, type VersionDto, type ViewerAcknowledgement, type ViewerInput, type ViewerRequest, type WorkspaceDto, type WorkspaceSettingsDto, type WorkspaceTreeDto, type WorkspaceTreeNodeDto, agentBackendIds, agentBackendMetadata, defaultAgentBackendId, extensionFallback, hasCapability, isAgentBackendId, mergeThreadHistoryItem, normalizeAgentBackendId, truncateAutoThreadTitle, validateArtifactMetadata, validateDiscovery, validateExtension, validateOptionValues, validatePayload, validateProgress, validateScientificTarget, validateUsage, validateValueSchema, validateViewerAcknowledgement, validateViewerInput, validateViewerRequest };

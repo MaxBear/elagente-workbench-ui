@@ -1,0 +1,60 @@
+import { translate, useI18n } from '../i18n';
+import { CopyButton } from './copy/CopyButton';
+import { useLayoutEffect, useRef, useState } from 'react';
+
+/** The path with forward slashes and the home folder as `~`. */
+export function homeRelativePath(path: string) {
+  return path.replace(/\\/g, '/')
+    .replace(/^(?:\/home\/[^/]+|\/Users\/[^/]+|[A-Za-z]:\/Users\/[^/]+|\/root)(?=\/|$)/, '~');
+}
+
+/** ElAgente: whether a workspace path is a real filesystem path that can be copied
+    (absolute POSIX, home-relative or a Windows drive), not an empty or display label. */
+export function isCopyableWorkspacePath(path: string | null | undefined): path is string {
+  return typeof path === 'string' && /^(?:\/|~(?:\/|$)|[A-Za-z]:[\\/])/.test(path.trim());
+}
+
+/** Keep the home/root and nearest directories visible, including on narrow screens. */
+export function WorkbenchPath({ path }: { path: string }) {
+  useI18n();
+  const ref = useRef<HTMLSpanElement>(null);
+  const [label, setLabel] = useState(path);
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const normalized = homeRelativePath(path);
+    const measure = typeof document.createElement('canvas').getContext === 'function'
+      ? document.createElement('canvas').getContext('2d') : null;
+    const update = () => {
+      if (!measure) return;
+      measure.font = getComputedStyle(node).font;
+      const fits = (text: string) => measure.measureText(text).width <= node.clientWidth;
+      if (fits(normalized)) { setLabel(normalized); return; }
+      const parts = normalized.split('/');
+      const root = `${parts[0]}/`;
+      for (let keep = Math.min(3, parts.length - 2); keep >= 1; keep--) {
+        const tail = parts.slice(-keep).join('/');
+        const withFirst = `${root}${parts[1]}/…/${tail}`;
+        if (parts.length > keep + 2 && fits(withFirst)) { setLabel(withFirst); return; }
+        const compact = `${root}…/${tail}`;
+        if (fits(compact)) { setLabel(compact); return; }
+      }
+      const name = parts.at(-1) ?? '';
+      for (let keep = name.length; keep > 1; keep--) {
+        const candidate = `${root}…/${name.slice(0, Math.ceil(keep / 2))}…${name.slice(-Math.floor(keep / 2))}`;
+        if (fits(candidate)) { setLabel(candidate); return; }
+      }
+      setLabel(`${root}…`);
+    };
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(node);
+    update();
+    if (document.fonts?.ready) void document.fonts.ready.then(update);
+    return () => observer?.disconnect();
+  }, [path]);
+  // The shortened path keeps its whole value in reach: tooltip, and the copy button beside it.
+  return <span className="matter-workspace-path-chip">
+    <span ref={ref} className="matter-workspace-path" title={path} aria-label={path}>{label}</span>
+    <CopyButton value={path} label={translate('common.copyPath')} />
+  </span>;
+}

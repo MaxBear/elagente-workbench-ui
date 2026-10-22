@@ -67,6 +67,11 @@ vi.mock('@xterm/addon-fit', () => ({
 }));
 
 function installBrowserMocks() {
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: vi.fn(),
+  });
+
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     value: vi.fn().mockImplementation((query: string) => ({
@@ -204,7 +209,7 @@ describe('playground smoke', () => {
     });
 
     expect(textContent()).toContain(
-      'No backend tools are available for this thread.',
+      'No tool shortcuts are configured for this thread.',
     );
 
     const shellButton = Array.from(
@@ -348,23 +353,30 @@ describe('playground smoke', () => {
       actionsButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(documentTextContent()).toContain('Thread actions');
-    expect(documentTextContent()).toContain('Latest 10');
-    expect(documentTextContent()).toContain('Export PDF');
+    const actionsDialog = document.body.querySelector<HTMLDivElement>(
+      '[role="dialog"][aria-label="Thread actions"]',
+    );
+    expect(actionsDialog).not.toBeNull();
+    expect(actionsDialog?.textContent).toContain('Share & export');
+    expect(actionsDialog?.textContent).toContain('Latest 10');
+    expect(actionsDialog?.textContent).toContain('Export HTML');
     expect(documentTextContent()).not.toContain(
       'Exports the latest 10 turns in chronological order.',
     );
 
     const shareTab = Array.from(
       document.body.querySelectorAll<HTMLButtonElement>('button'),
-    ).find((button) => button.textContent === 'Share');
+    ).find((button) => button.textContent === 'People');
     expect(shareTab).not.toBeNull();
 
     flushSync(() => {
       shareTab?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(documentTextContent()).toContain('Relay identifier');
+    expect(documentTextContent()).toContain('Invite someone');
+    expect(
+      document.body.querySelector('input[placeholder="username or email"]'),
+    ).not.toBeNull();
     expect(documentTextContent()).toContain('View only');
     expect(documentTextContent()).toContain('Collaborator');
     expect(documentTextContent()).toContain('alice');

@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import type {
   ShellSessionDto,
   ShellStatusDto,
@@ -6,7 +7,8 @@ import type {
 
 import { basenameFromPath, buildPromptLabel } from './shellPresentation';
 
-export type ShellPaneId = 'primary' | 'secondary';
+/** Panes are keyed by shell id; tests and older callers use fixed names. */
+export type ShellPaneId = string;
 
 export interface ShellPaneRuntimeState {
   status: ShellStatusDto;
@@ -103,14 +105,14 @@ export function buildConnectionButtonState({
   const disabled =
     busy || loading || status === 'creating' || workspacePathMissing;
   const label = activeRuntime.shellInputEnabled
-    ? 'Disconnect shell'
+    ? translate("workbench.disconnectShell")
     : activeShell && !isLiveShell(activeShell)
-      ? 'Restart shell'
+      ? translate("workbench.restartShell")
       : activeShell
-        ? 'Connect shell'
-        : 'Create shell';
+        ? translate("workbench.connectShell")
+        : translate("workbench.createShell");
   const className = activeRuntime.shellInputEnabled
-    ? 'border-emerald-300/45 bg-emerald-300/18 text-emerald-50 ring-1 ring-emerald-300/20 hover:bg-emerald-300/24'
+    ? 'border-sky-300/45 bg-sky-300/18 text-sky-50 ring-1 ring-sky-300/20 hover:bg-sky-300/24'
     : activeShell && !isLiveShell(activeShell)
       ? 'border-stone-600 bg-stone-800/90 text-stone-100 hover:border-stone-500 hover:bg-stone-800'
       : workspacePathMissing

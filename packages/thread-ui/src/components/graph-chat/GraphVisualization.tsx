@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import { useCallback, useEffect, useMemo } from 'react';
 import {
   addEdge,
@@ -30,6 +31,7 @@ interface GraphVisualizationProps {
 }
 
 export function GraphVisualization({ nodes: inputNodes }: GraphVisualizationProps) {
+  useI18n();
   const [flowNodes, setFlowNodes, onNodesChange] =
     useNodesState<GraphChatFlowNode>([]);
   const [flowEdges, setFlowEdges, onEdgesChange] =

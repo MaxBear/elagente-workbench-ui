@@ -48,6 +48,7 @@ describe('ComposerPromptEditor', () => {
 
     expect(document.activeElement).not.toBe(promptRef.current);
     expect(promptRef.current?.getAttribute('inputmode')).toBe('text');
+    expect(promptRef.current?.getAttribute('contenteditable')).toBe('plaintext-only');
   });
 
   it('focuses synchronously on pointer down inside the iOS native bridge', async () => {

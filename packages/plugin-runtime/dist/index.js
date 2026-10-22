@@ -65,7 +65,7 @@ var PluginRegistry = class {
 
 // src/artifacts.ts
 var artifactFenceLanguages = /* @__PURE__ */ new Set(["artifact", "remote-codex-artifact"]);
-var remoteCodexMoleculeMcpToolName = "remote_codex_render_molecule";
+var pockymoeMoleculeMcpToolName = "remote_codex_render_molecule";
 function stableArtifactId(input) {
   return [
     "artifact",
@@ -250,7 +250,7 @@ function extractToolJsonArtifactCandidateStrings(text) {
 function extractArtifactCandidateTexts(item, text) {
   const values = [text];
   if (item.kind !== "toolCall" || ![item.text, item.previewText, text].some(
-    (value) => typeof value === "string" && value.includes(remoteCodexMoleculeMcpToolName)
+    (value) => typeof value === "string" && value.includes(pockymoeMoleculeMcpToolName)
   )) {
     return values;
   }

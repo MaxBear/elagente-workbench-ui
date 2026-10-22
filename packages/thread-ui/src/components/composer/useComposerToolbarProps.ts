@@ -14,6 +14,7 @@ import type {
 } from '@remote-codex/shared';
 
 import type { ThreadShellControlState } from '../../types';
+import type { ComposerModelPolicyProps } from './modelPolicy';
 import {
   toolboxItemClassName,
   toolboxItemDisabled,
@@ -42,10 +43,13 @@ export interface ComposerToolbarCapabilities {
   planMode: boolean;
   sandboxMode: boolean;
   forkFromTurn: boolean;
+  /** A model chosen mid-turn applies from the turn's next model call. */
+  liveModelSwitch?: boolean;
 }
 
 export interface UseComposerToolbarPropsInput {
   isShellView: boolean;
+  attachmentCapabilities?: { files: boolean; images: boolean };
   canToggleShellView: boolean;
   isMobileShell: boolean;
   shellPromptLabel: string | null;
@@ -71,7 +75,9 @@ export interface UseComposerToolbarPropsInput {
   goalStatus: ThreadGoalDto['status'] | undefined;
   activeView: 'chat' | 'shell';
   disabled: boolean;
+  promptEmpty?: boolean;
   model: string | null | undefined;
+  agent?: string | undefined;
   modelOptions: ModelOptionDto[];
   modelContextTitle: string;
   contextUsage: ThreadContextUsageDto | null | undefined;
@@ -111,6 +117,9 @@ export interface UseComposerToolbarPropsInput {
   mcpHttpUrl: string;
   mcpRawBlock: string;
   capabilities: ComposerToolbarCapabilities;
+  /** What follows a typed `/`, filtering the toolbox; null when not opened by typing. */
+  slashQuery?: string | null;
+  slashActive?: number;
   shellControlState: ThreadShellControlState | null;
   onToggleView?: () => void;
   onDismissPromptFocus: () => void;
@@ -148,6 +157,8 @@ export interface UseComposerToolbarPropsInput {
   onPickPhoto: ComposerAttachmentMenuProps['onPickPhoto'];
   onPickFile: ComposerAttachmentMenuProps['onPickFile'];
   onUpdateSettings: (input: UpdateThreadSettingsInput) => void;
+  /** Group model policy; replaces the flat model list in the model menu. */
+  modelPolicy?: ComposerModelPolicyProps | null;
   onPasteShell: ComposerShellToolsPanelProps['onPaste'];
   onCopyShell: ComposerShellToolsPanelProps['onCopy'];
   onClearShell: ComposerShellToolsPanelProps['onClear'];
@@ -156,6 +167,7 @@ export interface UseComposerToolbarPropsInput {
 
 export function useComposerToolbarProps({
   isShellView,
+  attachmentCapabilities,
   canToggleShellView,
   isMobileShell,
   shellPromptLabel,
@@ -181,7 +193,9 @@ export function useComposerToolbarProps({
   goalStatus,
   activeView,
   disabled,
+  promptEmpty,
   model,
+  agent,
   modelOptions,
   modelContextTitle,
   contextUsage,
@@ -221,6 +235,8 @@ export function useComposerToolbarProps({
   mcpHttpUrl,
   mcpRawBlock,
   capabilities,
+  slashQuery = null,
+  slashActive = 0,
   shellControlState,
   onToggleView,
   onDismissPromptFocus,
@@ -258,16 +274,22 @@ export function useComposerToolbarProps({
   onPickPhoto,
   onPickFile,
   onUpdateSettings,
+  modelPolicy = null,
   onPasteShell,
   onCopyShell,
   onClearShell,
   onShellControl,
 }: UseComposerToolbarPropsInput): ComposerToolbarProps {
-  const slashToolboxProps: ComposerSlashToolboxProps | null = isShellView
+  // ElAgente: a host with no toolbox items and no plan mode (a scientific Agent)
+  // shows no slash button, rather than a menu that only says nothing is available.
+  const slashToolboxProps: ComposerSlashToolboxProps | null = isShellView ||
+    (availableToolboxItems.length === 0 && !capabilities.planMode)
     ? null
     : {
         open: openMenu === 'slash',
         slashPanelView,
+        slashQuery,
+        slashActive,
         availableToolboxItems,
         planModeAvailable: capabilities.planMode,
         forkFromTurnAvailable: capabilities.forkFromTurn,
@@ -370,10 +392,12 @@ export function useComposerToolbarProps({
         onSaveRawMcpBlock,
       };
 
-  const attachmentMenuProps: ComposerAttachmentMenuProps | null = isShellView
+  const attachmentMenuProps: ComposerAttachmentMenuProps | null = isShellView || (attachmentCapabilities && !attachmentCapabilities.files && !attachmentCapabilities.images)
     ? null
     : {
         open: openMenu === 'attachments',
+        canPickPhoto: attachmentCapabilities?.images ?? true,
+        canPickFile: attachmentCapabilities?.files ?? true,
         iconButtonClassName,
         menuClassName,
         menuItemClassName,
@@ -390,6 +414,7 @@ export function useComposerToolbarProps({
     : {
         openMenu,
         model,
+        agent,
         modelOptions,
         modelContextTitle,
         contextUsage,
@@ -397,11 +422,13 @@ export function useComposerToolbarProps({
         supportedEfforts,
         sandboxMode,
         sandboxModeAvailable: capabilities.sandboxMode,
+        liveModelSwitch: capabilities.liveModelSwitch ?? false,
         settingsBusy,
         goalComposeMode,
         goalBusy,
         activeView,
         disabled,
+        ...(promptEmpty !== undefined ? { promptEmpty } : {}),
         fastMode,
         sendButtonLabel,
         sendButtonClassName,
@@ -413,6 +440,7 @@ export function useComposerToolbarProps({
         sendButtonBaseClassName,
         onSetOpenMenu,
         onUpdateSettings,
+        modelPolicy,
       };
 
   const shellToolsPanelProps: ComposerShellToolsPanelProps | null =

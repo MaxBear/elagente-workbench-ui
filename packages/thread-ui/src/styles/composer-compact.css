@@ -1,0 +1,239 @@
+/* One live editor, two layouts. We clip its viewport on blur; its DOM, draft,
+   attachments and native selection stay intact. Controls keep a stable right
+   and bottom baseline so pointerdown -> blur -> click cannot move a target. */
+[data-composer-layout] { container-type: inline-size; }
+[data-composer-layout] .thread-graph-composer-input-group,
+.thread-ui-shell .matter-workbench [data-composer-layout] .thread-graph-composer-input-group {
+  display: grid; grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: end; column-gap: 8px; height: auto; padding: 0; overflow: visible;
+}
+[data-composer-layout] .thread-graph-composer-prompt-region {
+  min-width: 0; width: auto; grid-column: 1; grid-row: 1; align-self: center;
+}
+[data-composer-layout] .thread-graph-composer-toolbar,
+.thread-ui-shell .matter-workbench [data-composer-layout] .thread-graph-composer-toolbar {
+  grid-column: 2; grid-row: 1; width: max-content; min-width: 0; min-height: 0;
+  display: flex; flex-wrap: nowrap; justify-content: flex-end;
+  align-items: center; padding: 0; gap: 4px; margin: 0;
+}
+[data-composer-layout] :is(.composer-tools, .composer-settings),
+.thread-ui-shell .matter-workbench [data-composer-layout] :is(.composer-tools, .composer-settings) {
+  flex: 0 0 auto; display: flex; flex-wrap: nowrap; gap: 4px; align-items: center;
+}
+[data-composer-layout] .thread-graph-composer-input,
+.thread-ui-shell .matter-workbench [data-composer-layout] .thread-graph-composer-input {
+  min-height: 0 !important; max-height: none !important; width: 100%; padding: 0 !important;
+  line-height: 24px; overflow: visible; transition: none;
+}
+[data-composer-layout] .thread-graph-composer-input > [role='textbox'] {
+  min-height: 24px !important; max-height: 24px; line-height: 24px;
+  padding: 0; overflow: hidden; scrollbar-width: none;
+}
+[data-composer-layout='expanded'] .thread-graph-composer-prompt-region { grid-column: 1 / -1; }
+[data-composer-layout='expanded'] .thread-graph-composer-input > [role='textbox'] {
+  max-height: min(240px, 30dvh); overflow-y: auto;
+}
+/* Folded to one line, an attachment is a small tile that fits the line: its glyph
+   or thumbnail beside its name. */
+[data-composer-layout]:not([data-composer-layout='expanded']) .thread-graph-composer-input .attachment-tile {
+  flex-direction: row; gap: 4px; width: auto; max-width: 9rem; height: 22px; margin: 0 2px; padding: 0 6px 0 3px; border-radius: 6px;
+}
+[data-composer-layout]:not([data-composer-layout='expanded']) .thread-graph-composer-input .attachment-tile-icon { width: 16px; height: 18px; }
+[data-composer-layout]:not([data-composer-layout='expanded']) .thread-graph-composer-input .attachment-tile-glyph { width: 13px; height: 16px; }
+[data-composer-layout]:not([data-composer-layout='expanded']) .thread-graph-composer-input .attachment-tile-icon > b { display: none; }
+[data-composer-layout]:not([data-composer-layout='expanded']) .thread-graph-composer-input .attachment-tile-icon > img { border-radius: 3px; }
+[data-composer-layout] .composer-model-label {
+  /* Use the space freed by moving model/permission controls into Settings.
+     Reserve room for the prompt and action buttons in narrow split panes. */
+  max-width: min(24rem, max(4rem, calc(100cqi - 11rem)));
+  cursor: pointer; min-height: 28px; border-radius: 6px;
+}
+[data-composer-layout] .composer-model-label:hover { background: var(--theme-hover); }
+[data-composer-layout] .composer-model-name {
+  display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  line-height: 16px;
+}
+/* The effort under the model name wears its colour on the slider's scale; in
+   light themes the colour is deepened enough to read. */
+[data-composer-layout] .composer-model-effort {
+  display: block; font-size: 10px; font-weight: 600; line-height: 11px; color: var(--effort-color, currentColor);
+}
+:root[data-theme-effective='light'] [data-composer-layout] .composer-model-effort { color: color-mix(in oklab, var(--effort-color, currentColor) 72%, black); }
+[data-composer-layout] .composer-model-label:disabled { cursor: not-allowed; opacity: .5; }
+[data-composer-layout] .thread-graph-composer-toolbar { cursor: default; }
+[data-composer-layout] .thread-graph-composer-toolbar button:not(:disabled) { cursor: pointer; }
+[data-composer-layout] .thread-graph-composer-stop-button { position: static; }
+[data-composer-layout] .thread-graph-composer-shell,
+.thread-ui-shell .matter-workbench [data-composer-layout] .thread-graph-composer-shell { padding: 9px 12px; }
+@container (max-width: 480px) {
+  [data-composer-layout] :is(.composer-tools, .composer-settings),
+  .thread-ui-shell .matter-workbench [data-composer-layout] :is(.composer-tools, .composer-settings) { gap: 2px; }
+  [data-composer-layout] .thread-graph-composer-toolbar,
+  .thread-ui-shell .matter-workbench [data-composer-layout] .thread-graph-composer-toolbar { gap: 2px; }
+}
+
+[data-composer-layout] .thread-graph-composer-input > span { inset: 0; }
+@container (max-width: 300px) {
+  .thread-ui-shell .matter-workbench [data-composer-layout] :is(.thread-graph-composer-icon-button, .thread-graph-composer-stop-button, .thread-graph-composer-send-button) { width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; }
+}
+
+/* Fade clipped text into the actual surface in either theme, leaving controls crisp. */
+[data-composer-layout='collapsed'][data-composer-overflow] .thread-graph-composer-input > [role='textbox'] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - min(48px, 30%)), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - min(48px, 30%)), transparent 100%);
+}
+
+/* A border legend, shared by all themes. Absolute positioning keeps the
+   input/buttons identical with or without allowance data. The surface cutout
+   masks only this short segment of the frame, without a badge outline. */
+.thread-ui-shell .thread-composer-usage-tag {
+  position: absolute;
+  z-index: 2;
+  right: 24px;
+  bottom: 0;
+  transform: translateY(50%);
+  display: flex;
+  height: 14px;
+  pointer-events: none;
+}
+.thread-ui-shell .thread-composer-usage-tag .thread-subscription-usage {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 14px;
+  gap: 8px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(to bottom,
+    var(--composer-seam-surface, color-mix(in srgb, var(--theme-panel) 86%, var(--theme-bg))) calc(50% + 2px),
+    transparent calc(50% + 2px));
+  color: var(--theme-fg-muted);
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.thread-ui-shell .thread-composer-usage-tag .thread-subscription-usage:hover { color: var(--theme-fg); }
+.thread-ui-shell .thread-composer-usage-tag .thread-subscription-usage:focus-visible {
+  outline: 1px solid var(--theme-accent-strong);
+  outline-offset: 2px;
+}
+.thread-ui-shell .thread-composer-usage-tag [data-subscription-window-track] {
+  width: 18px;
+  height: 3px;
+  background: color-mix(in srgb, var(--theme-fg-muted) 25%, transparent);
+}
+.thread-subscription-usage[data-usage-stale] > span { opacity: .6; }
+
+/* Usage details live in the browser top layer, outside the trigger's opacity
+   and the composer's stacking context, while retaining theme inheritance. */
+:root .thread-ui-shell .thread-subscription-usage-details.thread-composer-menu-surface[data-composer-menu-surface] {
+  position: fixed;
+  inset: auto;
+  z-index: 150;
+  margin: 0;
+  width: 260px;
+  padding: 12px;
+  border: 1px solid var(--theme-border-strong, #52525b);
+  border-radius: 12px;
+  background: var(--subscription-details-bg, var(--theme-panel, #18181b)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: var(--theme-fg, #fafafa);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 24%);
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 1;
+  pointer-events: auto;
+  overflow: auto;
+}
+.thread-subscription-usage-details::backdrop { background: transparent; }
+.thread-subscription-usage-detail-window + .thread-subscription-usage-detail-window { margin-top: 10px; }
+.thread-subscription-usage-detail-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.thread-subscription-usage-detail-heading strong { font-weight: 600; }
+.thread-subscription-usage-detail-reset {
+  display: block; margin-top: 3px; padding: 0; border: 0; background: none; color: var(--theme-fg-muted, #a1a1aa);
+  font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; text-align: left; cursor: pointer;
+}
+.thread-subscription-usage-detail-reset:hover { color: var(--theme-fg, inherit); text-decoration: underline dotted; text-underline-offset: 2px; }
+.thread-subscription-usage-detail-freshness { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--theme-border, #3f3f46); color: var(--theme-fg-muted, #a1a1aa); font-size: 10px; }
+
+/* A folded draft of several lines: "+N lines" at the end of its first line. */
+[data-composer-layout='collapsed'][data-composer-overflow] .thread-graph-composer-input[data-more-lines]::after {
+  content: attr(data-more-lines);
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--theme-hover, rgba(127, 127, 127, .14));
+  color: var(--theme-fg-muted);
+  font-size: 11px;
+  line-height: 16px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+[data-composer-layout='collapsed'][data-composer-overflow] .thread-graph-composer-input[data-more-lines] > [role='textbox'] {
+  padding-right: 52px;
+}
+
+/* Nothing to send yet: the send button looks off but stays focusable. */
+.thread-ui-shell .thread-graph-composer-send-button[data-empty='true'] { opacity: .45; cursor: default; }
+
+/* The send shortcut only means something where there is a keyboard. */
+.thread-ui-shell .thread-composer-placeholder-hint { opacity: .75; }
+@media (max-width: 639px), (pointer: coarse) {
+  .thread-ui-shell .thread-composer-placeholder-hint { display: none; }
+}
+
+.thread-ui-shell .composer-mode-chip { align-self: flex-start; }
+
+/* Two layers (docs/ui-principles.md §12). Folded it is one line with only stop
+   and send beside the text; the tools and the model wait for editing. Open, the
+   text takes the whole width and the tools a row along the foot, flush with the
+   frame: slash and attach at the left, the model, stop and send at the right. */
+[data-composer-layout='collapsed'] :is(.composer-tools, .composer-model-control),
+.thread-ui-shell .matter-workbench [data-composer-layout='collapsed'] :is(.composer-tools, .composer-model-control) { display: none; }
+/* A control whose menu is open never vanishes under the finger. */
+[data-composer-layout='collapsed'] .composer-tools:has([data-composer-menu-surface]),
+.thread-ui-shell .matter-workbench [data-composer-layout='collapsed'] .composer-tools:has([data-composer-menu-surface]) { display: flex; }
+[data-composer-layout='collapsed'] .composer-model-control:has([data-composer-menu-surface]),
+.thread-ui-shell .matter-workbench [data-composer-layout='collapsed'] .composer-model-control:has([data-composer-menu-surface]) { display: block; }
+[data-composer-layout='expanded'] .thread-graph-composer-toolbar,
+.thread-ui-shell .matter-workbench [data-composer-layout='expanded'] .thread-graph-composer-toolbar {
+  grid-column: 1 / -1; grid-row: 2; width: auto; justify-self: stretch;
+  justify-content: space-between; padding-top: 4px; margin: 0 -6px -4px;
+}
+[data-composer-layout='expanded'] .composer-settings,
+.thread-ui-shell .matter-workbench [data-composer-layout='expanded'] .composer-settings { flex: 0 0 auto; flex-wrap: nowrap; }
+[data-composer-layout] .composer-model-control { flex: none; }
+
+/* One key size: 32px (34px on phones), their touch area widened to 40px. Tools
+   are bare icons until hovered or open; send is the one solid key. */
+[data-composer-layout] .thread-graph-composer-toolbar :is(.composer-tools > div > button, .composer-tools > button, .thread-graph-composer-stop-button, .thread-graph-composer-send-button),
+.thread-ui-shell .matter-workbench [data-composer-layout] .thread-graph-composer-toolbar :is(.composer-tools > div > button, .composer-tools > button, .thread-graph-composer-stop-button, .thread-graph-composer-send-button) {
+  position: relative; width: 32px; height: 32px; min-width: 32px; min-height: 32px;
+}
+/* !important: an older rule paints every composer icon button with !important. */
+[data-composer-layout] .thread-graph-composer-toolbar :is(.composer-tools > div > button, .composer-tools > button) {
+  background: transparent !important; border-color: transparent !important; box-shadow: none !important;
+}
+[data-composer-layout] .thread-graph-composer-toolbar :is(.composer-tools > div > button, .composer-tools > button):is(:hover, [aria-expanded='true']) {
+  background: var(--theme-hover) !important;
+}
+/* Hit area: only the toolbar's own keys, never buttons inside a menu surface. */
+[data-composer-layout] .thread-graph-composer-toolbar :is(.composer-tools > div > button, .composer-tools > button, .thread-graph-composer-stop-button, .thread-graph-composer-send-button)::after { content: ''; position: absolute; inset: -4px; }
+[data-composer-layout] .composer-model-label { min-height: 32px; }
+@media (max-width: 639px) {
+  [data-composer-layout] .thread-graph-composer-toolbar :is(.composer-tools > div > button, .composer-tools > button, .thread-graph-composer-stop-button, .thread-graph-composer-send-button),
+  .thread-ui-shell .matter-workbench [data-composer-layout] .thread-graph-composer-toolbar :is(.composer-tools > div > button, .composer-tools > button, .thread-graph-composer-stop-button, .thread-graph-composer-send-button) {
+    width: 34px; height: 34px; min-width: 34px; min-height: 34px;
+  }
+  [data-composer-layout] .thread-graph-composer-toolbar :is(.composer-tools > div > button, .composer-tools > button, .thread-graph-composer-stop-button, .thread-graph-composer-send-button)::after { inset: -3px; }
+  [data-composer-layout] .composer-model-label { min-height: 34px; }
+}

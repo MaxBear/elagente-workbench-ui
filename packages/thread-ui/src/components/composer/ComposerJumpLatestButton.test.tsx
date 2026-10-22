@@ -3,7 +3,6 @@
  */
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
-import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ComposerJumpLatestButton } from './ComposerJumpLatestButton';
@@ -19,7 +18,6 @@ function renderButton({
   onJumpToPreviousTurn = vi.fn(),
   canJumpToNextTurn = true,
   onJumpToNextTurn = vi.fn(),
-  subscriptionUsage,
 }: {
   activeView: 'chat' | 'shell';
   followTail?: boolean;
@@ -28,7 +26,6 @@ function renderButton({
   onJumpToPreviousTurn?: () => void;
   canJumpToNextTurn?: boolean;
   onJumpToNextTurn?: () => void;
-  subscriptionUsage?: ComponentProps<typeof ComposerJumpLatestButton>['subscriptionUsage'];
 }) {
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -44,7 +41,6 @@ function renderButton({
         onJumpToPreviousTurn={onJumpToPreviousTurn}
         canJumpToNextTurn={canJumpToNextTurn}
         onJumpToNextTurn={onJumpToNextTurn}
-        subscriptionUsage={subscriptionUsage}
       />,
     );
   });
@@ -72,6 +68,12 @@ describe('ComposerJumpLatestButton', () => {
     container = null;
   });
 
+  it('names its glyphs with data-icon for theme packs', () => {
+    const { view } = renderButton({ activeView: 'chat' });
+    expect([...view.querySelectorAll('svg[data-icon]')].map((icon) => icon.getAttribute('data-icon')))
+      .toEqual(['previous-turn', 'next-turn', 'latest']);
+  });
+
   it('renders only in chat view and forwards clicks', () => {
     const { view, onToggleFollow } = renderButton({ activeView: 'chat' });
     const button = view.querySelector<HTMLButtonElement>(
@@ -89,36 +91,20 @@ describe('ComposerJumpLatestButton', () => {
     expect(view.querySelector('[aria-label="Jump to latest"]')).toBeNull();
   });
 
-  it('marks the badge active when following the tail', () => {
+  it('marks the navigation as following the tail', () => {
     const { view } = renderButton({ activeView: 'chat', followTail: true });
+    expect(view.querySelector('[aria-label="Timeline navigation"]')?.hasAttribute('data-following')).toBe(true);
 
-    expect(view.querySelector('.thread-jump-latest-badge')?.className).toContain(
-      'is-active',
-    );
+    renderButton({ activeView: 'chat', followTail: false });
+    expect(container?.querySelector('[aria-label="Timeline navigation"]')?.hasAttribute('data-following')).toBe(false);
   });
 
-  it('keeps timeline navigation centered when subscription usage is visible', () => {
-    const { view } = renderButton({
-      activeView: 'chat',
-      subscriptionUsage: {
-        provider: 'claude',
-        authKind: 'subscription',
-        observedAt: '2026-07-13T00:00:00.000Z',
-        stale: false,
-        windows: [{
-          id: 'five_hour',
-          durationMinutes: 300,
-          label: '5h',
-          usedPercent: 2,
-          resetsAt: null,
-        }],
-      },
-    });
-
-    expect(view.querySelector('[aria-label="Timeline navigation"]')?.className)
-      .toContain('left-1/2');
-    expect(view.querySelector('.thread-subscription-usage')?.className)
-      .toContain('right-2');
+  it('groups previous, next and latest in one strip without usage', () => {
+    const { view } = renderButton({ activeView: 'chat' });
+    const nav = view.querySelector('[aria-label="Timeline navigation"]')!;
+    expect([...nav.querySelectorAll('button')].map(button => button.getAttribute('aria-label')))
+      .toEqual(['Jump to previous turn', 'Jump to next turn', 'Jump to latest']);
+    expect(view.querySelector('.thread-subscription-usage')).toBeNull();
   });
 
   it('jumps to the next turn and disables that segment at the last turn', () => {

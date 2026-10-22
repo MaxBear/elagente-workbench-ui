@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import type { GLModel, GLViewer } from '3dmol';
 
 export type ThreeDmolApi = {
@@ -14,7 +15,7 @@ let threeDmolPromise: Promise<ThreeDmolApi> | null = null;
 
 export async function load3Dmol(): Promise<ThreeDmolApi> {
   if (typeof window === 'undefined') {
-    throw new Error('3Dmol is only available in a browser environment.');
+    throw new Error(translate("files.3DmolIsOnlyAvailableInABrowser"));
   }
 
   if (window['3Dmol']) {
@@ -24,7 +25,7 @@ export async function load3Dmol(): Promise<ThreeDmolApi> {
   if (!threeDmolPromise) {
     threeDmolPromise = new Promise((resolve, reject) => {
       const existingScript = document.querySelector<HTMLScriptElement>(
-        'script[data-remote-codex-3dmol="true"]',
+        'script[data-pockymoe-3dmol="true"]',
       );
 
       const handleLoad = () => {
@@ -32,14 +33,14 @@ export async function load3Dmol(): Promise<ThreeDmolApi> {
           resolve(window['3Dmol']);
           return;
         }
-        reject(new Error('3Dmol loaded without exposing the expected global.'));
+        reject(new Error(translate("files.3DmolLoadedWithoutExposingTheExpectedGlobal")));
       };
 
       if (existingScript) {
         existingScript.addEventListener('load', handleLoad, { once: true });
         existingScript.addEventListener(
           'error',
-          () => reject(new Error('Unable to load 3Dmol viewer runtime.')),
+          () => reject(new Error(translate("files.unableToLoad3DmolViewerRuntime"))),
           { once: true },
         );
         return;
@@ -48,11 +49,11 @@ export async function load3Dmol(): Promise<ThreeDmolApi> {
       const script = document.createElement('script');
       script.src = '/vendor/3Dmol-min.js';
       script.async = true;
-      script.dataset.remoteCodex3dmol = 'true';
+      script.dataset.pockymoe3dmol = 'true';
       script.addEventListener('load', handleLoad, { once: true });
       script.addEventListener(
         'error',
-        () => reject(new Error('Unable to load 3Dmol viewer runtime.')),
+        () => reject(new Error(translate("files.unableToLoad3DmolViewerRuntime"))),
         { once: true },
       );
       document.head.appendChild(script);

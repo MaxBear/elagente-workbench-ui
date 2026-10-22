@@ -666,7 +666,9 @@
   border: 1px solid var(--theme-border);
   border-radius: 20px;
 }
-.thread-graph-download-preview button {
+.thread-graph-download-preview-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.thread-graph-download-preview button,
+.thread-graph-download-preview-actions a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -677,5 +679,148 @@
   background: var(--theme-panel);
   cursor: pointer;
 }
-.thread-graph-download-preview button:hover { background: var(--theme-bg); }
+.thread-graph-download-preview-actions a { text-decoration: none; }
+.thread-graph-download-preview button:hover,
+.thread-graph-download-preview-actions a:hover { background: var(--theme-bg); }
 .thread-graph-download-preview button:disabled { opacity: .6; cursor: wait; }
+
+/* Safe small-file documents reuse the workspace surface and existing themes. */
+.workspace-document-status { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; padding:8px 12px; border-bottom:1px solid var(--theme-border); color:var(--theme-fg-muted); font-size:11px; flex-shrink:0; }
+.workspace-document-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.workspace-document-actions button, .workspace-document-conflict select, .thread-graph-editor-close-confirm button { padding:5px 8px; border:1px solid var(--theme-border); border-radius:5px; background:var(--theme-surface); font-size:11px; color:var(--theme-fg); }
+.workspace-document-actions button:hover { background:var(--theme-hover); }
+.workspace-document-actions button:disabled { opacity:.45; cursor:not-allowed; }
+.workspace-document-conflict { padding:12px; border-bottom:1px solid #c58c31; background:color-mix(in srgb, #d89f35 9%, transparent); flex-shrink:0; max-height:65%; overflow:auto; min-width:0; font-size:12px; }
+.workspace-document-conflict strong { color:var(--theme-fg); }
+.workspace-document-conflict p { margin:6px 0; color:var(--theme-fg-muted); }
+.workspace-document-conflict label { display:block; margin:10px 0 6px; }
+.workspace-document-diff { height:220px; border:1px solid var(--theme-border); overflow:hidden; }
+.workspace-document-snapshot { font-size:10px; }
+@media (max-width:639px) { .workspace-document-diff {height:160px;} .workspace-document-status {padding:7px 9px;} .workspace-document-actions button {min-height:30px;} }
+
+.thread-ui-shell .thread-graph-file-editor { color:var(--theme-fg); background:var(--theme-panel); }
+
+/* File and thread tabs share one height. Labels preserve the filename tail. */
+.thread-ui-shell { --workbench-tab-height: 34px; }
+.thread-ui-shell .workspace-file-toolbar { align-items: center; min-width: 0; height: calc(var(--workbench-tab-height) + 1px); min-height: 0; }
+.thread-ui-shell .workspace-file-toolbar .thread-graph-editor-tab,
+.thread-ui-shell .workspace-file-toolbar .thread-graph-editor-tabs-action { height: var(--workbench-tab-height); }
+.thread-ui-shell .workspace-file-toolbar .thread-graph-editor-tab { flex: 0 0 auto; min-width: 88px; max-width: 156px; }
+.thread-ui-shell .workspace-file-tab-name { display: flex; min-width: 0; white-space: nowrap; text-align: left; }
+.thread-ui-shell .workspace-file-toolbar .thread-graph-editor-tab-close { flex: 0 0 24px; width: 24px; height: 28px; opacity: .7; }
+.thread-ui-shell .workspace-file-toolbar .thread-graph-editor-tab-close:hover { opacity: 1; }
+.thread-ui-shell .workspace-file-navigation { display: flex; flex: none; padding: 0; border-right: 1px solid var(--theme-border); }
+.thread-ui-shell .workspace-file-toolbar .workspace-preview-back,
+.thread-ui-shell .workspace-file-toolbar .workspace-file-more { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 34px; height: var(--workbench-tab-height); border-radius: 0; color: var(--theme-fg-muted); }
+.thread-ui-shell .workspace-preview-back:hover { background: var(--theme-hover); color: var(--theme-fg); }
+.thread-ui-shell .workspace-file-toolbar .thread-graph-editor-tabs-action { padding: 0; border-left: 1px solid var(--theme-border); }
+.thread-ui-shell .workspace-file-more[aria-expanded="true"] { color: var(--theme-accent-strong); background: var(--theme-accent-soft); }
+.thread-ui-shell .workspace-file-actions {
+  display: flex; align-self: flex-end; flex: none; min-width: 0; max-width: calc(100% - 8px); align-items: center; gap: 2px;
+  height: 28px; margin: 3px 4px; padding: 0 3px; border: 1px solid var(--theme-border); border-radius: 6px;
+  background: var(--theme-surface); color: var(--theme-fg-soft);
+}
+.thread-ui-shell .workspace-file-actions button { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; }
+.thread-ui-shell .workspace-file-actions button:hover { background: var(--theme-hover); color: var(--theme-fg); }
+.thread-ui-shell .workspace-file-actions button:focus-visible { outline: 2px solid var(--theme-accent-border); outline-offset: -2px; }
+.thread-ui-shell .workspace-file-actions button:disabled { opacity: .4; }
+.thread-ui-shell .workspace-file-action-feedback { min-width: 0; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--theme-fg-muted); }
+.thread-ui-shell .workspace-file-action-feedback.is-error { color: var(--status-danger-fg, #d76363); }
+@media (max-width: 639px) {
+  .thread-ui-shell { --workbench-tab-height: 36px; }
+  .thread-ui-shell .workspace-file-toolbar .thread-graph-editor-tab { min-width: 88px; max-width: 136px; }
+  .thread-ui-shell .workspace-file-toolbar .thread-graph-editor-tab [role='tab'] { padding: 0 4px; gap: 4px; }
+  .thread-ui-shell .workspace-file-toolbar .thread-graph-editor-tab [role='tab'] > svg { display: none; }
+  .thread-ui-shell .workspace-file-toolbar .thread-graph-editor-tab-close { margin: 0; }
+  .thread-ui-shell .workspace-file-actions { height: 30px; }
+  .thread-ui-shell .workspace-file-actions button { width: 28px; height: 28px; }
+}
+
+/* Window controls at the start of the tree's toolbar, as on a Mac: close (red) and
+   minimize (amber). Their marks show when the pointer is on them. */
+.thread-ui-shell .thread-graph-window-controls { display: inline-flex; flex: none; align-items: center; gap: 8px; margin-right: 6px; padding-left: 3px; }
+.thread-ui-shell .thread-graph-window-controls > button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 0.5px solid rgb(0 0 0 / 22%);
+  border-radius: 50%;
+  color: transparent;
+}
+.thread-ui-shell .thread-graph-window-controls > button::after { content: ''; position: absolute; inset: -5px; }
+.thread-ui-shell .thread-graph-window-controls > .is-close { background: #ff5f57; }
+.thread-ui-shell .thread-graph-window-controls > .is-minimize { background: #febc2e; }
+.thread-ui-shell .thread-graph-window-controls svg { width: 8px; height: 8px; stroke-width: 3.2; }
+.thread-ui-shell .thread-graph-window-controls:is(:hover, :focus-visible, :has(:focus-visible)) > button { color: rgb(0 0 0 / 58%); }
+.thread-ui-shell .thread-graph-window-controls > button:focus-visible { outline: 2px solid var(--theme-accent-ring, var(--theme-accent-solid)); outline-offset: 2px; }
+
+/* The explorer's item menu: short one-line items in a small type. */
+.workspace-node-menu { display: flex; flex-direction: column; gap: 1px; font-size: 12.5px; }
+.workspace-node-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--theme-fg);
+  font: inherit;
+  line-height: 1.3;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-node-menu > button:is(:hover, :focus-visible) { background: var(--theme-hover); outline: none; }
+.workspace-node-menu > button svg { flex: none; width: 14px; height: 14px; color: var(--theme-fg-muted); }
+.workspace-node-menu-separator { height: 1px; margin: 3px 4px; background: var(--theme-border); }
+
+/* Properties: the item's name with its icon, then labelled rows. */
+.workspace-properties.workspace-properties {
+  z-index: 1001;
+  width: min(380px, calc(100vw - 24px));
+  max-width: none;
+  padding: 14px 16px 16px;
+  gap: 0;
+  border: 1px solid var(--theme-border);
+  border-radius: 12px;
+  background: var(--theme-panel);
+  color: var(--theme-fg);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 28%);
+}
+.workspace-properties-overlay { z-index: 1000; background: rgb(0 0 0 / 32%); }
+/* Phones: a sheet rising from the bottom, like the other secondary windows. */
+@media (max-width: 639px) {
+  .workspace-properties.workspace-properties {
+    top: auto; bottom: 0; left: 0; width: 100vw; translate: none;
+    border-bottom: 0; border-radius: 18px 18px 0 0;
+    padding: 16px 18px calc(18px + env(safe-area-inset-bottom));
+  }
+}
+.workspace-properties > header { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.workspace-properties > header > svg { flex: none; width: 20px; height: 20px; color: var(--theme-fg-muted); }
+/* Long names wrap to two lines and long places shorten; nothing pushes the box
+   or its close button wider. */
+.workspace-properties.workspace-properties { grid-template-columns: minmax(0, 1fr); }
+.workspace-properties > * { min-width: 0; }
+.workspace-properties .workspace-properties-title { display: -webkit-box; flex: 1; min-width: 0; overflow: hidden; font-size: 14px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.workspace-properties-close { position: relative; display: grid; flex: none; place-items: center; align-self: flex-start; width: 28px; height: 28px; border-radius: 6px; color: var(--theme-fg-muted); }
+.workspace-properties-close::after { content: ''; position: absolute; inset: -6px; }
+.workspace-properties-close:hover { background: var(--theme-hover); color: var(--theme-fg); }
+.workspace-properties-close svg { width: 16px; height: 16px; }
+.workspace-properties dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 12.5px; line-height: 1.45; }
+.workspace-properties dl > div { display: contents; }
+.workspace-properties dt { color: var(--theme-fg-muted); }
+.workspace-properties dd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; color: var(--theme-fg); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.workspace-properties dd code { font-size: 12px; }
+.workspace-properties-tag { padding: 0 6px; border: 1px solid var(--theme-border); border-radius: 999px; color: var(--theme-fg-muted); font-size: 11px; }
+.workspace-properties-note { margin: 12px 0 0; color: var(--theme-fg-muted); font-size: 11.5px; line-height: 1.45; }
+/* A copy item shows its result before the menu closes; a failure stays. */
+.workspace-node-menu [data-copy-state='copied'] svg { color: var(--theme-accent-solid); }
+.workspace-node-menu [data-copy-state='failed'] { color: var(--theme-danger, #e5484d); }

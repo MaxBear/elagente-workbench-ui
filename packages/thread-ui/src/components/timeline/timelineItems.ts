@@ -1,5 +1,7 @@
+import { translate, useI18n } from '../../i18n';
+import { mergeTimelineItem } from './structuredEvidence';
 import { mergeThreadHistoryItem } from '@remote-codex/shared';
-import type { ThreadHistoryItemDto, ThreadTurnDto } from "@remote-codex/shared";
+import type { StructuredUsage, ThreadHistoryItemDto, ThreadTurnDto } from "@remote-codex/shared";
 
 export interface CommandHistoryItem extends ThreadHistoryItemDto {
   kind: "commandExecution";
@@ -77,7 +79,9 @@ export type TimelineHistoryEntry =
       itemCount: number;
     };
 
+export type TimelineUsageByScope = Record<string, { usage?: StructuredUsage }>;
 export type TimelineTurn = Omit<ThreadTurnDto, "status"> & {
+  usageByScope?: TimelineUsageByScope;
   status: ThreadTurnDto["status"] | "sending";
 };
 
@@ -105,6 +109,25 @@ function renderableHistoryItems(
   return items.filter(isRenderableHistoryItem);
 }
 
+// Count recorded work items before display grouping or reasoning preferences.
+// Deferred items are missing from the persisted summary, but can already be
+// present in its live overlay. Keep the snapshot and merged counts separate.
+export function countTurnSteps(
+  turn: Pick<ThreadTurnDto, 'hasDeferredItems' | 'deferredItemCount'>,
+  items: ThreadHistoryItemDto[],
+  summaryItems: ThreadHistoryItemDto[] = items,
+) {
+  const recorded = renderableHistoryItems([...new Map(items.map(item => [item.id, item])).values()]);
+  const latestReply = recorded.findLast(item => item.kind === 'agentMessage');
+  const count = (entries: ThreadHistoryItemDto[]) => entries.filter(item => item.kind !== 'userMessage' && item.id !== latestReply?.id && item.origin !== 'nativeBackgroundWait').length;
+  const loaded = count(recorded);
+  if (!turn.hasDeferredItems) return loaded;
+  const snapshot = renderableHistoryItems([...new Map(summaryItems.map(item => [item.id, item])).values()]);
+  // Neither source identifies the hidden IDs. Taking the larger known count
+  // avoids counting a persisted operation again when its event is also live.
+  return Math.max(count(snapshot) + (turn.deferredItemCount ?? 0), loaded);
+}
+
 function decodeXmlEntities(value: string) {
   return value
     .replace(/&quot;/g, '"')
@@ -127,7 +150,7 @@ export function parseHookPromptText(text: string): ThreadHistoryItemDto | null {
   const hookRunId = match[1] ? decodeXmlEntities(match[1]) : null;
   const output = decodeXmlEntities(match[2] ?? "").trim();
   const eventName = hookRunId?.split(":")[0] ?? "hook";
-  const eventLabel = eventName === "stop" ? "Stop" : eventName;
+  const eventLabel = eventName === "stop" ? translate("chat.stop") : eventName;
   const sourcePath = hookRunId?.split(":").slice(2).join(":") || null;
 
   return {
@@ -245,6 +268,12 @@ export function sortTurnItemsByRecordedSequence(items: ThreadHistoryItemDto[]) {
     index: number;
     order: number;
   }> = [];
+  // Sequenced items by time, for placing unsequenced ones that carry a time.
+  const timed = trailingItems
+    .filter(hasHistoryItemSequence)
+    .map((item) => ({ at: Date.parse(item.createdAt ?? ''), order: historyItemSequence(item) }))
+    .filter((entry) => Number.isFinite(entry.at))
+    .sort((left, right) => left.at - right.at || left.order - right.order);
 
   let cursor = 0;
   while (cursor < trailingItems.length) {
@@ -268,6 +297,18 @@ export function sortTurnItemsByRecordedSequence(items: ThreadHistoryItemDto[]) {
     }
 
     const block = trailingItems.slice(blockStart, cursor);
+    // An item with a time but no sequence (a prompt added mid-turn) goes where
+    // its time falls among the sequenced items, not where it happened to arrive:
+    // live, it arrives after items recorded later than it.
+    const timedOrder = (blockItem: ThreadHistoryItemDto) => {
+      const at = Date.parse(blockItem.createdAt ?? '');
+      if (!Number.isFinite(at) || timed.length === 0) return null;
+      const before = timed.filter((entry) => entry.at <= at).at(-1);
+      const after = timed.find((entry) => entry.at > at);
+      if (before && after) return before.order + (after.order - before.order) * ((at - before.at) / Math.max(1, after.at - before.at) * 0.98 + 0.01);
+      if (before) return before.order + 0.5;
+      return after ? after.order - 0.5 : null;
+    };
     const previousSequenced = [...trailingItems.slice(0, blockStart)]
       .reverse()
       .find(hasHistoryItemSequence);
@@ -283,7 +324,10 @@ export function sortTurnItemsByRecordedSequence(items: ThreadHistoryItemDto[]) {
 
     block.forEach((blockItem, blockIndex) => {
       let order: number;
-      if (previousSequence === null && nextSequence !== null) {
+      const byTime = timedOrder(blockItem);
+      if (byTime !== null) {
+        order = byTime;
+      } else if (previousSequence === null && nextSequence !== null) {
         order = nextSequence - (block.length - blockIndex) / (block.length + 1);
       } else if (
         previousSequence !== null &&
@@ -334,7 +378,7 @@ export function mergeLiveTurnItems(
     }
 
     liveItemsById.delete(item.id);
-    const mergedItem = mergeThreadHistoryItem(item, liveItem);
+    const mergedItem = mergeTimelineItem(item, liveItem, mergeThreadHistoryItem);
     return mergedItem;
   });
   const uniqueLiveItems = [...liveItemsById.values()];
@@ -450,6 +494,7 @@ function groupConsecutiveTimelineHistoryItems(items: ThreadHistoryItemDto[]) {
     }
 
     if (
+      (current.progress !== undefined || current.extension?.type === "elagente.progress") ||
       current.kind !== "commandExecution" &&
       current.kind !== "fileChange" &&
       current.kind !== "webSearch" &&
@@ -468,7 +513,7 @@ function groupConsecutiveTimelineHistoryItems(items: ThreadHistoryItemDto[]) {
     }
 
     const groupedItems: ThreadHistoryItemDto[] = [];
-    while (index < items.length && items[index]?.kind === current.kind) {
+    while (index < items.length && items[index]?.kind === current.kind && items[index]?.progress === undefined && items[index]?.extension?.type !== "elagente.progress") {
       groupedItems.push(items[index]!);
       index += 1;
     }
@@ -557,6 +602,7 @@ function isAgentActivityEntry(entry: TimelineHistoryEntry) {
   }
 
   return (
+    entry.item.origin === "nativeTaskNotification" ||
     entry.item.kind === "commandExecution" ||
     entry.item.kind === "fileChange" ||
     entry.item.kind === "webSearch" ||
@@ -571,15 +617,6 @@ function isAgentActivityEntry(entry: TimelineHistoryEntry) {
 function containsReasoningEntry(entries: TimelineHistoryEntry[]) {
   return entries.some(
     (entry) => entry.kind === "item" && entry.item.kind === "reasoning",
-  );
-}
-
-function isCompletedAgentNarrative(entry: TimelineHistoryEntry | undefined) {
-  return (
-    entry?.kind === "item" &&
-    entry.item.kind === "agentMessage" &&
-    entry.item.text.trim().length > 0 &&
-    !isRunningHistoryStatus(entry.item.status)
   );
 }
 
@@ -614,9 +651,17 @@ function groupAgentActivitySequences(entries: TimelineHistoryEntry[]) {
       0,
     );
 
+    // A single typed batch already has its own disclosure and count. An
+    // activity wrapper only helps when there are multiple children or reasoning.
+    if (activityEntries.length === 1 && activityEntries[0]!.kind !== "item") {
+      grouped.push(activityEntries[0]!);
+      continue;
+    }
+
     if (
       containsReasoningEntry(activityEntries) ||
-      (activityEntries.length > 1 && isCompletedAgentNarrative(entries[index]))
+      activityEntries.some(entry => entry.kind === "item" && entry.item.origin === "nativeTaskNotification") ||
+      itemCount >= 2
     ) {
       grouped.push({
         kind: "agentActivityGroup",

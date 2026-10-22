@@ -1,3 +1,4 @@
+import { translate, useI18n } from '../../i18n';
 import type {
   CollaborationModeDto,
   ModelOptionDto,
@@ -5,6 +6,7 @@ import type {
   ReasoningEffortDto,
   ThreadContextUsageDto,
 } from '@remote-codex/shared';
+import { themeAgentKey } from '../themeAgent';
 
 export type ComposerAttachmentDraft = {
   clientId: string;
@@ -52,9 +54,12 @@ export type PromptFileTransferAction =
       files?: File[];
     };
 
+export type ComposerSendShortcut = 'ctrlEnter' | 'enter';
+
 export type PromptKeyDownAction = {
   preventDefault: boolean;
   submit: boolean;
+  steer?: true;
 };
 
 export type ComposerSettingsUpdateDecision = {
@@ -320,19 +325,31 @@ export function derivePromptKeyDownAction({
   key,
   metaKey,
   ctrlKey,
+  shiftKey = false,
+  altKey = false,
+  sendShortcut = 'ctrlEnter',
   busy,
   disabled,
 }: {
   key: string;
   metaKey: boolean;
   ctrlKey: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
+  sendShortcut?: ComposerSendShortcut;
   busy: boolean;
   disabled: boolean;
 }): PromptKeyDownAction {
-  const isSubmitShortcut = key === 'Enter' && (metaKey || ctrlKey);
+  const modifier = metaKey || ctrlKey;
+  const steer = modifier && (sendShortcut === 'enter' ? !shiftKey : shiftKey);
+  const send = sendShortcut === 'enter'
+    ? !modifier && !shiftKey
+    : modifier && !shiftKey;
+  const isSubmitShortcut = key === 'Enter' && !altKey && (send || steer);
   return {
     preventDefault: isSubmitShortcut,
     submit: isSubmitShortcut && !busy && !disabled,
+    ...(isSubmitShortcut && steer ? { steer: true } : {}),
   };
 }
 
@@ -364,7 +381,7 @@ export function formatReasoningEffortLabel(
   value: ReasoningEffortDto | null | undefined,
 ) {
   if (!value) {
-    return 'Auto';
+    return translate("chat.auto");
   }
 
   switch (value) {
@@ -373,6 +390,11 @@ export function formatReasoningEffortLabel(
     default:
       return value;
   }
+}
+
+/** The `data-agent` key a theme uses for the harness avatar ("Claude Code" -> "claude"). */
+export function composerAgentKey(label: string | null | undefined) {
+  return themeAgentKey(label);
 }
 
 export function parseGoalTokenBudgetThousands(value: string) {
@@ -499,7 +521,7 @@ export function formatModelContextTitle(
   contextUsage: ThreadContextUsageDto | null | undefined,
 ) {
   if (!model) {
-    return 'Select model';
+    return translate("chat.selectModel");
   }
 
   if (
@@ -507,7 +529,7 @@ export function formatModelContextTitle(
     typeof contextUsage.tokensInContextWindow !== 'number' ||
     typeof contextUsage.modelContextWindow !== 'number'
   ) {
-    return `${model} · context unavailable`;
+    return translate("chat.contextUnavailable", { value1: model });
   }
 
   const usedTokens = Math.max(contextUsage.tokensInContextWindow, 0);
@@ -516,9 +538,9 @@ export function formatModelContextTitle(
 
   return [
     model,
-    `${formatContextTokenKilocount(usedTokens)} used / ${formatContextTokenKilocount(contextTokens)}`,
-    `${formatContextTokenKilocount(remainingTokens)} left`,
-    `${clampPercent(contextUsage.remainingPercent)}% context left`,
+    translate("chat.contextUsedSummary", { used: formatContextTokenKilocount(usedTokens), total: formatContextTokenKilocount(contextTokens) }),
+    translate("chat.contextRemainingSummary", { remaining: formatContextTokenKilocount(remainingTokens) }),
+    translate("chat.contextLeft", { value1: clampPercent(contextUsage.remainingPercent) }),
   ].join(' · ');
 }
 
@@ -635,4 +657,16 @@ export function modelSupportsReasoningEffort(
       (entry) => entry.reasoningEffort === effort,
     ),
   );
+}
+
+/** Reasoning levels in their semantic order, each with its colour: cool for
+    light thinking, warm to hot for heavy. The slider and the label under the
+    model name share it. */
+export const REASONING_EFFORT_ORDER = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
+const REASONING_EFFORT_COLORS = ['#3d8bff', '#2f7cf6', '#0fb5c8', '#16b364', '#f5b000', '#ff7a1a', '#f43f7a', '#9b5cff'];
+/** An unknown level takes its place on the same scale by position, when known. */
+export function reasoningEffortColor(effort: string | null | undefined, index = 0, count = 1) {
+  const known = REASONING_EFFORT_ORDER.indexOf(effort ?? '');
+  const at = known >= 0 ? known : Math.round((index / Math.max(1, count - 1)) * (REASONING_EFFORT_COLORS.length - 1));
+  return REASONING_EFFORT_COLORS[at]!;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  composerAgentKey,
   attachmentDisplayLabel,
   buildAttachmentInsertionText,
   buildAttachmentInsertionDraft,
@@ -47,6 +48,19 @@ function attachment(
 }
 
 describe('composer utilities', () => {
+  it('maps harness labels to theme avatar keys', () => {
+    expect(composerAgentKey('Claude Code')).toBe('claude');
+    expect(composerAgentKey('codex')).toBe('codex');
+    expect(composerAgentKey('GitHub Copilot CLI')).toBe('copilot');
+    expect(composerAgentKey('Gemini CLI')).toBe('gemini');
+    expect(composerAgentKey('Grok Build')).toBe('grok');
+    expect(composerAgentKey('DeepSeek Harness')).toBe('deepseek');
+    expect(composerAgentKey('dsh')).toBe('deepseek');
+    expect(composerAgentKey('Gemini CLI')).toBe('gemini');
+    expect(composerAgentKey('acp')).toBeUndefined();
+    expect(composerAgentKey(null)).toBeUndefined();
+  });
+
   it('normalizes non-breaking spaces in prompt text', () => {
     expect(normalizePromptText('hello\u00a0world')).toBe('hello world');
   });
@@ -252,6 +266,29 @@ describe('composer utilities', () => {
         disabled: false,
       }),
     ).toEqual({ preventDefault: true, submit: true });
+  });
+
+  it.each([
+    ['ctrlEnter', false, false, false, false, false],
+    ['ctrlEnter', true, false, false, true, false],
+    ['ctrlEnter', true, true, false, true, true],
+    ['ctrlEnter', false, true, false, false, false],
+    ['enter', false, false, false, true, false],
+    ['enter', false, true, false, false, false],
+    ['enter', true, false, false, true, true],
+    ['enter', true, true, false, false, false],
+    ['enter', false, false, true, false, false],
+  ] as const)('maps %s ctrl=%s shift=%s alt=%s to send/steer', (sendShortcut, ctrlKey, shiftKey, altKey, submit, steer) => {
+    const action = derivePromptKeyDownAction({ key: 'Enter', sendShortcut, ctrlKey, shiftKey, altKey, metaKey: false, busy: false, disabled: false });
+    expect(action.submit).toBe(submit);
+    expect(action.preventDefault).toBe(submit);
+    expect(Boolean(action.steer)).toBe(steer);
+    expect(derivePromptKeyDownAction({ key: 'Enter', sendShortcut, ctrlKey, shiftKey, altKey, metaKey: false, busy: true, disabled: false }).submit).toBe(false);
+  });
+
+  it('supports Command with both shortcut modes and blocks disabled submission', () => {
+    expect(derivePromptKeyDownAction({ key: 'Enter', sendShortcut: 'enter', ctrlKey: false, metaKey: true, busy: false, disabled: false })).toEqual({ preventDefault: true, submit: true, steer: true });
+    expect(derivePromptKeyDownAction({ key: 'Enter', ctrlKey: false, metaKey: true, shiftKey: true, busy: false, disabled: true })).toEqual({ preventDefault: true, submit: false, steer: true });
   });
 
   it('derives settings update optimistic mode and rollback behavior', () => {

@@ -214,10 +214,9 @@ describe('useDeferredHistoryDetail', () => {
     harness.unmount();
   });
 
-  it('shows loader error text for generic deferred detail failures', async () => {
-    const loadHistoryItemDetail = async () => {
-      throw new Error('loader exploded');
-    };
+  it('shows loader errors separately from tool output and allows retry', async () => {
+    const loadHistoryItemDetail = vi.fn().mockRejectedValueOnce(new Error('loader exploded'))
+      .mockResolvedValueOnce({ text: 'recovered details' });
     const harness = renderHookHarness({ loadHistoryItemDetail });
     const fileRead = item('file', 'fileRead', { hasDeferredDetail: true });
 
@@ -233,8 +232,15 @@ describe('useDeferredHistoryDetail', () => {
 
     expect(latestResult?.expandedText).toEqual({
       title: 'File Read Details',
-      text: 'loader exploded',
+      text: '',
+      error: 'loader exploded',
+      onRetry: expect.any(Function),
     });
+    await latestResult?.expandedText?.onRetry?.();
+    await flushPromises();
+    harness.rerender({ loadHistoryItemDetail });
+    expect(latestResult?.expandedText?.text).toBe('recovered details');
+    expect(latestResult?.expandedText?.error).toBeUndefined();
     harness.unmount();
   });
 

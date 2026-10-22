@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   ExportThreadTranscriptInput,
   ShellEventEnvelope,
@@ -10,6 +10,7 @@ import type {
   ThreadShellAdapter,
   ThreadShellControlState,
   ThreadWorkspaceAdapter,
+  ThemeMode,
 } from '@remote-codex/thread-ui';
 import {
   AppShellMenuButton,
@@ -27,6 +28,7 @@ import {
   mockThreads,
 } from './mockData';
 import { builtinFrontendPlugins } from '@remote-codex/thread-ui/builtin-plugins';
+import { usePlaygroundModelPolicy } from './modelPolicyFixture';
 
 const mockShellSession = {
   id: 'shell-playground-1',
@@ -216,8 +218,27 @@ function createLargeWorkspaceAdapter(): ThreadWorkspaceAdapter {
 export function PlaygroundApp() {
   const playgroundParams = new URLSearchParams(window.location.search);
   const largeWorkspace = playgroundParams.has('largeWorkspace');
+  const modelPolicy = usePlaygroundModelPolicy(playgroundParams);
+  const [playgroundThemeMode, setPlaygroundThemeMode] = useState<ThemeMode>(
+    () => {
+      const queryTheme = playgroundParams.get('theme');
+      if (queryTheme === 'light' || queryTheme === 'dark') return queryTheme;
+
+      const savedTheme = window.localStorage.getItem('workbench-theme-mode');
+      return savedTheme === 'light' || savedTheme === 'system'
+        ? savedTheme
+        : 'dark';
+    },
+  );
+  const [systemPrefersDark, setSystemPrefersDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches,
+  );
   const playgroundTheme =
-    playgroundParams.get('theme') === 'light' ? 'light' : 'dark';
+    playgroundThemeMode === 'system'
+      ? systemPrefersDark
+        ? 'dark'
+        : 'light'
+      : playgroundThemeMode;
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [threadActionsOpen, setThreadActionsOpen] = useState(false);
@@ -230,6 +251,32 @@ export function PlaygroundApp() {
     null,
   );
   const [lastSubmittedPrompt, setLastSubmittedPrompt] = useState('');
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const syncSystemTheme = () => setSystemPrefersDark(mediaQuery.matches);
+    mediaQuery.addEventListener('change', syncSystemTheme);
+    return () => mediaQuery.removeEventListener('change', syncSystemTheme);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('workbench-theme-mode', playgroundThemeMode);
+
+    const root = document.documentElement;
+    root.dataset.themeEffective = playgroundTheme;
+    root.style.colorScheme = playgroundTheme;
+
+    const shell = document.querySelector<HTMLElement>('.thread-ui-shell');
+    const shellThemeBackground = shell
+      ? window.getComputedStyle(shell).getPropertyValue('--theme-bg').trim()
+      : '';
+    const background =
+      shellThemeBackground || (playgroundTheme === 'dark' ? '#0a0f1f' : '#fff');
+    document.body.style.backgroundColor = background;
+    document
+      .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+      ?.setAttribute('content', background);
+  }, [playgroundTheme, playgroundThemeMode]);
 
   const adapter = useMemo<ThreadDetailUiAdapter>(
     () => ({
@@ -269,15 +316,21 @@ export function PlaygroundApp() {
       settingsOpen,
       openSettings: () => setSettingsOpen(true),
       closeSettings: () => setSettingsOpen(false),
-      themeMode: playgroundTheme,
-      setThemeMode: () => {},
+      themeMode: playgroundThemeMode,
+      setThemeMode: setPlaygroundThemeMode,
       effectiveTheme: playgroundTheme,
       defaultBackend: 'codex',
       setDefaultBackend: () => {},
       autoCollapseCompletedTurns,
       setAutoCollapseCompletedTurns,
     }),
-    [autoCollapseCompletedTurns, menuOpen, playgroundTheme, settingsOpen],
+    [
+      autoCollapseCompletedTurns,
+      menuOpen,
+      playgroundTheme,
+      playgroundThemeMode,
+      settingsOpen,
+    ],
   );
 
   const threadActionsButton = (
@@ -306,6 +359,29 @@ export function PlaygroundApp() {
           currentThreadId={mockDetail.thread.id}
           currentWorkspaceId={mockDetail.workspace.id}
           currentWorkspaceLabel={mockDetail.workspace.label}
+          workbench={{
+            brandName: 'ElAgente Workbench',
+            threads: mockThreads.map((thread) => ({
+              key: thread.id,
+              title: thread.title,
+              subtitle: thread.provider,
+              href: `#${thread.id}`,
+              status: thread.status,
+              favorite: thread.isPinned,
+            })),
+            currentKey: mockDetail.thread.id,
+            favorite: mockDetail.thread.isPinned,
+            workspacePath: mockDetail.workspace.absPath,
+            activeView,
+            terminalEnabled: true,
+            onViewChange: setActiveView,
+            onToggleFavorite: () => {},
+            onNavigate: () => {},
+            onSearch: () => {},
+            notifications: [],
+            unreadCount: 0,
+            onReadNotifications: () => {},
+          }}
           activeView={activeView}
           appMenuButton={<AppShellMenuButton />}
           threadActionsButton={threadActionsButton}
@@ -336,6 +412,7 @@ export function PlaygroundApp() {
             collaborationMode: mockDetail.thread.collaborationMode,
             canInterrupt: true,
             onInterrupt: adapter.interrupt,
+            modelPolicy,
             followTail,
             onToggleFollow: () => {
               setFollowTail(true);
@@ -347,7 +424,7 @@ export function PlaygroundApp() {
             disabledPlaceholder: 'Shell adapter is not connected in playground',
           }}
           shellEffectiveTheme={playgroundTheme}
-          shellThemeMode={playgroundTheme}
+          shellThemeMode={playgroundThemeMode}
           onShellStateChange={setShellState}
           metaContent={
             <div className="space-y-2 text-xs text-[var(--theme-fg-muted)]">

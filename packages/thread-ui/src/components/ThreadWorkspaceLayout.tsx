@@ -1,3 +1,6 @@
+import { translate, useI18n } from '../i18n';
+import { SettingsDialog } from "./SettingsDialog";
+import { WorkbenchThreadMenu } from "./workbench/WorkbenchThreadMenu";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -30,6 +33,7 @@ import {
   threadStatusLabel,
 } from "./threadPresentation";
 import { RenameDialog } from "./RenameDialog";
+import { MatterWorkbench, type MatterWorkbenchOptions } from './MatterWorkbench';
 import type { ThemeMode } from "../app-shell/AppShellNavContext";
 import {
   GraphChatMainShell,
@@ -61,14 +65,17 @@ const THEME_MODE_OPTIONS: Array<{
   label: string;
   icon: typeof Monitor;
 }> = [
-  { value: "system", label: "Follow system", icon: Monitor },
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "light", label: "Light", icon: Sun },
+  { value: "system", get label() { return translate("files.followSystem"); }, icon: Monitor },
+  { value: "dark", get label() { return translate("files.dark"); }, icon: Moon },
+  { value: "light", get label() { return translate("files.light"); }, icon: Sun },
 ];
 
 interface ThreadWorkspaceLayoutProps {
+  workbench?: MatterWorkbenchOptions;
+  /** Host navigation (ElAgente's Agent switcher) above the workbench thread list. */
+  renderNavigationHeader?: (input: { collapsed: boolean; closeNavigation: () => void }) => ReactNode;
   threads: ThreadDto[];
-  status: AgentRuntimeStatusDto | null;
+  status?: AgentRuntimeStatusDto | null;
   loading?: boolean;
   error?: string | null;
   viewportConstrained?: boolean;
@@ -92,10 +99,12 @@ interface ThreadWorkspaceLayoutProps {
   usageLabel?: string | null | undefined;
   threadActionsButton?: ReactNode;
   topbarActions?: ReactNode;
+  deviceMonitor?: ReactNode;
   workspaceLabels?: Record<string, string>;
   metaContent?: ReactNode;
   settingsContent?: ReactNode;
   globalSettingsContent?: ReactNode;
+  settingsSections?: import("./SettingsPanels").SettingsSection[];
   appMenuButton?: ReactNode;
   appNavigationMenu?: ReactNode;
   workspaceReturnHref?: string;
@@ -105,6 +114,10 @@ interface ThreadWorkspaceLayoutProps {
   getNewThreadHref?: (workspaceId?: string | null) => string;
   newThreadHref?: string;
   newThreadLabel?: string;
+  /** Host scope disables global settings and home navigation; conversation creation stays available. */
+  restrictedNavigation?: boolean;
+  /** Keep Settings under restrictedNavigation; the host passes only the sections its scope allows. */
+  scopedSettings?: boolean;
   onNewThread?: () => void;
   onNewThreadTitle?: (title: string) => Promise<void> | void;
   renderNewThreadDialogContent?: (input: {
@@ -174,6 +187,7 @@ function ThreadCard({
   showSessionCopyButton?: boolean;
   collapsed?: boolean;
 }) {
+  const { locale: i18nLocale } = useI18n();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
     "idle",
   );
@@ -231,7 +245,7 @@ function ThreadCard({
           isCurrentThread ? "is-active" : ""
         }`}
       >
-        {thread.status === "running" ? <LoaderCircle className="thread-room-running h-4 w-4" aria-label="Running" /> : thread.status === "failed" ? <CircleAlert className="h-4 w-4" aria-label="Failed" /> : <MessageSquare className="h-4 w-4" />}
+        {thread.status === "running" ? <LoaderCircle className="thread-room-running h-4 w-4" aria-label={translate("files.running")} /> : thread.status === "failed" ? <CircleAlert className="h-4 w-4" aria-label={translate("files.failed")} /> : <MessageSquare className="h-4 w-4" />}
       </div>
       <div
         className={`min-w-0 flex-1 ${
@@ -253,8 +267,8 @@ function ThreadCard({
                 event.preventDefault();
                 onBeginRenameThread(thread);
               }}
-              aria-label={`Rename thread ${thread.title}`}
-              title="Rename thread"
+              aria-label={translate("files.renameThread", { value1: thread.title })}
+              title={translate("files.renameThread_1ebf84")}
               className="thread-card-quiet-button inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition"
             >
               <Pencil className="h-3 w-3" />
@@ -263,13 +277,13 @@ function ThreadCard({
           {showSessionCopyButton && thread.providerSessionId ? (
             <button
               type="button"
-              aria-label="Copy session ID"
+              aria-label={translate("files.copySessionID")}
               title={
                 copyState === "copied"
-                  ? "Copied"
+                  ? translate("files.copied")
                   : copyState === "failed"
-                    ? "Copy failed"
-                    : "Copy session ID"
+                    ? translate("files.copyFailed")
+                    : translate("files.copySessionID")
               }
               onClick={(event) => {
                 event.stopPropagation();
@@ -318,9 +332,9 @@ function ThreadCard({
             event.preventDefault();
             onDeleteThread(thread);
           }}
-          aria-label={`Delete thread ${thread.title}`}
+          aria-label={translate("files.deleteThread", { value1: thread.title })}
           className="thread-card-danger-button shrink-0 rounded-full p-1 transition"
-          title="Delete thread"
+          title={translate("files.deleteThread_d6d95f")}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -367,6 +381,7 @@ export function ThreadCards({
   showSessionCopyButton = false,
   collapsed = false,
 }: ThreadCardsProps) {
+  const { locale: i18nLocale } = useI18n();
   const containerClassName = scrollable
     ? `min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain pr-1 ${maxHeightClassName}`
     : "";
@@ -397,6 +412,8 @@ export function ThreadCards({
 }
 
 export function ThreadWorkspaceLayout({
+  workbench,
+  renderNavigationHeader,
   threads,
   status,
   loading = false,
@@ -420,9 +437,13 @@ export function ThreadWorkspaceLayout({
   usageLabel = null,
   threadActionsButton,
   topbarActions,
+  deviceMonitor,
   metaContent,
   settingsContent,
   globalSettingsContent,
+  settingsSections,
+  restrictedNavigation = false,
+  scopedSettings = false,
   workspaceLabels = {},
   workspaceReturnHref,
   onWorkspaceReturn,
@@ -430,7 +451,7 @@ export function ThreadWorkspaceLayout({
   onOpenThread,
   getNewThreadHref,
   newThreadHref: explicitNewThreadHref,
-  newThreadLabel = "New Chat",
+  newThreadLabel = translate("files.newChat"),
   onNewThread,
   onNewThreadTitle,
   renderNewThreadDialogContent,
@@ -439,11 +460,12 @@ export function ThreadWorkspaceLayout({
   onRenameThread,
   onDeleteThread,
   workspaceContent,
-  workspaceTitle = "Workspace",
+  workspaceTitle = translate("files.workspace"),
   workspaceActions,
   workspaceRevealRequestKey,
   children,
 }: ThreadWorkspaceLayoutProps) {
+  const { locale: i18nLocale } = useI18n();
   const shellNav = useAppShellNav();
   const initialShellMobileViewport =
     typeof window !== "undefined"
@@ -468,6 +490,18 @@ export function ThreadWorkspaceLayout({
         : "light"
       : themeMode);
   const [mobileRoomsOpen, setMobileRoomsOpen] = useState(false);
+  // The settings button moves between the phone dock's More sheet and the top
+  // bar when the one-handed layout is switched from inside settings, which
+  // remounts the dialog: keep it open, on the same section, from here.
+  const [ownSettingsOpen, setOwnSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<string | undefined>();
+  const settingsScroll = useRef(0);
+  const settingsOpen = settingsDialogOpen ?? ownSettingsOpen;
+  const changeSettingsOpen = (open: boolean) => {
+    if (settingsDialogOpen === undefined) setOwnSettingsOpen(open);
+    if (!open) { setSettingsSection(undefined); settingsScroll.current = 0; }
+    onSettingsDialogOpenChange?.(open);
+  };
   const [roomsRailCollapsed, setRoomsRailCollapsed] = useState(false);
   const [workspaceCollapsed, setWorkspaceCollapsed] = useState(
     !initialWorkspaceFocusViewport,
@@ -492,9 +526,6 @@ export function ThreadWorkspaceLayout({
   const [newThreadTitleDraft, setNewThreadTitleDraft] = useState("");
   const [creatingThread, setCreatingThread] = useState(false);
   const [topbarDetailsOpen, setTopbarDetailsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"session" | "global">(
-    "session",
-  );
 
   useEffect(() => {
     if (workspaceRevealRequestKey === undefined) {
@@ -581,13 +612,13 @@ export function ThreadWorkspaceLayout({
   const newThreadHref =
     explicitNewThreadHref ?? getNewThreadHref?.(currentWorkspaceId);
   const topbarWorkspaceLabel =
-    currentWorkspaceLabel ?? currentWorkspaceId ?? "All workspaces";
-  const topbarHarnessLabel = harnessLabel ?? "Agent";
+    currentWorkspaceLabel ?? currentWorkspaceId ?? translate("files.allWorkspaces");
+  const topbarHarnessLabel = harnessLabel ?? translate("files.agent");
   const topbarSessionLabel =
     sessionLabel ?? currentThreadLabel ?? currentThreadId ?? "default_session";
   const topbarUsageLabel =
     usageLabel ??
-    (status?.state ? `runtime ${status.state}` : "waiting for agent usage");
+    (status?.state ? `runtime ${status.state}` : translate("files.waitingForAgentUsage"));
   const setThemeMode = onThemeModeChange ?? shellNav?.setThemeMode;
   const canUpdateThemeMode = Boolean(setThemeMode);
   const closeNavigationSurfaces = () => {
@@ -682,12 +713,12 @@ export function ThreadWorkspaceLayout({
   function renderNewThreadDialogButton(className: string, compact = false) {
     const content = compact ? (
       <>
-        <Plus className="h-4 w-4" />
+        <Plus data-icon="new-thread" className="h-4 w-4" />
         <span className="sr-only">{newThreadLabel}</span>
       </>
     ) : (
       <>
-        <Plus className="h-4 w-4" />
+        <Plus data-icon="new-thread" className="h-4 w-4" />
         <span>{newThreadLabel}</span>
       </>
     );
@@ -726,10 +757,9 @@ export function ThreadWorkspaceLayout({
           ) : (
             <>
               <DialogHeader>
-                <DialogTitle>Create New Chat</DialogTitle>
+                <DialogTitle>{translate("files.createNewChat")}</DialogTitle>
                 <DialogDescription>
-                  Name the room so it is easy to find later.
-                </DialogDescription>
+                  {translate("files.nameTheRoomSoItIsEasy")}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-3">
                 <input
@@ -745,8 +775,8 @@ export function ThreadWorkspaceLayout({
                       void handleCreateThreadFromDialog();
                     }
                   }}
-                  placeholder="Chat name"
-                  aria-label="Chat name"
+                  placeholder={translate("files.chatName")}
+                  aria-label={translate("files.chatName")}
                   autoComplete="off"
                   className="thread-graph-create-thread-input h-10 rounded-md border px-3 text-sm outline-none transition"
                 />
@@ -756,7 +786,7 @@ export function ThreadWorkspaceLayout({
                   disabled={creatingThread}
                   className="thread-graph-create-thread-submit inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {creatingThread ? "Creating..." : "Create"}
+                  {creatingThread ? translate("files.creating") : translate("files.create")}
                 </button>
               </div>
             </>
@@ -767,71 +797,50 @@ export function ThreadWorkspaceLayout({
   }
 
   function renderSettingsDialog() {
+    if (restrictedNavigation && !scopedSettings) return null;
     if (
       !settingsContent &&
       !metaContent &&
       !globalSettingsContent &&
+      !settingsSections?.length &&
       !canUpdateThemeMode
     ) {
       return null;
     }
 
-    const hasSessionSettings = Boolean(settingsContent || metaContent);
-    const hasGlobalSettings = Boolean(globalSettingsContent);
-    const showSettingsTabs = hasSessionSettings && hasGlobalSettings;
-    const activeSettingsTab =
-      settingsTab === "global" && hasGlobalSettings
-        ? "global"
-        : !hasSessionSettings && hasGlobalSettings
-          ? "global"
-          : "session";
+    const sections = [
+      ...(settingsContent || metaContent ? [{ id: "session", label: translate("files.session"), description: translate("files.controlsAndDetailsForThisConversation"), content: <div className="space-y-5">{settingsContent}{metaContent && <details className="settings-detail"><summary>{translate("files.sessionDetails")}</summary><div>{metaContent}</div></details>}</div> }] : []),
+      ...(settingsSections ?? (globalSettingsContent ? [{ id: "preferences", label: translate("files.preferences"), content: globalSettingsContent }] : [])),
+    ];
 
     return (
-      <Dialog
-        {...(settingsDialogOpen !== undefined
-          ? { open: settingsDialogOpen }
-          : {})}
-        {...(onSettingsDialogOpenChange
-          ? { onOpenChange: onSettingsDialogOpenChange }
-          : {})}
-      >
-        <DialogTrigger asChild>
-          <button
-            type="button"
-            aria-label="Open settings"
-            title="Settings"
-            className="thread-icon-button inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-        </DialogTrigger>
-        <DialogContent
-          data-testid="settings-dialog"
-          data-theme-effective={effectiveTheme}
-          data-theme-mode={themeMode}
-          className="thread-graph-settings-dialog thread-graph-dialog"
-        >
-          <DialogHeader>
-            <DialogTitle>Settings</DialogTitle>
-            <DialogDescription>
-              Manage this session and host-wide preferences.
-            </DialogDescription>
-          </DialogHeader>
-          {canUpdateThemeMode ? (
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={changeSettingsOpen}
+        section={settingsSection}
+        onSectionChange={setSettingsSection}
+        panelScroll={settingsScroll}
+        themeMode={themeMode} effectiveTheme={effectiveTheme}
+        contentProps={{ 'data-testid': 'settings-dialog' }}
+        sections={sections}
+        trigger={<button type="button" aria-label={translate("files.openSettings")} title={translate("files.settings")}
+          className="thread-icon-button inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full">
+          <Settings data-icon="settings" className="h-4 w-4" />
+        </button>}
+        extraContent={canUpdateThemeMode && !settingsSections ? (
             <div className="thread-graph-settings-card rounded-lg border p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="font-medium text-[var(--theme-fg)]">
-                    Appearance
-                  </p>
+                    {translate("files.appearance")}</p>
                   <p className="mt-1 text-xs leading-5 text-[var(--theme-fg-muted)]">
-                    Current theme: {effectiveTheme}
+                    {translate("files.currentTheme")} {effectiveTheme}
                   </p>
                 </div>
                 <div
                   className="thread-graph-theme-mode-group grid grid-cols-3 gap-1 rounded-lg border p-1"
                   role="group"
-                  aria-label="Theme mode"
+                  aria-label={translate("files.themeMode")}
                 >
                   {THEME_MODE_OPTIONS.map((option) => {
                     const Icon = option.icon;
@@ -858,57 +867,7 @@ export function ThreadWorkspaceLayout({
               </div>
             </div>
           ) : null}
-          {showSettingsTabs ? (
-            <div className="thread-graph-settings-tabs grid grid-cols-2 gap-1 rounded-lg border p-1">
-              <button
-                type="button"
-                aria-pressed={activeSettingsTab === "session"}
-                onClick={() => setSettingsTab("session")}
-                className={`thread-graph-settings-tab-button rounded-md px-3 py-2 text-sm font-medium transition ${
-                  activeSettingsTab === "session" ? "is-active" : ""
-                }`}
-              >
-                Session
-              </button>
-              <button
-                type="button"
-                aria-pressed={activeSettingsTab === "global"}
-                onClick={() => setSettingsTab("global")}
-                className={`thread-graph-settings-tab-button rounded-md px-3 py-2 text-sm font-medium transition ${
-                  activeSettingsTab === "global" ? "is-active" : ""
-                }`}
-              >
-                Global
-              </button>
-            </div>
-          ) : null}
-          <div className="thread-graph-settings-body mt-2 min-h-0 pr-1 text-sm">
-            {activeSettingsTab === "session" ? (
-              <div className="grid gap-4">
-                {settingsContent ? (
-                  <div className="thread-graph-settings-card rounded-lg border p-3">
-                    {settingsContent}
-                  </div>
-                ) : null}
-                {metaContent ? (
-                  <div className="thread-graph-settings-card rounded-lg border p-3">
-                    {metaContent}
-                  </div>
-                ) : null}
-                {!hasSessionSettings ? (
-                  <div className="thread-graph-settings-card rounded-lg border p-3 text-[var(--theme-fg-muted)]">
-                    No session settings are available.
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="thread-graph-settings-global-content">
-                {globalSettingsContent}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      />
     );
   }
 
@@ -922,11 +881,10 @@ export function ThreadWorkspaceLayout({
             }`}
           >
             <Rows3 className="h-3.5 w-3.5" />
-            <span className={collapsed ? "sr-only" : ""}>Rooms</span>
+            <span className={collapsed ? "sr-only" : ""}>{translate("files.rooms")}</span>
             {!collapsed && loading ? (
               <span className="ml-auto text-xs text-[var(--theme-fg-muted)]">
-                Refreshing...
-              </span>
+                {translate("files.refreshing")}</span>
             ) : null}
           </div>
 
@@ -939,8 +897,7 @@ export function ThreadWorkspaceLayout({
 
             {!error && visibleThreads.length === 0 && !loading ? (
               <div className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-surface)] px-4 py-6 text-sm text-[var(--theme-fg-muted)]">
-                No threads available in this view.
-              </div>
+                {translate("files.noThreadsAvailableInThisView")}</div>
             ) : null}
 
             {visibleThreads.length > 0 ? (
@@ -974,8 +931,8 @@ export function ThreadWorkspaceLayout({
             type="button"
             onClick={() => setWorkspaceCollapsed(true)}
             className="thread-workspace-collapse-tab thread-desktop-only-inline-flex"
-            title="Collapse workspace"
-            aria-label="Collapse workspace"
+            title={translate("files.collapseWorkspace")}
+            aria-label={translate("files.collapseWorkspace")}
           >
             <ChevronsRight className="h-4 w-4" />
           </button>
@@ -999,7 +956,7 @@ export function ThreadWorkspaceLayout({
               {workspaceTitle}
             </p>
             <p className="truncate text-xs text-[var(--theme-fg-muted)]">
-              {currentWorkspaceLabel ?? currentWorkspaceId ?? "Current context"}
+              {currentWorkspaceLabel ?? currentWorkspaceId ?? translate("files.currentContext")}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -1008,8 +965,8 @@ export function ThreadWorkspaceLayout({
               type="button"
               onClick={() => setWorkspaceCollapsed(true)}
               className="thread-workspace-small-toggle thread-desktop-only-inline-flex"
-              title="Collapse workspace"
-              aria-label="Collapse workspace"
+              title={translate("files.collapseWorkspace")}
+              aria-label={translate("files.collapseWorkspace")}
             >
               <ChevronsRight className="h-4 w-4" />
             </button>
@@ -1020,18 +977,16 @@ export function ThreadWorkspaceLayout({
             <div className="grid h-full min-h-0 gap-3 overflow-y-auto p-3 text-sm text-[var(--theme-fg-soft)]">
               <div className="thread-workspace-card rounded-lg border p-3">
                 <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--theme-fg-muted)]">
-                  Runtime
-                </p>
+                  {translate("files.runtime")}</p>
                 <p className="mt-2 text-[var(--theme-fg)]">
-                  {status?.state ?? "unknown"}
+                  {status?.state ?? translate("files.unknown")}
                 </p>
               </div>
               <div className="thread-workspace-card rounded-lg border p-3">
                 <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--theme-fg-muted)]">
-                  Workspace
-                </p>
+                  {translate("files.workspace")}</p>
                 <p className="mt-2 break-words text-[var(--theme-fg)]">
-                  {currentWorkspaceLabel ?? currentWorkspaceId ?? "All threads"}
+                  {currentWorkspaceLabel ?? currentWorkspaceId ?? translate("files.allThreads")}
                 </p>
               </div>
             </div>
@@ -1050,7 +1005,7 @@ export function ThreadWorkspaceLayout({
     (layoutMode === "responsive" && isWorkspaceFocusViewport);
   const renderMobileTopbarControls = renderMobileWorkspaceSplit;
   const canReturnToWorkspace = Boolean(
-    workspaceReturnHref || onWorkspaceReturn,
+    !restrictedNavigation && (workspaceReturnHref || onWorkspaceReturn),
   );
   const workspaceReturnControl = canReturnToWorkspace ? (
     <a
@@ -1062,12 +1017,36 @@ export function ThreadWorkspaceLayout({
         }
       }}
       className="thread-icon-button inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-      title="Back to workspace"
-      aria-label="Back to workspace"
+      title={translate("files.backToWorkspace")}
+      aria-label={translate("files.backToWorkspace")}
     >
       <ArrowLeft className="h-4 w-4" />
     </a>
   ) : null;
+
+  if (workbench) {
+    return <GraphChatShellRoot effectiveTheme={effectiveTheme} layoutMode={layoutMode} themeMode={themeMode} viewportConstrained={viewportConstrained}>
+      <MatterWorkbench options={{ ...workbench,
+        renderNavigationHeader: workbench.renderNavigationHeader ?? renderNavigationHeader,
+        // Hosts that rename and delete through the layout get the thread menu on rows and tabs.
+        renderThreadMenu: workbench.renderThreadMenu ?? (onRenameThread || onDeleteThread ? (entry, context) => {
+          const thread = threads.find(value => value.id === entry.key);
+          if (!thread) return null;
+          return <WorkbenchThreadMenu thread={entry} context={context} copyIdLabel={translate("files.copySessionID")}
+            onNavigate={workbench.onNavigate}
+            onRename={onRenameThread ? () => beginRenameThread(thread) : undefined}
+            onDelete={onDeleteThread ? () => onDeleteThread(thread) : undefined} />;
+        } : undefined),
+      }} title={currentThreadLabel ?? (currentThreadId ? "" : translate("files.newThread"))} homeHref={restrictedNavigation ? undefined : workspaceReturnHref ?? '/workspaces'}
+        settings={renderSettingsDialog()} newThread={renderNewThreadDialogButton('matter-new-thread', true)}
+        actions={threadActionsButton} connection={topbarActions ?? mobileHeaderAction} deviceMonitor={deviceMonitor}
+        threadMenu={null}
+        explorer={workspaceContent} revealExplorer={workspaceRevealRequestKey ?? 0}>
+        {children}
+      </MatterWorkbench>
+      <RenameDialog open={editingThreadId !== null} title={translate("files.renameThread_c51d25")} label={translate("files.threadTitle")} value={draftTitle} busy={renamingThreadId !== null} onChange={setDraftTitle} onCancel={cancelRenameThread} onSubmit={() => editingThreadId ? handleRenameThread(editingThreadId) : undefined} />
+    </GraphChatShellRoot>;
+  }
 
   return (
     <>
@@ -1085,8 +1064,8 @@ export function ThreadWorkspaceLayout({
                       renderMobileTopbarControls ? (
                         <button
                           type="button"
-                          aria-label="Open rooms"
-                          title="Open rooms"
+                          aria-label={translate("files.openRooms")}
+                          title={translate("files.openRooms")}
                           aria-expanded={mobileRoomsOpen}
                           onClick={() => setMobileRoomsOpen(true)}
                           className="thread-icon-button inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
@@ -1099,9 +1078,9 @@ export function ThreadWorkspaceLayout({
                     <div className="min-w-0">
                       <h1
                         className="min-w-0 truncate text-sm font-semibold leading-tight text-[var(--theme-fg)] sm:text-base"
-                        title={currentThreadLabel ?? "Shared Workspace"}
+                        title={currentThreadLabel ?? translate("files.sharedWorkspace")}
                       >
-                        {currentThreadLabel ?? "Shared Workspace"}
+                        {currentThreadLabel ?? translate("files.sharedWorkspace")}
                       </h1>
                       <div className="relative mt-0.5 flex min-w-0 items-center gap-1.5">
                         <button
@@ -1112,7 +1091,7 @@ export function ThreadWorkspaceLayout({
                           aria-expanded={topbarDetailsOpen}
                           aria-haspopup="dialog"
                           className="thread-topbar-meta-row flex min-w-0 max-w-full items-center gap-1 text-left text-[11px] leading-none sm:text-xs"
-                          title="Session and usage"
+                          title={translate("files.sessionAndUsage")}
                         >
                           <span className="shrink-0 font-medium text-[var(--theme-fg-soft)]">
                             {topbarHarnessLabel}
@@ -1128,7 +1107,7 @@ export function ThreadWorkspaceLayout({
                           <div
                             className="thread-topbar-details-popover absolute left-0 top-[calc(100%+0.5rem)] z-50 w-[min(28rem,calc(100vw-1.5rem))] rounded-lg border p-2.5 shadow-lg"
                             role="dialog"
-                            aria-label="Session and usage"
+                            aria-label={translate("files.sessionAndUsage")}
                           >
                             <button
                               type="button"
@@ -1141,18 +1120,18 @@ export function ThreadWorkspaceLayout({
                                 );
                               }}
                               className="thread-topbar-meta-row flex min-w-0 max-w-full items-center gap-2 text-left text-xs leading-5"
-                              title="Copy session ID"
+                              title={translate("files.copySessionID")}
                             >
-                              <span className="w-14 shrink-0">Session</span>
+                              <span className="w-14 shrink-0">{translate("files.session")}</span>
                               <span className="min-w-0 break-all font-mono">
                                 {topbarSessionLabel}
                               </span>
                             </button>
                             <div
                               className="thread-topbar-meta-row mt-1 flex min-w-0 max-w-full items-start gap-2 text-xs leading-5"
-                              title="Session token usage and estimated cost"
+                              title={translate("files.sessionTokenUsageAndEstimatedCost")}
                             >
-                              <span className="w-14 shrink-0">Usage</span>
+                              <span className="w-14 shrink-0">{translate("files.usage")}</span>
                               <span className="min-w-0 whitespace-normal break-words font-mono">
                                 {topbarUsageLabel}
                               </span>
@@ -1186,13 +1165,13 @@ export function ThreadWorkspaceLayout({
                         }}
                         aria-label={
                           mobileWorkspace === "workspace"
-                            ? "Show chat"
-                            : "Show workspace"
+                            ? translate("files.showChat")
+                            : translate("files.showWorkspace")
                         }
                         title={
                           mobileWorkspace === "workspace"
-                            ? "Show chat"
-                            : "Show workspace"
+                            ? translate("files.showChat")
+                            : translate("files.showWorkspace")
                         }
                         className="thread-icon-button inline-flex h-10 w-10 items-center justify-center rounded-full"
                       >
@@ -1248,10 +1227,10 @@ export function ThreadWorkspaceLayout({
                     onClick={() => setRoomsRailCollapsed((current) => !current)}
                     className="thread-icon-button thread-desktop-only-flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
                     title={
-                      roomsRailCollapsed ? "Expand rooms" : "Collapse rooms"
+                      roomsRailCollapsed ? translate("files.expandRooms") : translate("files.collapseRooms")
                     }
                     aria-label={
-                      roomsRailCollapsed ? "Expand rooms" : "Collapse rooms"
+                      roomsRailCollapsed ? translate("files.expandRooms") : translate("files.collapseRooms")
                     }
                   >
                     {roomsRailCollapsed ? (
@@ -1269,8 +1248,8 @@ export function ThreadWorkspaceLayout({
                   <button
                     type="button"
                     onClick={() => setMobileRoomsOpen(false)}
-                    aria-label="Close rooms"
-                    title="Close rooms"
+                    aria-label={translate("files.closeRooms")}
+                    title={translate("files.closeRooms")}
                     className="thread-icon-button thread-mobile-only-inline-flex h-10 w-10 items-center justify-center rounded-full"
                   >
                     <X className="h-4 w-4" />
@@ -1367,8 +1346,8 @@ export function ThreadWorkspaceLayout({
                       type="button"
                       onClick={() => setWorkspaceCollapsed(false)}
                       className="thread-workspace-expand-fab thread-desktop-only-inline-flex"
-                      title="Expand workspace"
-                      aria-label="Expand workspace"
+                      title={translate("files.expandWorkspace")}
+                      aria-label={translate("files.expandWorkspace")}
                     >
                       <ChevronsLeft className="h-4 w-4" />
                     </button>
@@ -1383,8 +1362,8 @@ export function ThreadWorkspaceLayout({
 
       <RenameDialog
         open={editingThreadId !== null}
-        title="Rename Thread"
-        label="Thread Title"
+        title={translate("files.renameThread_c51d25")}
+        label={translate("files.threadTitle")}
         value={draftTitle}
         busy={renamingThreadId !== null}
         onChange={setDraftTitle}

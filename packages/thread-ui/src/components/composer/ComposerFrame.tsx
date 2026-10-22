@@ -1,3 +1,4 @@
+import { usePhoneDock } from '../workbench/phoneDockContext';
 import type {
   FormEvent,
   MutableRefObject,
@@ -5,18 +6,24 @@ import type {
 } from 'react';
 
 import type { AgentSubscriptionUsageDto, PromptAttachmentKindDto } from '@remote-codex/shared';
+import { useCompactComposer } from './useCompactComposer';
 import { InputGroup } from '../graph-ui/InputGroup';
 import { ComposerHiddenAttachmentInputs } from './ComposerHiddenAttachmentInputs';
 import { ComposerJumpLatestButton } from './ComposerJumpLatestButton';
+import { ComposerSubscriptionUsage, visibleSubscriptionWindows } from './ComposerSubscriptionUsage';
 
 export interface ComposerFrameProps {
   activeView: 'chat' | 'shell';
+  /** Theme avatar key of the thread's harness; presentation only. */
+  agent?: string | undefined;
+  busy?: boolean;
   layerClassName: string;
   formClassName: string;
   shellClassName: string;
   inputGroupClassName: string;
   error: string | null | undefined;
   followTail: boolean;
+  attachmentCapabilities?: { files: boolean; images: boolean } | undefined;
   photoInputRef: MutableRefObject<HTMLInputElement | null>;
   fileInputRef: MutableRefObject<HTMLInputElement | null>;
   onAppendAttachments: (
@@ -40,12 +47,15 @@ export interface ComposerFrameProps {
 
 export function ComposerFrame({
   activeView,
+  agent,
+  busy = false,
   layerClassName,
   formClassName,
   shellClassName,
   inputGroupClassName,
   error,
   followTail,
+  attachmentCapabilities,
   photoInputRef,
   fileInputRef,
   onAppendAttachments,
@@ -63,9 +73,16 @@ export function ComposerFrame({
   goalSlot,
   shellPromptSlot,
 }: ComposerFrameProps) {
+  const { expanded, focusOwner, ...focusEvents } = useCompactComposer(formRef, activeView === 'chat');
+  // The phone dock's status bar shows usage instead.
+  const dock = usePhoneDock();
+  const usage = !dock && activeView === 'chat' && visibleSubscriptionWindows(subscriptionUsage).length > 0
+    ? <ComposerSubscriptionUsage usage={subscriptionUsage} />
+    : null;
   return (
     <div className={layerClassName}>
       <ComposerHiddenAttachmentInputs
+        attachmentCapabilities={attachmentCapabilities}
         photoInputRef={photoInputRef}
         fileInputRef={fileInputRef}
         onAppendAttachments={onAppendAttachments}
@@ -78,19 +95,23 @@ export function ComposerFrame({
         onJumpToPreviousTurn={onJumpToPreviousTurn}
         canJumpToNextTurn={canJumpToNextTurn}
         onJumpToNextTurn={onJumpToNextTurn}
-        subscriptionUsage={subscriptionUsage}
       />
 
       {pendingQueueSlot}
 
       <form
         ref={formRef}
+        {...focusEvents}
+        data-composer-focus-owner={focusOwner}
+        data-agent={agent}
+        data-composer-busy={busy ? 'true' : undefined}
+        data-composer-layout={activeView === 'chat' ? (expanded ? 'expanded' : 'collapsed') : undefined}
         data-testid={activeView === 'chat' ? 'chat-composer' : undefined}
         onSubmit={onSubmit}
         className={formClassName}
       >
         <div
-          className={`${shellClassName} flex w-full flex-col overflow-visible rounded-[16px] sm:rounded-[18px]`}
+          className={`${shellClassName} relative flex w-full flex-col overflow-visible rounded-[16px] sm:rounded-[18px]`}
         >
           <InputGroup className={inputGroupClassName}>
             {promptSlot}
@@ -99,9 +120,10 @@ export function ComposerFrame({
 
           {goalSlot}
           {shellPromptSlot}
+          {usage ? <div className="thread-composer-usage-tag">{usage}</div> : null}
         </div>
         {error ? (
-          <div className="mt-2 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div role="alert" className="mt-2 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
             {error}
           </div>
         ) : null}

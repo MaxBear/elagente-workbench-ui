@@ -115,6 +115,20 @@ describe('contenteditable prompt helpers', () => {
     editor.remove();
   });
 
+  it('preserves selections in dictation wrappers and multiline text around attachments', () => {
+    const editor = document.createElement('div');
+    editor.innerHTML = 'first<div><span style="color:inherit">hello world</span><span data-segment-type="attachment" data-placeholder="[FILE a.txt]" contenteditable="false">a.txt</span> tail</div>';
+    document.body.append(editor);
+    const wrapped = editor.querySelector('span')!.firstChild!;
+    expect(measureSelectionOffset(editor, wrapped, 6)).toBe('first\nhello '.length);
+    restoreEditorSelection(editor, { start: 'first\nhello '.length, end: 'first\nhello world'.length });
+    expect(window.getSelection()?.toString()).toBe('world');
+    expect(snapshotEditorSelection(editor)).toEqual({ start: 12, end: 17 });
+    const after = editor.lastChild!.lastChild!;
+    expect(measureSelectionOffset(editor, after, 2)).toBe('first\nhello world[FILE a.txt] t'.length);
+    editor.remove();
+  });
+
   it('moves the caret after the last inserted attachment chip', () => {
     const editor = document.createElement('div');
     const chip = document.createElement('span');

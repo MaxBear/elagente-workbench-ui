@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
+import { translate, useI18n } from '../../i18n';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type {
   ThreadHistoryItemDetailDto,
@@ -8,6 +9,9 @@ import type {
 export interface ExpandedTextState {
   title: string;
   text: string;
+  kind?: string;
+  error?: string;
+  onRetry?: () => void;
 }
 
 type HistoryItemDetailLoader = (
@@ -50,6 +54,7 @@ export function useDeferredHistoryDetail({
   loadHistoryItemDetail,
   onSelectHistoryItemDetail,
 }: DeferredHistoryDetailInput) {
+  useI18n();
   const requestIdRef = useRef(0);
   const detailCacheRef = useRef<Map<string, ThreadHistoryItemDetailDto>>(
     new Map(),
@@ -57,9 +62,15 @@ export function useDeferredHistoryDetail({
   const [expandedText, setExpandedText] = useState<ExpandedTextState | null>(
     null,
   );
+  useEffect(() => {
+    requestIdRef.current += 1;
+    detailCacheRef.current.clear();
+    setExpandedText(null);
+  }, [loadHistoryItemDetail]);
 
-  const openExpandedText = useCallback((title: string, text: string) => {
-    setExpandedText({ title, text });
+  const openExpandedText = useCallback((title: string, text: string, kind?: string) => {
+    requestIdRef.current += 1;
+    setExpandedText({ title, text, ...(kind ? { kind } : {}) });
   }, []);
 
   const resolveDetail = useCallback(
@@ -72,7 +83,7 @@ export function useDeferredHistoryDetail({
         onSelectHistoryItemDetail({ item, detail });
         return;
       }
-      setExpandedText({ title: detail.title, text: detail.text });
+      setExpandedText({ title: detail.title, text: detail.text, ...(['fileChange', 'toolCall', 'agentToolCall', 'skillToolCall'].includes(item.kind) ? {kind: item.kind} : {}) });
     },
     [onSelectHistoryItemDetail],
   );
@@ -86,7 +97,8 @@ export function useDeferredHistoryDetail({
       errorText,
       useSelectionCallback,
     }: OpenDeferredDetailInput) => {
-      if (!item.hasDeferredDetail || !loadHistoryItemDetail) {
+      const requestId = ++requestIdRef.current;
+      if (!loadHistoryItemDetail || (!item.hasDeferredDetail && item.kind !== 'commandExecution' && item.kind !== 'fileChange')) {
         resolveDetail(
           item,
           inlineDetail(item, fallbackTitle, fallbackText),
@@ -95,21 +107,20 @@ export function useDeferredHistoryDetail({
         return;
       }
 
-      const cached = detailCacheRef.current.get(item.id);
+      const cacheKey = `${item.id}:${item.status ?? ''}`;
+      const cached = detailCacheRef.current.get(cacheKey);
       if (cached) {
         resolveDetail(item, cached, useSelectionCallback);
         return;
       }
 
-      const requestId = requestIdRef.current + 1;
-      requestIdRef.current = requestId;
       if (!(useSelectionCallback && onSelectHistoryItemDetail)) {
         setExpandedText({ title: fallbackTitle, text: loadingText });
       }
 
       try {
         const detail = await loadHistoryItemDetail(item.id);
-        detailCacheRef.current.set(item.id, detail);
+        if (!['running', 'in_progress', 'pending'].includes(item.status ?? '')) detailCacheRef.current.set(cacheKey, detail);
         if (requestIdRef.current !== requestId) {
           return;
         }
@@ -118,15 +129,11 @@ export function useDeferredHistoryDetail({
         if (requestIdRef.current !== requestId) {
           return;
         }
-        resolveDetail(
-          item,
-          inlineDetail(
-            item,
-            fallbackTitle,
-            caught instanceof Error ? caught.message : errorText,
-          ),
-          useSelectionCallback,
-        );
+        // Failure belongs to the loader UI, never to the scientific tool output.
+        setExpandedText({title: fallbackTitle, text: '',
+          error: caught instanceof Error ? caught.message : errorText,
+          onRetry: () => { void openDeferredDetail({item, fallbackTitle, fallbackText, loadingText, errorText, useSelectionCallback}); },
+        });
       }
     },
     [
@@ -144,9 +151,9 @@ export function useDeferredHistoryDetail({
       await openDeferredDetail({
         item,
         fallbackTitle,
-        fallbackText: item.detailText?.trim() || item.text || 'Command output',
-        loadingText: 'Loading full command output...',
-        errorText: 'Unable to load full command output.',
+        fallbackText: item.detailText?.trim() || item.text || translate("chat.commandOutput_e73be3"),
+        loadingText: translate("chat.loadingFullCommandOutput"),
+        errorText: translate("chat.unableToLoadFullCommandOutput"),
         useSelectionCallback: true,
       });
     },
@@ -162,10 +169,10 @@ export function useDeferredHistoryDetail({
     ) => {
       await openDeferredDetail({
         item,
-        fallbackTitle,
-        fallbackText: item.detailText?.trim() || item.text || 'Tool call',
-        loadingText: 'Loading full tool call details...',
-        errorText: 'Unable to load full tool call details.',
+        fallbackTitle: item.previewText?.split('\n')[0]?.trim() || fallbackTitle,
+        fallbackText: item.detailText?.trim() || item.text || translate("chat.toolCall_e31318"),
+        loadingText: translate("chat.loadingFullToolCallDetails"),
+        errorText: translate("chat.unableToLoadFullToolCallDetails"),
         useSelectionCallback: true,
       });
     },

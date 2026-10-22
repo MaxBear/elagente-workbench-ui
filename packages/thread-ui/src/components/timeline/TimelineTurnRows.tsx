@@ -1,15 +1,23 @@
+import { latestUsage, progressEvidence, scopeUsageItems, usageEvidenceResult, usageEvidence } from './structuredEvidence';
+import { StructuredToolEvidence, TurnEvidenceStatusContext } from './StructuredToolEvidence';
+import { StructuredUsageInline } from './StructuredUsageInline';
+import { translate, useI18n } from '../../i18n';
 import {
+  Fragment,
   memo,
   useCallback,
+  useContext,
+  useEffect,
+  useRef,
   useMemo,
   useState,
   type RefCallback,
   type ReactNode,
   type RefObject,
 } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
-import type { ThreadHistoryItemDto } from '@remote-codex/shared';
+import type { ThreadHistoryItemDto, ThreadTurnActivitySegmentDto } from '@remote-codex/shared';
 
 import type { ThreadTimelineAdapter } from '../../adapters';
 import {
@@ -18,51 +26,57 @@ import {
   formatPreciseMessageTimestamp,
   formatShortTimestamp,
 } from '../threadPresentation';
-import { GraphChatHistoryEntries } from '../graph-chat/GraphChatHistoryEntries';
 import {
   GraphChatAgentToolCallItem as AgentToolCallItem,
-  GraphChatAgentActivityGroupItem as AgentActivityGroupItem,
   GraphChatArtifactHistoryItem as ArtifactHistoryItem,
-  GraphChatCommandGroupItem as CommandGroupItem,
   GraphChatCommandItem as CommandItem,
   GraphChatContextCompactionItem as ContextCompactionItem,
-  GraphChatFileChangeGroupItem as FileChangeGroupItem,
   GraphChatFileChangeItem as FileChangeItem,
-  GraphChatFileReadGroupItem as FileReadGroupItem,
   GraphChatFileReadItem as FileReadItem,
   GraphChatGenericHistoryItem as GenericHistoryItem,
   GraphChatHookItem as HookItem,
   GraphChatImageItem as ImageItem,
   GraphChatPlanHistoryItem as PlanHistoryItem,
-  GraphChatSearchGroupItem as SearchGroupItem,
   GraphChatSkillToolCallItem as SkillToolCallItem,
   GraphChatToolCallItem as ToolCallItem,
-  GraphChatToolCallGroupItem as ToolCallGroupItem,
   GraphChatWebSearchItem as WebSearchItem,
 } from '../graph-chat/GraphChatHistoryItems';
 import { GraphChatCompactMessageItem as CompactMessageItem } from '../graph-chat/GraphChatCompactMessageItem';
 import { MessageExpansionScope } from '../graph-chat/MessageExpansionScope';
 import { GraphChatTurnBody } from '../graph-chat/GraphChatTurnBody';
 import { GraphChatTurnFrame } from '../graph-chat/GraphChatTurnFrame';
+import { echoesFailure, TurnPromptContext } from '../graph-chat/turnPrompts';
+import { TurnHead } from './TurnHead';
+import { TranscriptAgentByline } from '../graph-chat/TranscriptAgent';
 import {
+  countTurnSteps,
   getLiveOutputTailForTurn,
   groupTimelineHistoryItems,
   isActiveTurnStatus,
   isCompactChatItem,
+  isRunningHistoryStatus,
   mergeLiveTurnItems,
   parseHookPromptText,
   prepareTurnItemsForRendering,
   type TimelineHistoryEntry,
   type TimelineTurn,
 } from './timelineItems';
+import { groupAnswerSections, isSubstantiveAnswer } from './answerSections';
 import { TurnTokenSummary } from './tokenFormatting';
-import { deriveDisplayedLivePlan, TurnStatusBar } from './turnStatus';
-import { TurnUsageInline } from './TurnUsageInline';
+import { TurnStatusBar } from './turnStatus';
+import { Collapse } from './Collapse';
+import { turnErrorText } from './turnErrors';
+import { activityParts, hasActivity, storySegments, stretchBetween, stretchFromItems, turnActivity, turnChangedFiles } from './activity';
+import { ActivitySummary, ChangedFiles, isLogItem, LogRow, LogRun, opensDiff, Parts, RunPlaceholder } from './TranscriptLog';
+import { useAppShellNav } from '../../app-shell/AppShellNavContext';
+
+const FILE_PARTS = new Set(['edits', 'added', 'removed']);
 
 type LivePlan = {
   turnId: string;
   explanation: string | null;
   plan: Array<{ step: string; status: string }>;
+  updatedAt?: string | null;
 };
 
 type SelectArtifactHandler = (input: {
@@ -112,7 +126,7 @@ interface HistoryItemRowProps {
   onOpenToolCallDetail: OpenToolCallDetailHandler;
   onOpenDeferredHistoryItemDetail: OpenDeferredHistoryItemDetailHandler;
   onSelectArtifact?: SelectArtifactHandler;
-  onBeforeMessageResize?: () => void;
+  onBeforeMessageResize?: (anchor?: Element | null) => void;
   adapter?: ThreadTimelineAdapter | undefined;
 }
 
@@ -132,6 +146,17 @@ export const HistoryItemRow = memo(function HistoryItemRow({
   timeMeta,
   autoOpenToolDetails = false,
 }: HistoryItemRowProps) {
+  const { locale: i18nLocale } = useI18n();
+  const shellNav = useAppShellNav();
+  const turnStatus = useContext(TurnEvidenceStatusContext);
+  if (item.kind === 'reasoning' && !shellNav?.showReasoningSummaries) return null;
+  // ElAgente structured evidence: validated tool progress and usage reports.
+  if (item.progress !== undefined || item.extension?.type === 'elagente.progress') {
+    return <StructuredToolEvidence item={item} scrollRootRef={scrollRootRef} adapter={adapter} onBeforeResize={onBeforeMessageResize} turnStatus={turnStatus} />;
+  }
+  const usageError = usageEvidenceResult(item).error;
+  if (usageError) return <div role="alert">{translate('chat.usageUnavailable', { value1: usageError })}</div>;
+  if (item.extension?.type === 'elagente.usage') return null;
   if (isCompactChatItem(item.kind)) {
     return (
       <CompactMessageItem
@@ -158,6 +183,7 @@ export const HistoryItemRow = memo(function HistoryItemRow({
           kind: 'agentMessage',
           status: item.status ?? null,
         }}
+        variant="reasoning"
         scrollRootRef={scrollRootRef}
         timeLabel={timeLabel}
         timeTitle={timeTitle}
@@ -169,6 +195,7 @@ export const HistoryItemRow = memo(function HistoryItemRow({
   if (item.kind === 'artifact') {
     return (
       <ArtifactHistoryItem
+        {...(adapter?.onOpenWorkspaceFile ? { onOpenWorkspaceFile: adapter.onOpenWorkspaceFile } : {})}
         item={
           item as ThreadHistoryItemDto & {
             kind: 'artifact';
@@ -250,7 +277,7 @@ export const HistoryItemRow = memo(function HistoryItemRow({
       kind: 'webSearch';
     };
     const detailText =
-      typedItem.detailText?.trim() || typedItem.text || 'Web search';
+      typedItem.detailText?.trim() || typedItem.text || translate("chat.webSearch");
     return (
       <WebSearchItem
         autoOpen={autoOpenToolDetails}
@@ -259,10 +286,10 @@ export const HistoryItemRow = memo(function HistoryItemRow({
         onOpen={() =>
           onOpenDeferredHistoryItemDetail(
             typedItem,
-            'Web Search Details',
+            translate("chat.webSearchDetails"),
             detailText,
-            'Loading full web search details...',
-            'Unable to load full web search details.',
+            translate("chat.loadingFullWebSearchDetails"),
+            translate("chat.unableToLoadFullWebSearchDetails"),
           )
         }
       />
@@ -274,7 +301,7 @@ export const HistoryItemRow = memo(function HistoryItemRow({
       kind: 'fileRead';
     };
     const detailText =
-      typedItem.detailText?.trim() || typedItem.text || 'File read';
+      typedItem.detailText?.trim() || typedItem.text || translate("chat.fileRead");
     return (
       <FileReadItem
         autoOpen={autoOpenToolDetails}
@@ -283,10 +310,10 @@ export const HistoryItemRow = memo(function HistoryItemRow({
         onOpen={() =>
           onOpenDeferredHistoryItemDetail(
             typedItem,
-            'File Read Details',
+            translate("chat.fileReadDetails"),
             detailText,
-            'Loading full file read details...',
-            'Unable to load full file read details.',
+            translate("chat.loadingFullFileReadDetails"),
+            translate("chat.unableToLoadFullFileReadDetails"),
           )
         }
       />
@@ -331,7 +358,7 @@ export const HistoryItemRow = memo(function HistoryItemRow({
       kind: 'fileChange';
     };
     const detailText =
-      typedItem.detailText?.trim() || typedItem.text || 'File change';
+      typedItem.detailText?.trim() || typedItem.text || translate("chat.fileChange");
     return (
       <FileChangeItem
         item={typedItem}
@@ -339,10 +366,10 @@ export const HistoryItemRow = memo(function HistoryItemRow({
         onOpen={() =>
           onOpenDeferredHistoryItemDetail(
             typedItem,
-            'File Change Details',
+            translate("chat.fileChangeDetails"),
             detailText,
-            'Loading full file change details...',
-            'Unable to load full file change details.',
+            translate("chat.loadingFullFileChangeDetails"),
+            translate("chat.unableToLoadFullFileChangeDetails"),
           )
         }
       />
@@ -379,6 +406,13 @@ export const HistoryItemRow = memo(function HistoryItemRow({
 });
 
 interface ThreadTurnRowProps {
+  peerWorkChildren?: ReactNode;
+  peerWorkSteps?: number;
+  peerWaitingForWake?: boolean;
+  summaryAgentOverride?: (ThreadHistoryItemDto & { kind: 'agentMessage' }) | null;
+  nestedPeerWork?: boolean;
+  omitAgentId?: string | undefined;
+  revealTarget?: { itemId: string; key: number } | undefined;
   threadId: string | undefined;
   adapter?: ThreadTimelineAdapter | undefined;
   turn: TimelineTurn;
@@ -389,7 +423,13 @@ interface ThreadTurnRowProps {
   liveActivityAt?: string | null;
   liveOutput: string;
   forceActive?: boolean;
-  onToggleCollapse: (turn: TimelineTurn, currentCollapsed: boolean) => void;
+  backgroundAgentCount?: number;
+  renderTurnNotification?: ((turnId: string) => ReactNode) | undefined;
+  onToggleCollapse: (turn: TimelineTurn, currentCollapsed: boolean, loadDetails?: boolean) => void;
+  /** Loads a folded turn's operations without opening the turn. */
+  onLoadTurnItems?: (turn: TimelineTurn) => void;
+  /** Completed turns open as their narration (auto-collapse is off). */
+  narrationMode?: boolean;
   deferredItemsLoading?: boolean;
   deferredItemsError?: string | undefined;
   onOpenExpandedText: OpenExpandedTextHandler;
@@ -397,10 +437,9 @@ interface ThreadTurnRowProps {
   onOpenToolCallDetail: OpenToolCallDetailHandler;
   onOpenDeferredHistoryItemDetail: OpenDeferredHistoryItemDetailHandler;
   onSelectArtifact?: SelectArtifactHandler;
-  onBeforeMessageResize?: () => void;
+  onBeforeMessageResize?: (anchor?: Element | null) => void;
   scrollRootRef: RefObject<HTMLDivElement | null>;
   articleRef?: RefCallback<HTMLElement> | undefined;
-  isLatestVisibleTurn?: boolean;
 }
 
 function isTerminalTurnStatus(status: TimelineTurn['status']) {
@@ -457,125 +496,30 @@ export function formatWorkedDuration(
     endMillis === null ||
     endMillis < startMillis
   ) {
-    return 'Worked';
+    return translate("chat.worked");
   }
 
+  // Whole seconds rounded down, like the turn head, so both show the same time.
   const totalSeconds = Math.max(
     1,
-    Math.round((endMillis - startMillis) / 1000),
+    Math.floor((endMillis - startMillis) / 1000),
   );
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
   if (hours > 0) {
-    return `Worked for ${hours}h ${minutes}m`;
+    return translate("chat.workedForHours", { hours, minutes });
   }
   if (minutes > 0) {
-    return `Worked for ${minutes}m ${seconds}s`;
+    return translate("chat.workedForMinutes", { minutes, seconds });
   }
-  return `Worked for ${seconds}s`;
+  return translate("chat.workedForSeconds", { seconds });
 }
 
-function formatRelativeTurnTime(
-  startedAt: string | null | undefined,
-  timestamp: string | null | undefined,
-) {
-  const startMillis = Date.parse(startedAt ?? '');
-  const itemMillis = Date.parse(timestamp ?? '');
-  if (!Number.isFinite(startMillis) || !Number.isFinite(itemMillis)) {
-    return timestamp ? formatShortTimestamp(timestamp) : 'Time unavailable';
-  }
+import { TimelineTimeToggle } from './TimelineTimeToggle';
 
-  const totalSeconds = Math.max(
-    0,
-    Math.round((itemMillis - startMillis) / 1000),
-  );
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
 
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-  return `${seconds}s`;
-}
-
-function TimelineTimeToggle({
-  absoluteLabel,
-  className = '',
-  timestamp,
-  endTimestamp,
-  turnStartedAt,
-}: {
-  absoluteLabel: string;
-  endTimestamp?: string | null | undefined;
-  className?: string;
-  timestamp: string | null | undefined;
-  turnStartedAt: string | null | undefined;
-}) {
-  const [showAbsolute, setShowAbsolute] = useState(false);
-  if (!timestamp) {
-    return null;
-  }
-
-  const absoluteTitle = formatLongTimestamp(timestamp);
-  const relativeLabel = formatRelativeTurnTime(turnStartedAt, timestamp);
-  const hasRange = endTimestamp && endTimestamp !== timestamp;
-  const label = showAbsolute
-    ? absoluteLabel + (hasRange ? ` – ${formatShortTimestamp(endTimestamp)}` : '')
-    : relativeLabel + (hasRange ? ` – ${formatRelativeTurnTime(turnStartedAt, endTimestamp)}` : '');
-
-  return (
-    <span
-      role="button"
-      tabIndex={0}
-      className={`thread-graph-relative-time rounded-full px-1.5 py-0.5 ${className}`}
-      title={showAbsolute ? relativeLabel : absoluteTitle}
-      aria-label={`Toggle timestamp, currently ${label}`}
-      onClick={(event) => {
-        event.stopPropagation();
-        setShowAbsolute((value) => !value);
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') {
-          return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        setShowAbsolute((value) => !value);
-      }}
-    >
-      <time dateTime={timestamp}>{label}</time>
-    </span>
-  );
-}
-
-function firstHistoryEntryTimestamp(
-  entry: TimelineHistoryEntry,
-): string | null {
-  if (entry.kind === 'item') {
-    return entry.item.createdAt ?? null;
-  }
-  if (entry.kind === 'agentActivityGroup') {
-    return entry.entries[0]
-      ? firstHistoryEntryTimestamp(entry.entries[0])
-      : null;
-  }
-  return entry.items.find((item) => item.createdAt)?.createdAt ?? null;
-}
-
-function lastHistoryEntryTimestamp(entry: TimelineHistoryEntry): string | null {
-  if (entry.kind === 'item') return entry.item.updatedAt ?? entry.item.createdAt ?? null;
-  if (entry.kind === 'agentActivityGroup') {
-    const timestamps = entry.entries.map(lastHistoryEntryTimestamp).filter((value): value is string => Boolean(value));
-    return timestamps.sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1) ?? null;
-  }
-  return entry.items.map(item=>item.updatedAt ?? item.createdAt).filter((value): value is string => Boolean(value)).sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1) ?? null;
-}
 
 function collapsedSummaryMessages(entries: TimelineHistoryEntry[], active: boolean) {
   const itemEntries = entries.filter(
@@ -588,7 +532,6 @@ function collapsedSummaryMessages(entries: TimelineHistoryEntry[], active: boole
       (item): item is ThreadHistoryItemDto & { kind: 'userMessage' } =>
         item.kind === 'userMessage',
     );
-  const last = entries.at(-1);
   const latestAgent = itemEntries
     .map((entry) => entry.item)
     .reverse()
@@ -596,27 +539,45 @@ function collapsedSummaryMessages(entries: TimelineHistoryEntry[], active: boole
       (item): item is ThreadHistoryItemDto & { kind: 'agentMessage' } =>
         item.kind === 'agentMessage' && item.text.trim().length > 0,
     );
-  const finalAgent = active && !(last?.kind === 'item' && last.item.kind === 'agentMessage') ? undefined : latestAgent;
+  const hasBackgroundOrigin = (entry: TimelineHistoryEntry): boolean => {
+    if (entry.kind === 'agentActivityGroup') return entry.entries.some(hasBackgroundOrigin);
+    return entry.kind === 'item' &&
+      (entry.item.origin === 'nativeBackgroundWait' || entry.item.origin === 'nativeTaskNotification');
+  };
+  const hasBackground = entries.some(hasBackgroundOrigin);
+  // Keep the latest narration visible while working, including during tools or
+  // a background wait. Completed background turns require a confirmed final
+  // reply; a completed progress item alone is not proof that the turn finished.
+  const summaryAgent = active || !hasBackground
+    ? latestAgent
+    : (latestAgent?.responsePhase === 'final' ? latestAgent : undefined);
   const hiddenEntries = entries.filter((entry) => {
     if (entry.kind !== 'item') {
       return true;
     }
 
     return (
-      entry.item.kind !== 'userMessage' && entry.item.id !== finalAgent?.id
+      entry.item.kind !== 'userMessage' && entry.item.id !== summaryAgent?.id
     );
   });
 
   return {
     users,
     latestAgent,
-    finalAgent,
+    summaryAgent,
     hiddenEntries,
   };
 }
 
 export const ThreadTurnRow = memo(function ThreadTurnRow({
+  peerWorkChildren,
+  peerWorkSteps = 0,
+  peerWaitingForWake,
+  summaryAgentOverride,
+  nestedPeerWork = false,
+  omitAgentId,
   threadId,
+  revealTarget,
   adapter,
   turn,
   absoluteIndex,
@@ -626,7 +587,11 @@ export const ThreadTurnRow = memo(function ThreadTurnRow({
   liveActivityAt = null,
   liveOutput,
   forceActive = false,
+  backgroundAgentCount = 0,
+  renderTurnNotification,
   onToggleCollapse,
+  onLoadTurnItems,
+  narrationMode = false,
   deferredItemsLoading = false,
   deferredItemsError,
   onOpenExpandedText,
@@ -637,8 +602,9 @@ export const ThreadTurnRow = memo(function ThreadTurnRow({
   onBeforeMessageResize,
   scrollRootRef,
   articleRef,
-  isLatestVisibleTurn = false,
 }: ThreadTurnRowProps) {
+  const { locale: i18nLocale } = useI18n();
+  const showReasoningSummaries = useAppShellNav()?.showReasoningSummaries ?? false;
   const hasLiveActivity =
     Boolean(livePlan) ||
     Boolean(liveOutput) ||
@@ -646,8 +612,7 @@ export const ThreadTurnRow = memo(function ThreadTurnRow({
   const activeForRendering =
     forceActive ||
     isActiveTurnStatus(turn.status) ||
-    hasLiveActivity ||
-    isLatestVisibleTurn;
+    (hasLiveActivity && !isTerminalTurnStatus(turn.status));
   const activeFooterTurn: TimelineTurn =
     activeForRendering && !isActiveTurnStatus(turn.status)
       ? {
@@ -659,50 +624,109 @@ export const ThreadTurnRow = memo(function ThreadTurnRow({
     () => mergeLiveTurnItems(turn.items, liveItems),
     [liveItems, turn.items],
   );
+  const stepCount = useMemo(
+    () => countTurnSteps({ hasDeferredItems: turn.hasDeferredItems, deferredItemCount: turn.deferredItemCount }, mergedItems, turn.items),
+    [mergedItems, turn.items, turn.hasDeferredItems, turn.deferredItemCount],
+  );
   const lastActivityAt = useMemo(
     () => latestActivityTimestamp(turn.startedAt, mergedItems, liveActivityAt),
     [liveActivityAt, mergedItems, turn.startedAt],
   );
-  const displayedLivePlan = useMemo(
-    () => deriveDisplayedLivePlan(livePlan, mergedItems, turn.status),
-    [livePlan, mergedItems, turn.status],
-  );
+  // The plan reads as the agent last reported it; the transcript does not guess progress.
+  const displayedLivePlan = livePlan;
   const visibleLiveOutput = useMemo(
     () => getLiveOutputTailForTurn(liveOutput, mergedItems),
     [liveOutput, mergedItems],
   );
-  const preparedItems = useMemo(
-    () => prepareTurnItemsForRendering(mergedItems, activeForRendering),
-    [activeForRendering, mergedItems],
+  // A failed turn's error sits on its prompt; a reply that only repeats it is left out.
+  const failedWith = turn.status === 'failed' && turn.error ? turn.error : null;
+  const preparedItems = useMemo(() => {
+    // ElAgente: a tool's usage report joins its progress row; a usage-only item has no row.
+    const tools = new Map<string, NonNullable<ThreadHistoryItemDto['usage']>>();
+    for (const item of scopeUsageItems({ id: turn.id, items: mergedItems, usageByScope: turn.usageByScope })) {
+      const usage = usageEvidence(item);
+      if (usage?.scope !== 'tool') continue;
+      const previous = tools.get(usage.scopeId);
+      if (!previous || Date.parse(usage.observedAt) >= Date.parse(previous.observedAt)) tools.set(usage.scopeId, usage);
+    }
+    return prepareTurnItemsForRendering(mergedItems, activeForRendering).filter(item =>
+      (showReasoningSummaries || item.kind !== 'reasoning') &&
+      (!nestedPeerWork || item.kind !== 'userMessage') && item.id !== omitAgentId &&
+      !(failedWith && item.kind === 'agentMessage' && echoesFailure(failedWith, item.text)) &&
+      !(item.kind === 'other' && !item.text?.trim() && !item.progress && usageEvidence(item)))
+      .map(item => {
+        const progress = progressEvidence(item).data;
+        const usage = progress ? tools.get(progress.callId) : undefined;
+        return usage ? { ...item, usage } : item;
+      });
+  }, [activeForRendering, mergedItems, showReasoningSummaries, nestedPeerWork, omitAgentId, failedWith, turn.id, turn.usageByScope]);
+  // The first prompt started the turn; any later one was added while it worked.
+  const prompts = preparedItems.filter(item => item.kind === 'userMessage');
+  const firstPromptId = prompts[0]?.id;
+  const promptContext = useMemo(
+    () => firstPromptId ? { firstPromptId, error: failedWith } : null,
+    [failedWith, firstPromptId],
   );
   const groupedItems = useMemo(
     () => groupTimelineHistoryItems(preparedItems),
     [preparedItems],
   );
   const autoOpenLatestToolDetails =
-    forceActive || isActiveTurnStatus(turn.status) || hasLiveActivity;
+    activeForRendering;
   const turnTimeLabel = formatShortTimestamp(turn.startedAt);
   const turnTimeTitle = formatLongTimestamp(turn.startedAt);
   const visibleLiveHookPrompt = useMemo(
     () => parseHookPromptText(visibleLiveOutput),
-    [visibleLiveOutput],
+    [visibleLiveOutput, i18nLocale],
   );
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
     {},
   );
+  // The run a reader opened from a folded turn's narration; null is the last run.
+  const [openRunBefore, setOpenRunBefore] = useState<string | null | undefined>(undefined);
+  // The reader unfolded the turn from its work line: work that is one run opens with it.
+  const [openSoleRun, setOpenSoleRun] = useState(false);
+  // Stretches of work opened in a folded turn, by the answer they precede ('end' for the last).
+  const [openStretches, setOpenStretches] = useState<Set<string>>(() => new Set());
+  const revealedSearch = useRef<number | null>(null);
+  useEffect(() => {
+    if (!revealTarget || revealedSearch.current === revealTarget.key) return;
+    const keys: string[] = [];
+    function contains(entry: TimelineHistoryEntry): boolean {
+      if (entry.kind === 'item') return entry.item.id === revealTarget?.itemId;
+      const found = entry.kind === 'agentActivityGroup'
+        ? entry.entries.some(contains)
+        : entry.items.some(item => item.id === revealTarget?.itemId);
+      if (found) keys.push(entry.key);
+      return found;
+    }
+    if (groupedItems.some(contains)) {
+      revealedSearch.current = revealTarget.key;
+      setExpandedGroups(current => ({ ...current, ...Object.fromEntries(keys.map(key => [key, true])) }));
+    }
+  }, [groupedItems, revealTarget]);
 
-  const toggleGroupedItem = useCallback((groupKey: string) => {
+  const toggleGroupedItem = useCallback((groupKey: string, currentExpanded: boolean) => {
+    onBeforeMessageResize?.();
     setExpandedGroups((current) => ({
       ...current,
-      [groupKey]: !current[groupKey],
+      [groupKey]: !currentExpanded,
     }));
-  }, []);
+  }, [onBeforeMessageResize]);
 
-  const renderHistoryEntries = (entries: TimelineHistoryEntry[]) => (
+  const renderHistoryEntries = (entries: TimelineHistoryEntry[], options?: {
+    collapsed?: boolean;
+    onExpand?: () => void;
+    /** Open the last run of these entries (a stretch of work opened by the reader). */
+    openLastRun?: boolean;
+  }) => (
     <TimelineHistoryEntries
       entries={entries}
-      expandedGroups={expandedGroups}
-      onToggleGroupedItem={toggleGroupedItem}
+      expandedGroups={options?.collapsed ? {} : expandedGroups}
+      onToggleGroupedItem={options?.onExpand ? (key, current) => {
+        if (options.collapsed) options.onExpand?.();
+        toggleGroupedItem(key, options.collapsed ? false : current);
+      } : toggleGroupedItem}
       threadId={threadId}
       scrollRootRef={scrollRootRef}
       onOpenExpandedText={onOpenExpandedText}
@@ -715,6 +739,8 @@ export const ThreadTurnRow = memo(function ThreadTurnRow({
       fallbackTimeTitle={turnTimeTitle}
       turnStartedAt={turn.startedAt}
       autoOpenLatestToolDetails={autoOpenLatestToolDetails && entries.at(-1)?.key === groupedItems.at(-1)?.key}
+      {...(options?.openLastRun ? { openRunBefore: null } : openRunBefore !== undefined ? { openRunBefore } : {})}
+      openSoleRun={openSoleRun}
       {...(onSelectArtifact ? { onSelectArtifact } : {})}
       {...(adapter ? { adapter } : {})}
     />
@@ -764,148 +790,298 @@ export const ThreadTurnRow = memo(function ThreadTurnRow({
     <TurnStatusBar
       turn={activeFooterTurn}
       variant="footer"
+      notificationControl={renderTurnNotification?.(activeFooterTurn.id)}
       lastActivityAt={lastActivityAt}
+      backgroundAgentCount={backgroundAgentCount}
+      waitingForWake={peerWaitingForWake ?? mergedItems.some(item => item.origin === 'nativeBackgroundWait' && item.status === 'waiting')}
     />
   ) : null;
   const collapsedSummary = useMemo(
-    () => collapsedSummaryMessages(groupedItems, activeForRendering),
-    [groupedItems, activeForRendering],
+    () => {
+      const summary = collapsedSummaryMessages(groupedItems, activeForRendering);
+      return summaryAgentOverride === undefined ? summary : {
+        ...summary, summaryAgent: summaryAgentOverride ?? undefined,
+        hiddenEntries: groupedItems.filter(entry => entry.kind !== 'item' || entry.item.kind !== 'userMessage'),
+      };
+    },
+    [groupedItems, activeForRendering, summaryAgentOverride],
   );
   const workedLabel = useMemo(
-    () => turn.status === 'recovering' ? 'Confirming status' : activeForRendering ? 'Working' : formatWorkedDuration(turn.startedAt, turn.completedAt, mergedItems),
-    [activeForRendering, mergedItems, turn.completedAt, turn.startedAt, turn.status],
+    () => turn.status === 'recovering' ? translate("chat.confirmingStatus") : activeForRendering ? translate("chat.working") : formatWorkedDuration(turn.startedAt, turn.completedAt, mergedItems),
+    [activeForRendering, mergedItems, turn.completedAt, turn.startedAt, turn.status, i18nLocale],
   );
   const interruptedLabel =
     turn.status === 'interrupted' ? (
       <span className="thread-graph-worked-interrupted shrink-0 text-[11px]">
-        Interrupted
-      </span>
+        {translate("chat.interrupted")}</span>
     ) : null;
   const hasCollapsedHiddenItems =
-    collapsedSummary.hiddenEntries.length > 0 || Boolean(turn.hasDeferredItems);
+    collapsedSummary.hiddenEntries.length > 0 || Boolean(turn.hasDeferredItems) || Boolean(peerWorkChildren);
   const effectiveCollapsed = isCollapsed && hasCollapsedHiddenItems;
-  const visibleSummaryAgent = effectiveCollapsed ? collapsedSummary.latestAgent : collapsedSummary.finalAgent;
+  const visibleSummaryAgent = collapsedSummary.summaryAgent;
+  const answerSections = useMemo(() =>
+    groupedItems.some(entry => entry.kind === 'item' && isSubstantiveAnswer(entry.item) && (entry.item.id !== visibleSummaryAgent?.id || Array.from(entry.item.text.trim()).length >= 300))
+      ? groupAnswerSections(groupedItems.filter(entry => entry.kind !== 'item' || entry.item.kind !== 'userMessage'), visibleSummaryAgent?.id) : null,
+    [groupedItems, visibleSummaryAgent?.id]);
+
   const canToggleWorkedSummary =
     hasCollapsedHiddenItems;
+  const activityCounts = useMemo(() => turnActivity(turn, mergedItems), [turn, mergedItems]);
+  const summaryParts = hasActivity(activityCounts) ? activityParts(activityCounts) : [];
+  // The edit counts open the changed files on their own, without opening the work.
+  const fileParts = summaryParts.filter(part => FILE_PARTS.has(part.key));
+  const workParts = summaryParts.filter(part => !FILE_PARTS.has(part.key));
+  const [filesOpen, setFilesOpen] = useState(false);
+  const changedFiles = useMemo(() => turnChangedFiles(turn, mergedItems), [turn, mergedItems]);
+  // Only a finished turn is told from its summary; a working one loads as it streams.
+  const story = effectiveCollapsed || !narrationMode || !isTerminalTurnStatus(turn.status) ? null : storySegments(turn);
+  // When the turn started, its model and usage open the turn, above its prompt.
+  // ElAgente: a turn's validated usage report, when its Agent reports one, follows the head.
+  const structuredTurnUsage = latestUsage(scopeUsageItems({ id: turn.id, items: mergedItems, usageByScope: turn.usageByScope }), 'turn', turn.id);
+  const headNode = (<>
+    <TurnHead turn={turn} active={activeForRendering} added={Math.max(0, prompts.length - 1)}
+      {...(onBeforeMessageResize ? { onBeforeResize: onBeforeMessageResize } : {})} />
+    {structuredTurnUsage ? <StructuredUsageInline usage={structuredTurnUsage} scope="turn" /> : null}
+  </>);
+  // A turn that ended without recording anything (it was cut off before any
+  // output reached the Supervisor) still opens: to say so, and why.
+  const recordedNothing = isTerminalTurnStatus(turn.status) && !hasCollapsedHiddenItems
+    && !groupedItems.some(entry => entry.kind !== 'item' || entry.item.kind !== 'userMessage');
+  const [emptyOpen, setEmptyOpen] = useState(false);
   const terminalWorkedNode =
-    isTerminalTurnStatus(turn.status) && !hasCollapsedHiddenItems ? (
+    isTerminalTurnStatus(turn.status) && !hasCollapsedHiddenItems ? recordedNothing ? (
+      <>
+        <div className="thread-graph-worked-summary flex w-full items-center gap-2 py-2 text-sm">
+          <TranscriptAgentByline />
+          <button type="button" className="thread-worked-toggle group flex min-w-0 items-center gap-2 text-left transition"
+            aria-expanded={emptyOpen} onClick={(event) => { onBeforeMessageResize?.(event.currentTarget); setEmptyOpen(open => !open); }}>
+            <ChevronRight className={`thread-worked-chevron h-4 w-4 shrink-0 transition ${emptyOpen ? 'rotate-90' : ''}`} />
+            <span className="thread-graph-worked-label shrink-0">{workedLabel}</span>
+            {interruptedLabel}
+          </button>
+          <span className="thread-graph-worked-rule h-px min-w-0 flex-1" aria-hidden="true" />
+        </div>
+        <Collapse open={emptyOpen}>
+          <div className="thread-graph-turn-empty-note">
+            <p>{translate('chat.turnRecordedNothing')}</p>
+            {turn.error ? <p className="thread-graph-turn-empty-reason">{turnErrorText(turn.error)}</p> : null}
+          </div>
+        </Collapse>
+      </>
+    ) : (
       <div className="thread-graph-worked-summary flex w-full items-center gap-2 py-2 text-sm">
+        <TranscriptAgentByline />
         <span className="thread-graph-worked-label shrink-0">
           {workedLabel}
         </span>
         {interruptedLabel}
-        <TurnUsageInline turn={turn} />
+        <ActivitySummary parts={summaryParts} />
         <span
           className="thread-graph-worked-rule h-px min-w-0 flex-1"
           aria-hidden="true"
         />
       </div>
     ) : null;
+  const leadingUserCount = groupedItems.findIndex(
+    (entry) => !(entry.kind === 'item' && entry.item.kind === 'userMessage'),
+  );
+  const renderSummaryAgent = (item: ThreadHistoryItemDto & { kind: 'agentMessage' }) => (
+    <CompactMessageItem
+      threadId={threadId}
+      item={item}
+      streaming={activeForRendering && isRunningHistoryStatus(item.status)}
+      scrollRootRef={scrollRootRef}
+      timeTitle={item.createdAt ? formatLongTimestamp(item.createdAt) : turnTimeTitle}
+      {...(onBeforeMessageResize ? { onBeforeMessageResize } : {})}
+      {...(adapter ? { adapter } : {})}
+    />
+  );
+  // While a folded turn works, the operation after its latest narration says what it is doing now.
+  const currentOperation = useMemo(() => {
+    if (!activeForRendering) return null;
+    const narration = visibleSummaryAgent ? mergedItems.findIndex(item => item.id === visibleSummaryAgent.id) : -1;
+    const index = mergedItems.findLastIndex(item => isLogItem(item) && item.kind !== 'reasoning');
+    return index > narration ? mergedItems[index]! : null;
+  }, [activeForRendering, mergedItems, visibleSummaryAgent]);
+  const logEntries = leadingUserCount < 0 ? [] : groupedItems.slice(leadingUserCount);
+  // A finished turn's answer has one place, below its work, folded or open: it
+  // never moves into the opening work (where it would vanish for a moment).
+  const finalAnswer = isTerminalTurnStatus(turn.status) && visibleSummaryAgent ? visibleSummaryAgent : null;
+  const lastLogEntry = logEntries.at(-1);
+  const answerInLog = Boolean(finalAnswer && lastLogEntry?.kind === 'item' && lastLogEntry.item.id === finalAnswer.id);
+  const processEntries = answerInLog ? logEntries.slice(0, -1) : logEntries;
+  // Prompts that started the turn sit above its work line; prompts added while it
+  // worked sit below it when folded, so opening or folding the turn never moves
+  // what is above the line.
+  const leadingPrompts = leadingUserCount < 0 ? collapsedSummary.users.length : leadingUserCount;
+  const renderPrompt = (item: (typeof collapsedSummary.users)[number]) => (
+    <CompactMessageItem
+      key={item.id}
+      threadId={threadId}
+      item={item}
+      scrollRootRef={scrollRootRef}
+      timeTitle={item.createdAt ? formatLongTimestamp(item.createdAt) : turnTimeTitle}
+      {...(onBeforeMessageResize ? { onBeforeMessageResize } : {})}
+      {...(adapter ? { adapter } : {})}
+    />
+  );
   const collapsedSummaryNode =
     hasCollapsedHiddenItems ? (
       <div className="thread-graph-turn-collapsed-summary space-y-2">
-        {collapsedSummary.users.map((item) => (
-          <CompactMessageItem
-            key={item.id}
-            threadId={threadId}
-            item={item}
-            scrollRootRef={scrollRootRef}
-            timeLabel={
-              item.createdAt
-                ? formatMessageTimestamp(item.createdAt)
-                : formatMessageTimestamp(turn.startedAt)
-            }
-            timeTitle={
-              item.createdAt
-                ? formatLongTimestamp(item.createdAt)
-                : turnTimeTitle
-            }
-            {...(onBeforeMessageResize ? { onBeforeMessageResize } : {})}
-            {...(adapter ? { adapter } : {})}
-          />
-        ))}
+        {collapsedSummary.users.slice(0, leadingPrompts).map(renderPrompt)}
         <div className="thread-graph-worked-summary flex w-full items-center gap-2 py-2 text-sm">
+          <TranscriptAgentByline />
           <button
             type="button"
-            className="group flex shrink-0 items-center gap-2 text-left transition"
-          onClick={() => onToggleCollapse(turn, effectiveCollapsed)}
-          disabled={deferredItemsLoading}
-          aria-label={`${workedLabel}. ${effectiveCollapsed ? 'Expand' : 'Collapse'} turn ${absoluteIndex}`}
-          aria-expanded={!effectiveCollapsed}
-        >
-          <span className="thread-graph-worked-label shrink-0">
+            className="thread-worked-toggle group flex min-w-0 items-center gap-2 text-left transition"
+            onClick={(event) => {
+              if (deferredItemsLoading) return;
+              onBeforeMessageResize?.(event.currentTarget);
+              setOpenSoleRun(effectiveCollapsed);
+              onToggleCollapse(turn, effectiveCollapsed);
+            }}
+            aria-label={translate("chat.turn_6e6e38", { value1: workedLabel, value2: effectiveCollapsed ? translate("chat.expand") : translate("chat.collapse"), value3: absoluteIndex })}
+            aria-expanded={!effectiveCollapsed}
+            aria-busy={deferredItemsLoading}
+            title={deferredItemsLoading ? translate("chat.loadingCompleteHistory") : undefined}
+          >
+            {/* Loading only turns the chevron into a spinner; the line itself stays put. */}
             {deferredItemsLoading
-              ? 'Loading complete history...'
-              : deferredItemsError
-                ? 'History unavailable, retry'
-                : workedLabel}
-          </span>
-          {interruptedLabel}
-          <ChevronRight className={`h-4 w-4 shrink-0 transition ${effectiveCollapsed ? '' : 'rotate-90'}`} />
+              ? <span className="tlog-spinner thread-worked-spinner" role="img" aria-label={translate("chat.loadingCompleteHistory")} />
+              : <ChevronRight className={`thread-worked-chevron h-4 w-4 shrink-0 transition ${effectiveCollapsed ? '' : 'rotate-90'}`} />}
+            <span className="thread-graph-worked-label shrink-0">
+              {deferredItemsError ? translate("chat.historyUnavailableRetry") : workedLabel}
+            </span>
+            {interruptedLabel}
+            {workParts.length
+              ? <ActivitySummary parts={workParts} />
+              : fileParts.length ? null : <span className="thread-execution-step-count">{stepCount + peerWorkSteps} {translate("chat.steps")}</span>}
           </button>
-          <TurnUsageInline turn={turn} />
+          {fileParts.length && changedFiles.length ? (
+            <button type="button" className="tlog-files-toggle" aria-expanded={filesOpen} title={translate('chat.logShowFiles')}
+              onClick={(event) => { onBeforeMessageResize?.(event.currentTarget); setFilesOpen(value => !value); }}>
+              <span className="tlog-sep" aria-hidden="true">·</span><Parts parts={fileParts} />
+            </button>
+          ) : fileParts.length ? <span className="tlog-summary"><span className="tlog-sep" aria-hidden="true">·</span><Parts parts={fileParts} /></span> : null}
           <span
             className="thread-graph-worked-rule h-px min-w-0 flex-1"
             aria-hidden="true"
           />
         </div>
-        {!effectiveCollapsed ? renderHistoryEntries(collapsedSummary.hiddenEntries) : null}
-        {visibleSummaryAgent ? (
-          <CompactMessageItem
-            threadId={threadId}
-            item={visibleSummaryAgent}
-            scrollRootRef={scrollRootRef}
-            timeLabel={
-              visibleSummaryAgent.createdAt
-                ? formatPreciseMessageTimestamp(
-                    visibleSummaryAgent.createdAt,
-                  )
-                : formatPreciseMessageTimestamp(turn.startedAt)
-            }
-            timeTitle={
-              visibleSummaryAgent.createdAt
-                ? formatLongTimestamp(visibleSummaryAgent.createdAt)
-                : turnTimeTitle
-            }
-            {...(onBeforeMessageResize ? { onBeforeMessageResize } : {})}
-            {...(adapter ? { adapter } : {})}
+        <Collapse open={filesOpen}><ChangedFiles files={changedFiles} total={activityCounts?.fileCount} /></Collapse>
+        {effectiveCollapsed ? collapsedSummary.users.slice(leadingPrompts).map(renderPrompt) : null}
+        {/* The work: folded into the line above when the turn ends, unfolded on request. */}
+        <Collapse open={!effectiveCollapsed}>
+          {story ? (
+            <div className="thread-execution-timeline is-story">
+              {storyBlocks(processEntries, story, answerInLog ? finalAnswer!.id : null).map((block) => block.kind === 'run'
+                ? <RunPlaceholder key={`run:${block.segment.before ?? 'end'}`} segment={block.segment} loading={deferredItemsLoading}
+                    onOpen={() => { setOpenRunBefore(block.segment.before); onToggleCollapse(turn, true, true); }} />
+                : <Fragment key={block.entry.key}>{renderHistoryEntries([block.entry])}</Fragment>)}
+              {peerWorkChildren}
+            </div>
+          ) : (
+            <div className="thread-execution-timeline">
+              {renderHistoryEntries(processEntries)}
+              {peerWorkChildren}
+            </div>
+          )}
+        </Collapse>
+        {effectiveCollapsed && answerSections ? <div className="thread-answer-sequence">
+          {foldedAnswerBlocks(answerSections, turn.activity?.segments, finalAnswer?.id).map(block => {
+            if (block.kind === 'answer') return (
+              <div className="thread-answer-section" key={block.entry.key}>
+                {block.entry.item.kind !== 'agentMessage' ? renderHistoryEntries([block.entry]) : <CompactMessageItem threadId={threadId} item={block.entry.item as ThreadHistoryItemDto & { kind: 'agentMessage' }}
+                  streaming={block.entry.item.id === visibleSummaryAgent?.id && activeForRendering && isRunningHistoryStatus(block.entry.item.status)}
+                  scrollRootRef={scrollRootRef}
+                  timeTitle={block.entry.item.createdAt ? formatLongTimestamp(block.entry.item.createdAt) : turnTimeTitle}
+                  {...(onBeforeMessageResize ? { onBeforeMessageResize } : {})}
+                  {...(adapter ? { adapter } : {})} />}
+              </div>
+            );
+            // A stretch of work between two answers opens in place, under its line;
+            // the rest of the turn stays folded and nothing above it moves.
+            const key = block.before ?? 'end';
+            const open = openStretches.has(key);
+            return (
+              <div className="thread-execution-timeline" key={`gap:${key}`}>
+                <RunPlaceholder segment={block.stretch} loading={open && deferredItemsLoading} open={open && block.work.length > 0}
+                  onOpen={() => {
+                    setOpenStretches(current => { const next = new Set(current); if (!next.delete(key)) next.add(key); return next; });
+                    if (!open && turn.hasDeferredItems) onLoadTurnItems?.(turn);
+                  }} />
+                {open && block.work.length > 0 ? <div className="thread-stretch-work">{renderHistoryEntries(block.work, { openLastRun: true })}</div> : null}
+              </div>
+            );
+          })}
+        </div> : null}
+        {/* A finished turn's answer stays below its work, folded or not. */}
+        {finalAnswer && (effectiveCollapsed || answerInLog || !mergedItems.some(item => item.id === finalAnswer.id))
+          ? renderSummaryAgent(finalAnswer) : null}
+        {effectiveCollapsed && !finalAnswer && visibleSummaryAgent && !answerSections?.some(entry => entry.kind === 'item' && entry.item.id === visibleSummaryAgent.id)
+          ? renderSummaryAgent(visibleSummaryAgent) : null}
+        {effectiveCollapsed && currentOperation ? <div className="tlog-current"><LogRow key={currentOperation.id} item={currentOperation} /></div> : null}
+        {/* The plan and status leave with the work when the turn ends. */}
+        <Collapse open={activeForRendering}>
+          <GraphChatTurnBody
+            footer={footerNode}
+            history={null}
+            liveHookPrompt={liveHookPromptNode}
+            liveOutput={liveOutputNode}
+            livePlan={displayedLivePlan}
           />
-        ) : null}
-        {activeForRendering ? <GraphChatTurnBody
-          footer={footerNode}
-          history={null}
-          liveHookPrompt={liveHookPromptNode}
-          liveOutput={liveOutputNode}
-          livePlan={displayedLivePlan}
-        /> : null}
+        </Collapse>
       </div>
     ) : null;
+  // Prompt, what the agent did, then its answer and the receipt.
+  const terminalHistoryNode =
+    terminalWorkedNode && leadingUserCount > 0 ? (
+      <>
+        {renderHistoryEntries(groupedItems.slice(0, leadingUserCount))}
+        {terminalWorkedNode}
+        {renderHistoryEntries(groupedItems.slice(leadingUserCount))}
+      </>
+    ) : (
+      <>{historyNode}{terminalWorkedNode}</>
+    );
   const turnBody = (
     <GraphChatTurnBody
       footer={footerNode}
-      history={<>{historyNode}{terminalWorkedNode}</>}
+      history={terminalHistoryNode}
       liveHookPrompt={liveHookPromptNode}
       liveOutput={liveOutputNode}
       livePlan={displayedLivePlan}
     />
   );
 
+  if (nestedPeerWork) return <MessageExpansionScope key={`${threadId ?? ''}:${turn.id}`}><TurnEvidenceStatusContext.Provider value={turn.status}>
+    <div className="thread-peer-execution">{historyNode}{liveHookPromptNode}{liveOutputNode}
+      {turn.error ? <p role="alert">{turn.error}</p> : null}
+    </div>
+  </TurnEvidenceStatusContext.Provider></MessageExpansionScope>;
+
   return (
     <MessageExpansionScope key={`${threadId ?? ''}:${turn.id}`}>
+    <TurnEvidenceStatusContext.Provider value={turn.status}>
+    <TurnPromptContext.Provider value={promptContext}>
     <GraphChatTurnFrame
       absoluteIndex={absoluteIndex}
       body={canToggleWorkedSummary ? collapsedSummaryNode : turnBody}
       collapsed={effectiveCollapsed}
       collapsedBody={collapsedSummaryNode}
-      error={turn.error}
+      error={(failedWith && firstPromptId) || recordedNothing || !turn.error ? null : turnErrorText(turn.error)}
+      head={headNode}
       headerStatus={<TurnStatusBar turn={turn} />}
       isActive={activeForRendering}
+      status={turn.status}
       refCallback={articleRef}
       startedAt={turn.startedAt}
       timeLabel={turnTimeLabel}
       timeTitle={turnTimeTitle}
       tokenSummary={<TurnTokenSummary turn={turn} />}
     />
+    </TurnPromptContext.Provider>
+    </TurnEvidenceStatusContext.Provider>
     </MessageExpansionScope>
   );
 });
@@ -913,7 +1089,11 @@ export const ThreadTurnRow = memo(function ThreadTurnRow({
 interface TimelineHistoryEntriesProps {
   entries: TimelineHistoryEntry[];
   expandedGroups: Record<string, boolean>;
-  onToggleGroupedItem: (groupKey: string) => void;
+  onToggleGroupedItem: (groupKey: string, currentExpanded: boolean) => void;
+  /** Open the run before this item (null: the last run), once the turn has loaded. */
+  openRunBefore?: string | null;
+  /** Open the run when it is the whole of these entries. */
+  openSoleRun?: boolean;
   threadId: string | undefined;
   scrollRootRef: RefObject<HTMLDivElement | null>;
   fallbackTimestamp?: string | null | undefined;
@@ -926,7 +1106,7 @@ interface TimelineHistoryEntriesProps {
   onOpenToolCallDetail: OpenToolCallDetailHandler;
   onOpenDeferredHistoryItemDetail: OpenDeferredHistoryItemDetailHandler;
   onSelectArtifact?: SelectArtifactHandler;
-  onBeforeMessageResize?: () => void;
+  onBeforeMessageResize?: (anchor?: Element | null) => void;
   adapter?: ThreadTimelineAdapter | undefined;
 }
 
@@ -948,7 +1128,10 @@ function TimelineHistoryEntries({
   fallbackTimeTitle,
   turnStartedAt,
   autoOpenLatestToolDetails = false,
+  openRunBefore,
+  openSoleRun = false,
 }: TimelineHistoryEntriesProps) {
+  const { locale: i18nLocale } = useI18n();
   const latestEntryKey = entries.at(-1)?.key ?? null;
   const relativeTimeMeta = useCallback(
     (timestamp: string | null | undefined, endTimestamp?: string | null) =>
@@ -957,138 +1140,184 @@ function TimelineHistoryEntries({
           absoluteLabel={formatShortTimestamp(timestamp)}
           timestamp={timestamp}
           endTimestamp={endTimestamp}
+          displayMode={endTimestamp ? 'duration' : 'offset'}
           turnStartedAt={turnStartedAt ?? fallbackTimestamp}
         />
       ) : null,
     [fallbackTimestamp, turnStartedAt],
   );
 
+  const renderItem = (item: ThreadHistoryItemDto, key: string) => {
+    const timestamp = timestampForHistoryItem(item, fallbackTimestamp ?? null);
+    const isUserMessage = item.kind === 'userMessage';
+    const isAgentMessage = item.kind === 'agentMessage' || item.kind === 'reasoning';
+    const timeLabel = isUserMessage
+      ? formatMessageTimestamp(timestamp)
+      : isAgentMessage
+        ? formatPreciseMessageTimestamp(timestamp)
+        : fallbackTimeLabel;
+    return (
+      <HistoryItemRow
+        key={key}
+        threadId={threadId}
+        item={item}
+        scrollRootRef={scrollRootRef}
+        // Messages read as one log; their time shows on hover.
+        timeLabel={isAgentMessage || isUserMessage ? null : timeLabel}
+        timeTitle={item.createdAt ? formatLongTimestamp(timestamp) : fallbackTimeTitle}
+        timeMeta={relativeTimeMeta(timestamp)}
+        autoOpenToolDetails={autoOpenLatestToolDetails && key === latestEntryKey}
+        onOpenExpandedText={onOpenExpandedText}
+        onOpenCommandDetail={onOpenCommandDetail}
+        onOpenToolCallDetail={onOpenToolCallDetail}
+        onOpenDeferredHistoryItemDetail={onOpenDeferredHistoryItemDetail}
+        {...(onBeforeMessageResize ? { onBeforeMessageResize } : {})}
+        {...(onSelectArtifact ? { onSelectArtifact } : {})}
+        {...(adapter ? { adapter } : {})}
+      />
+    );
+  };
+
+  const blocks = logBlocks(entries);
+  const lastKey = blocks.at(-1)?.key;
+  const lastRunKey = blocks.findLast((block) => block.kind === 'run')?.key;
+  // Work that is one run opens with the work line the reader just unfolded: its
+  // summary would only repeat that line.
+  const soleRun = openSoleRun && blocks.length === 1 && blocks[0]!.kind === 'run';
   return (
-    <GraphChatHistoryEntries<TimelineHistoryEntry>
-      entries={entries}
-      expandedGroups={expandedGroups}
-      onToggleGroupedItem={onToggleGroupedItem}
-      renderCommandGroup={(entry, expanded, onToggleExpanded) => (
-        <CommandGroupItem
-          key={entry.key}
-          items={entry.items}
-          expanded={expanded}
-          onToggleExpanded={onToggleExpanded}
-          onOpen={onOpenCommandDetail}
-          timeMeta={relativeTimeMeta(firstHistoryEntryTimestamp(entry), lastHistoryEntryTimestamp(entry))}
-        />
-      )}
-      renderFileChangeGroup={(entry, expanded, onToggleExpanded) => (
-        <FileChangeGroupItem
-          key={entry.key}
-          items={entry.items}
-          expanded={expanded}
-          onToggleExpanded={onToggleExpanded}
-          onOpen={onOpenExpandedText}
-          timeMeta={relativeTimeMeta(firstHistoryEntryTimestamp(entry), lastHistoryEntryTimestamp(entry))}
-        />
-      )}
-      renderSearchGroup={(entry, expanded, onToggleExpanded) => (
-        <SearchGroupItem
-          key={entry.key}
-          items={entry.items}
-          expanded={expanded}
-          onToggleExpanded={onToggleExpanded}
-          onOpen={onOpenExpandedText}
-          timeMeta={relativeTimeMeta(firstHistoryEntryTimestamp(entry), lastHistoryEntryTimestamp(entry))}
-        />
-      )}
-      renderFileReadGroup={(entry, expanded, onToggleExpanded) => (
-        <FileReadGroupItem
-          key={entry.key}
-          items={entry.items}
-          expanded={expanded}
-          onToggleExpanded={onToggleExpanded}
-          onOpen={onOpenExpandedText}
-          timeMeta={relativeTimeMeta(firstHistoryEntryTimestamp(entry), lastHistoryEntryTimestamp(entry))}
-        />
-      )}
-      renderToolCallGroup={(entry, expanded, onToggleExpanded) => (
-        <ToolCallGroupItem
-          key={entry.key}
-          items={entry.items}
-          expanded={expanded}
-          onToggleExpanded={onToggleExpanded}
-          onOpen={onOpenToolCallDetail}
-          timeMeta={relativeTimeMeta(firstHistoryEntryTimestamp(entry), lastHistoryEntryTimestamp(entry))}
-        />
-      )}
-      renderAgentActivityGroup={(entry, expanded, onToggleExpanded) => (
-        <AgentActivityGroupItem
-          key={entry.key}
-          itemCount={entry.itemCount}
-          running={autoOpenLatestToolDetails && entry.key === latestEntryKey}
-          expanded={expanded}
-          onToggleExpanded={onToggleExpanded}
-          timeMeta={relativeTimeMeta(
-            firstHistoryEntryTimestamp(entry), lastHistoryEntryTimestamp(entry),
-          )}
-        >
-          <TimelineHistoryEntries
-            entries={entry.entries}
-            expandedGroups={expandedGroups}
-            onToggleGroupedItem={onToggleGroupedItem}
-            threadId={threadId}
-            scrollRootRef={scrollRootRef}
-            onOpenExpandedText={onOpenExpandedText}
-            onOpenCommandDetail={onOpenCommandDetail}
-            onOpenToolCallDetail={onOpenToolCallDetail}
-            onOpenDeferredHistoryItemDetail={onOpenDeferredHistoryItemDetail}
-            {...(onBeforeMessageResize ? { onBeforeMessageResize } : {})}
-            fallbackTimestamp={fallbackTimestamp}
-            fallbackTimeLabel={fallbackTimeLabel}
-            fallbackTimeTitle={fallbackTimeTitle}
-            turnStartedAt={turnStartedAt}
-            autoOpenLatestToolDetails={false}
-            {...(onSelectArtifact ? { onSelectArtifact } : {})}
-            {...(adapter ? { adapter } : {})}
-          />
-        </AgentActivityGroupItem>
-      )}
-      renderItem={(entry) => {
-        const timestamp = timestampForHistoryItem(
-          entry.item,
-          fallbackTimestamp ?? null,
-        );
-        const isUserMessage = entry.item.kind === 'userMessage';
-        const isAgentMessage =
-          entry.item.kind === 'agentMessage' || entry.item.kind === 'reasoning';
-        const timeLabel = isUserMessage
-          ? formatMessageTimestamp(timestamp)
-          : isAgentMessage
-            ? formatPreciseMessageTimestamp(timestamp)
-            : fallbackTimeLabel;
+    <>
+      {blocks.map((block, index) => {
+        if (block.kind === 'item') {
+          // A lone operation between messages is already one line.
+          // The latest operation of a working turn shows its edit; earlier ones stay folded.
+          return isLogItem(block.item)
+            ? <div key={block.key} className="tlog-single"><LogRow item={block.item} defaultOpen={autoOpenLatestToolDetails && block.key === lastKey && opensDiff(block.item)} /></div>
+            : renderItem(block.item, block.key);
+        }
+        // The run a working turn is in stays open; once narration or another run follows, it folds.
+        const live = autoOpenLatestToolDetails && block.key === lastKey;
+        const next = blocks[index + 1];
+        const opened = openRunBefore === null ? block.key === lastRunKey
+          : openRunBefore !== undefined && (next?.kind === 'item'
+            ? next.item.id === openRunBefore
+            // The item it precedes may be the answer, shown below the work.
+            : block.key === lastRunKey && !blocks.some(other => other.kind === 'item' && other.item.id === openRunBefore));
+        const expanded = expandedGroups[block.key] ?? expandedGroups[block.parentKey] ?? (live || opened || soleRun);
         return (
-          <HistoryItemRow
-            key={entry.key}
-            threadId={threadId}
-            item={entry.item}
-            scrollRootRef={scrollRootRef}
-            timeLabel={timeLabel}
-            timeTitle={
-              entry.item.createdAt
-                ? formatLongTimestamp(timestamp)
-                : fallbackTimeTitle
-            }
-            timeMeta={relativeTimeMeta(timestamp)}
-            autoOpenToolDetails={
-              autoOpenLatestToolDetails && entry.key === latestEntryKey
-            }
-            onOpenExpandedText={onOpenExpandedText}
-            onOpenCommandDetail={onOpenCommandDetail}
-            onOpenToolCallDetail={onOpenToolCallDetail}
-            onOpenDeferredHistoryItemDetail={onOpenDeferredHistoryItemDetail}
-            {...(onBeforeMessageResize ? { onBeforeMessageResize } : {})}
-            {...(onSelectArtifact ? { onSelectArtifact } : {})}
-            {...(adapter ? { adapter } : {})}
+          <LogRun
+            key={block.key}
+            items={block.items}
+            expanded={expanded}
+            live={live}
+            onToggle={() => onToggleGroupedItem(block.key, expanded)}
           />
         );
-      }}
-    />
+      })}
+    </>
   );
+}
+
+type FoldedAnswerBlock =
+  | { kind: 'answer'; entry: TimelineHistoryEntry & { kind: 'item' } }
+  | { kind: 'gap'; before: string | null; stretch: ThreadTurnActivitySegmentDto; work: TimelineHistoryEntry[] };
+
+function entryItems(entry: TimelineHistoryEntry): ThreadHistoryItemDto[] {
+  if (entry.kind === 'item') return [entry.item];
+  if (entry.kind === 'agentActivityGroup') return entry.entries.flatMap(entryItems);
+  return entry.items;
+}
+
+/** A folded turn reads as its answers. The work before the first one is the work
+    line's; the work between two answers (and after the last) is one counted line,
+    from the summary's stretches, else from loaded operations. */
+function foldedAnswerBlocks(
+  sections: TimelineHistoryEntry[],
+  segments: readonly ThreadTurnActivitySegmentDto[] | null | undefined,
+  // Rendered after the sequence by the turn itself; the sequence stops before it.
+  finalId?: string,
+): FoldedAnswerBlock[] {
+  const blocks: FoldedAnswerBlock[] = [];
+  let previous: string | null = null;
+  let work: ThreadHistoryItemDto[] = [];
+  let workEntries: TimelineHistoryEntry[] = [];
+  const gap = (before: string | null) => {
+    if (previous === null) return;
+    const stretch = stretchBetween(segments, previous, before) ?? stretchFromItems(work, before);
+    if (stretch) blocks.push({ kind: 'gap', before, stretch, work: workEntries });
+  };
+  for (const entry of sections) {
+    if (entry.kind !== 'item') {
+      work.push(...entryItems(entry));
+      workEntries.push(entry);
+      continue;
+    }
+    gap(entry.item.id);
+    if (entry.item.id === finalId) return blocks;
+    blocks.push({ kind: 'answer', entry });
+    previous = entry.item.id;
+    work = [];
+    workEntries = [];
+  }
+  gap(null);
+  return blocks;
+}
+
+type LogBlock =
+  | { kind: 'item'; key: string; item: ThreadHistoryItemDto }
+  | { kind: 'run'; key: string; parentKey: string; items: ThreadHistoryItemDto[] };
+
+/** Messages and notices stay in the reading flow; operations between them form runs. */
+function logBlocks(entries: TimelineHistoryEntry[]): LogBlock[] {
+  const blocks: LogBlock[] = [];
+  for (const entry of entries) {
+    if (entry.kind === 'item') {
+      blocks.push({ kind: 'item', key: entry.key, item: entry.item });
+      continue;
+    }
+    let run: ThreadHistoryItemDto[] = [];
+    let first = true;
+    const flush = () => {
+      if (run.length === 1) blocks.push({ kind: 'item', key: run[0]!.id, item: run[0]! });
+      else if (run.length) blocks.push({ kind: 'run', key: first ? entry.key : `${entry.key}@${run[0]!.id}`, parentKey: entry.key, items: run });
+      if (run.length) first = false;
+      run = [];
+    };
+    for (const item of flattenHistoryEntries([entry])) {
+      if (isLogItem(item)) run.push(item);
+      else {
+        flush();
+        blocks.push({ kind: 'item', key: item.id, item });
+      }
+    }
+    flush();
+  }
+  return blocks;
+}
+
+function flattenHistoryEntries(entries: TimelineHistoryEntry[]): ThreadHistoryItemDto[] {
+  return entries.flatMap((entry) =>
+    entry.kind === 'item' ? [entry.item]
+      : entry.kind === 'agentActivityGroup' ? flattenHistoryEntries(entry.entries)
+        : entry.items);
+}
+
+type StoryBlock =
+  | { kind: 'entry'; entry: TimelineHistoryEntry }
+  | { kind: 'run'; segment: ThreadTurnActivitySegmentDto };
+
+/** A folded turn's summary items in order, each preceded by the work before it. */
+function storyBlocks(entries: TimelineHistoryEntry[], segments: ThreadTurnActivitySegmentDto[], answerId: string | null): StoryBlock[] {
+  const before = new Map(segments.flatMap((segment) => segment.before ? [[segment.before, segment] as const] : []));
+  const blocks: StoryBlock[] = [];
+  for (const item of flattenHistoryEntries(entries)) {
+    const segment = before.get(item.id);
+    if (segment) blocks.push({ kind: 'run', segment });
+    blocks.push({ kind: 'entry', entry: { kind: 'item', key: item.id, item } });
+  }
+  // The work before the answer, which is shown outside the folding part.
+  const beforeAnswer = answerId ? before.get(answerId) : undefined;
+  if (beforeAnswer) blocks.push({ kind: 'run', segment: beforeAnswer });
+  const end = segments.find((segment) => segment.before === null);
+  if (end) blocks.push({ kind: 'run', segment: end });
+  return blocks;
 }

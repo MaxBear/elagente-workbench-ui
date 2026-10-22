@@ -1,17 +1,10 @@
 import {
-  AlignVerticalDistributeCenter,
   ArrowUpRight,
   Box,
   Boxes,
-  Bubbles,
-  CircleX,
   Eraser,
-  Rotate3d,
   Send,
-  Share2,
-  Spline,
   Trash2,
-  Waypoints,
 } from 'lucide-react';
 
 import {
@@ -22,6 +15,7 @@ import {
 
 export default function GraphMoleculeViewerLowerButtonGroup({
   cameraInfo,
+  canSubmit = false,
   onClearSelection,
   onClearStaged,
   onSendSelection,
@@ -35,6 +29,7 @@ export default function GraphMoleculeViewerLowerButtonGroup({
   unitCellAvailable,
   unitCellVisible,
 }: {
+  canSubmit?: boolean;
   cameraInfo: GraphMoleculeCameraInfo | null;
   onClearSelection: () => void;
   onClearStaged: () => void;
@@ -54,31 +49,7 @@ export default function GraphMoleculeViewerLowerButtonGroup({
 
   return (
     <>
-      <div className="flex w-full justify-between gap-2 overflow-x-auto">
-        <GraphMoleculeButtonGroup>
-          <GraphMoleculeIconButton label="Distance">
-            <AlignVerticalDistributeCenter className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton label="Connectivity">
-            <Share2 className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton label="Angle">
-            <Waypoints className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton label="Dihedral">
-            <Spline className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton label="Add dummy atoms">
-            <Bubbles className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton label="Delete atoms">
-            <CircleX className="size-4" />
-          </GraphMoleculeIconButton>
-          <GraphMoleculeIconButton label="Rotate">
-            <Rotate3d className="size-4" />
-          </GraphMoleculeIconButton>
-        </GraphMoleculeButtonGroup>
-
+      <div className="thread-graph-molecule-lower-toolbar flex w-full shrink-0 flex-wrap justify-between gap-2">
         <GraphMoleculeButtonGroup>
           <GraphMoleculeIconButton
             label={unitCellVisible ? 'Hide unit cell' : 'Show unit cell'}
@@ -96,7 +67,7 @@ export default function GraphMoleculeViewerLowerButtonGroup({
           </GraphMoleculeIconButton>
           <GraphMoleculeIconButton
             label="Send selection"
-            disabled={!hasSelection}
+            disabled={!hasSelection || !canSubmit}
             onClick={onSendSelection}
           >
             <Send className="size-4" />
@@ -117,7 +88,7 @@ export default function GraphMoleculeViewerLowerButtonGroup({
           </GraphMoleculeIconButton>
           <GraphMoleculeIconButton
             label="Send staged selections"
-            disabled={!hasStaged}
+            disabled={!hasStaged || !canSubmit}
             onClick={onSendStaged}
           >
             <ArrowUpRight className="size-4" />

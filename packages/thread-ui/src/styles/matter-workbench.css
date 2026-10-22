@@ -1,0 +1,1676 @@
+/* Matter design system, adapted with the author's permission for Pockymoe. */
+.matter-thread-menu {
+  position: relative;
+}
+.matter-thread-menu > summary {
+  list-style: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.matter-thread-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.matter-thread-menu > summary:hover {
+  background: var(--theme-hover);
+}
+.matter-thread-menu > div {
+  position: absolute;
+  top: 34px;
+  right: 0;
+  width: min(270px, calc(100vw - 24px));
+  z-index: 80;
+  padding: 6px;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 10px;
+  background: var(--theme-panel);
+  box-shadow: var(--matter-composer-shadow);
+}
+.thread-ui-shell .matter-workbench .matter-thread-menu > div > button {
+  display: flex;
+  width: 100%;
+  height: 36px;
+  gap: 10px;
+  justify-content: flex-start;
+  padding: 0 9px;
+  font-size: 12px;
+}
+.thread-execution-step-count {
+  display: none;
+}
+.matter-workbench .thread-execution-step-count {
+  display: inline;
+  color: var(--theme-fg-muted);
+  font-size: 11px;
+}
+.thread-ui-shell.thread-ui-shell,
+.thread-graph-dialog.matter-settings-dialog {
+  padding: 0;
+  background: var(--matter-chrome);
+  --thread-gc-bg: #fff;
+  --thread-gc-panel: #fff;
+  --thread-gc-workspace: #fafafa;
+  --thread-gc-surface: #f3f4f6;
+  --thread-gc-muted: #f3f4f6;
+  --thread-gc-hover: #eeeef2;
+  --thread-gc-border: #e5e5e5;
+  --thread-gc-border-strong: #d4d4d4;
+  --thread-gc-border-contrast: #737373;
+  --thread-gc-fg: #0a0a0a;
+  --thread-gc-fg-soft: #525252;
+  --thread-gc-fg-muted: #6e6e6e;
+  --thread-gc-primary: #171717;
+  --thread-gc-primary-hover: #1f2937;
+  --thread-gc-primary-fg: #fff;
+  --thread-gc-accent-soft: #eeeef4;
+  --thread-gc-accent-strong: #28377a;
+  --thread-gc-accent-border: #a3aac4;
+  --thread-gc-focus-ring: #28377a;
+  --thread-gc-info: #285ea8;
+  --thread-gc-warning: #8a5a00;
+  --thread-gc-error: #dc2626;
+  --matter-chrome: #f5f5f5;
+  --matter-composer-shadow: 0 18px 44px rgb(17 24 39 / 12%), 0 4px 12px rgb(17 24 39 / 7%);
+  --matter-glass-highlight: rgb(255 255 255 / 75%);
+  font-family: 'DM Sans', Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.thread-ui-shell.thread-ui-shell[data-theme-effective='dark'],
+.thread-graph-dialog.matter-settings-dialog[data-theme-effective='dark'] {
+  --thread-gc-bg: #0a0f1f;
+  --thread-gc-panel: #11182c;
+  --thread-gc-workspace: #171f36;
+  --thread-gc-surface: #20273c;
+  --thread-gc-muted: #20273c;
+  --thread-gc-hover: #242b42;
+  --thread-gc-border: #242b42;
+  --thread-gc-border-strong: rgb(240 241 245 / 15%);
+  --thread-gc-border-contrast: #7b879d;
+  --thread-gc-fg: #f0f1f5;
+  --thread-gc-fg-soft: #c2c4ca;
+  --thread-gc-fg-muted: #7b879d;
+  --thread-gc-primary: #f0f1f5;
+  --thread-gc-primary-hover: #fff;
+  --thread-gc-primary-fg: #0a0f1f;
+  --thread-gc-accent-soft: #29182c;
+  --thread-gc-accent-strong: #ec5b87;
+  --thread-gc-accent-border: rgb(230 76 127 / 45%);
+  --thread-gc-focus-ring: #e64c7f;
+  --thread-gc-info: #8fc2e8;
+  --thread-gc-warning: #e8b764;
+  --thread-gc-error: #e8908a;
+  --matter-chrome: #11182c;
+  --matter-composer-shadow: 0 22px 52px rgb(3 8 16 / 48%), 0 4px 14px rgb(3 8 16 / 30%);
+  --matter-glass-highlight: rgb(196 214 226 / 5%);
+}
+.thread-ui-shell .matter-workbench {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: 49px var(--matter-sidebar-width, 236px) minmax(0, 1fr);
+  /* The desktop has no top bar: the tabs row is the only bar (phones keep theirs). */
+  grid-template-rows: minmax(0, 1fr);
+  background: var(--matter-chrome);
+  font-size: 13px;
+}
+.thread-ui-shell .matter-workbench svg {
+  stroke-width: 1.65;
+}
+.thread-ui-shell .matter-workbench :where(button, a):focus-visible {
+  outline: 2px solid var(--theme-focus-ring);
+  outline-offset: 2px;
+}
+.thread-ui-shell .matter-workbench :where(button, a) {
+  -webkit-tap-highlight-color: transparent;
+}
+.thread-ui-shell
+  .matter-workbench
+  :is(
+    .matter-rail,
+    .matter-topbar,
+    .matter-breadcrumb,
+    .matter-sidebar-heading,
+    .matter-explorer-heading,
+    .matter-notifications-heading
+  )
+  :where(button, a),
+.matter-new-thread {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--theme-fg-soft);
+  box-shadow: none;
+  transition:
+    background 120ms,
+    color 120ms;
+}
+.thread-ui-shell
+  .matter-workbench
+  :is(
+    .matter-rail,
+    .matter-topbar,
+    .matter-breadcrumb,
+    .matter-sidebar-heading,
+    .matter-explorer-heading,
+    .matter-notifications-heading
+  )
+  :where(button, a):hover,
+.matter-new-thread:hover {
+  background: var(--theme-hover);
+  color: var(--theme-fg);
+}
+.thread-ui-shell
+  .matter-workbench
+  :is(
+    .matter-rail,
+    .matter-topbar,
+    .matter-breadcrumb,
+    .matter-sidebar-heading,
+    .matter-explorer-heading,
+    .matter-notifications-heading
+  )
+  svg {
+  width: 16px;
+  height: 16px;
+}
+.matter-rail {
+  grid-row: 1 / -1;
+  border-right: 1px solid var(--theme-border);
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0 10px;
+}
+.thread-ui-shell .matter-workbench .matter-rail > .matter-brand {
+  height: 32px;
+  margin-bottom: 4px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -3px;
+  color: var(--theme-fg);
+}
+.matter-brand span {
+  color: var(--theme-accent-strong);
+}
+.thread-ui-shell .matter-workbench .matter-rail > button {
+  width: 35px;
+  height: 35px;
+}
+.thread-ui-shell .matter-workbench .matter-rail > button[aria-pressed='true'] {
+  color: var(--theme-accent-strong);
+  background: var(--theme-accent-soft);
+}
+.matter-rail-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.matter-watches-toggle { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 8px; flex-shrink: 0; height: 34px; color: var(--theme-fg-muted); border-left: 1px solid var(--theme-border); }
+.matter-watches-toggle:hover { background: var(--theme-hover); color: var(--theme-fg); }
+
+@media (min-width: 640px) {
+  /* Four file actions must remain inside the narrow side Explorer. */
+  .matter-explorer .thread-graph-workspace-resizable > [data-panel]:has(> .thread-graph-workspace-explorer-pane) {
+    min-width: 144px !important;
+  }
+}
+.matter-topbar {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--theme-border);
+}
+.matter-topbar-brand {
+  font-weight: 600;
+  font-size: 12px;
+  margin: 0 10px;
+}
+.matter-topbar-separator {
+  height: 15px;
+  width: 1px;
+  background: var(--theme-border-strong);
+  margin-right: 7px;
+}
+.thread-ui-shell .matter-workbench .matter-topbar .matter-search-trigger {
+  width: auto;
+  gap: 8px;
+  padding: 0 10px;
+  margin-left: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.matter-topbar-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.matter-topbar-end > button {
+  position: relative;
+}
+.matter-connection > * {
+  display: flex;
+  align-items: center;
+}
+.matter-connection .device-connection-button {
+  width: 28px;
+  height: 28px;
+}
+.matter-connection .device-connection-button > svg {
+  width: 17px;
+  height: 17px;
+}
+.matter-unread {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  right: 5px;
+  top: 5px;
+  border-radius: 50%;
+  background: var(--theme-accent-solid);
+}
+.matter-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 12px 10px;
+  border-right: 1px solid var(--theme-border);
+  background: var(--theme-surface);
+}
+.matter-sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  margin-bottom: 17px;
+  padding: 0 8px;
+  font-weight: 600;
+}
+/* The sidebar splits in two: this workspace above, recent chats from halfway
+   down, a blank strip between. Each half scrolls on its own. */
+.matter-sidebar-upper {
+  display: flex;
+  flex: 0 0 50%;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 18px;
+}
+.matter-sidebar-upper.is-alone { flex: 1 1 auto; }
+/* A list cut by the split fades out rather than ending in half a row. */
+.matter-sidebar-upper:not(.is-alone) > .matter-sidebar-scroll {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+}
+.matter-sidebar-recents {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Folded, recent chats are just their heading; this workspace takes the room. */
+.matter-sidebar-recents.is-folded { flex: none; }
+/* The sidebar's edge: drag to resize (200–420px), double-click for the default. */
+.matter-sidebar-resize { position: absolute; top: 0; bottom: 0; left: -4px; z-index: 30; width: 7px; cursor: col-resize; touch-action: none; }
+.matter-sidebar-resize::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent; transition: background 120ms; }
+.matter-sidebar-resize:is(:hover, :focus-visible, :active)::after { background: var(--theme-accent-solid); }
+.matter-sidebar-resize:focus-visible { outline: none; }
+/* Desktop sidebar, denser: lists scroll against the very edge, rows are shorter
+   and longer, and each row's menu is a vertical ⋯ shown when pointed at. */
+@media (min-width: 640px) {
+  .thread-ui-shell .matter-workbench .matter-sidebar { padding: 0 0 8px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar > .matter-nav-strip { margin-bottom: 10px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar-heading { margin-bottom: 8px; padding: 0 16px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-sidebar-scroll { padding: 0 4px 0 8px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar-recents > .matter-section-heading { width: auto; margin: 0 4px 0 8px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar :is(.matter-drawer-tools, .matter-drawer-home, .matter-sidebar-error) { margin-inline: 8px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar-footer { padding: 14px 16px 0; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-thread-section { margin-bottom: 8px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-thread-row { gap: 8px; margin: 1px 0; padding: 4px 8px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-thread-copy { gap: 0; line-height: 16px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-thread-copy small { line-height: 14px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-thread-entry > .matter-thread-row { padding-right: 24px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-thread-entry:has(> .matter-agent-toggle) > .matter-thread-row { padding-right: 58px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-agent-toggle { right: 24px; height: 22px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-thread-entry > .recent-thread-actions { right: 2px; width: 22px; height: 26px; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .recent-thread-actions svg { transform: rotate(90deg); }
+}
+@media (min-width: 640px) and (hover: hover) {
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-thread-entry > .recent-thread-actions { opacity: 0; transition: opacity 120ms; }
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-thread-entry:is(:hover, :has(:focus-visible)) > .recent-thread-actions,
+  .thread-ui-shell .matter-workbench .matter-sidebar .matter-thread-entry > .recent-thread-actions[aria-expanded='true'] { opacity: 1; }
+}
+.matter-sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.matter-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0 8px;
+  color: var(--theme-fg-soft);
+  font-size: 12px;
+  text-align: left;
+}
+/* A section heading with an action after its count (This workspace → New thread). */
+.matter-section-heading-row { display: flex; align-items: center; min-width: 0; }
+.matter-section-heading-row > .matter-section-heading { flex: 1; min-width: 0; }
+.matter-section-add { display: flex; flex: none; align-items: center; margin-left: 2px; }
+.thread-ui-shell .matter-workbench .matter-section-add :is(button, a) { width: 26px; height: 26px; border-radius: 7px; }
+.thread-ui-shell .matter-workbench .matter-section-add svg { width: 15px; height: 15px; }
+.matter-section-heading svg {
+  width: 13px;
+  height: 13px;
+}
+.matter-section-heading svg:last-child,
+.matter-section-count {
+  margin-left: auto;
+  color: var(--theme-fg-muted);
+}
+.matter-thread-section {
+  margin-bottom: 14px;
+}
+.matter-sidebar-hint,
+.matter-sidebar-error {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--theme-fg-muted);
+}
+.matter-sidebar-error {
+  color: #c0544b;
+}
+.matter-thread-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  margin: 2px 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--theme-fg-soft);
+  transition: background-color 150ms, border-color 150ms;
+}
+.matter-thread-row:hover {
+  background: var(--theme-hover);
+}
+.matter-thread-row[aria-current='page'] {
+  background: var(--theme-panel);
+  border-color: var(--theme-border);
+  box-shadow: 0 1px 2px rgb(18 24 32 / 3%);
+  color: var(--theme-fg);
+}
+.thread-ui-shell[data-theme-effective='dark'] .matter-thread-row {
+  color: #c1cad1;
+}
+.thread-ui-shell[data-theme-effective='dark'] .matter-thread-row:hover {
+  background: #202a32;
+}
+.thread-ui-shell[data-theme-effective='dark'] .matter-thread-row[aria-current='page'] {
+  background: #2a3943;
+  border-color: #536977;
+  color: #f4f7f6;
+  box-shadow: none;
+}
+.thread-ui-shell[data-theme-effective='dark'] .matter-thread-row[aria-current='page'] small { color: #c1ced6; }
+.matter-copy-notice { padding: 7px 9px; font-size: 11px; line-height: 1.5; color: var(--theme-fg-muted); }
+
+/* Settings are portaled, so they receive the workbench tokens explicitly. */
+.thread-graph-dialog.matter-settings-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 22px;
+  border-radius: 14px;
+  background: var(--theme-panel);
+  border-color: var(--theme-border-strong);
+  box-shadow: 0 24px 72px rgb(0 0 0 / 24%);
+  --action-primary-bg: var(--theme-accent-solid);
+  --action-primary-bg-hover: var(--theme-accent-solid-hover);
+  --action-primary-fg: var(--theme-accent-solid-fg);
+  --theme-accent: var(--theme-accent-solid);
+  --theme-accent-fg: var(--theme-accent-solid-fg);
+}
+.matter-settings-overlay { background: rgb(12 18 22 / 40%); backdrop-filter: blur(3px); }
+.matter-settings-dialog [data-slot='dialog-header'] { gap: 7px; text-align: left; padding-bottom: 4px; }
+.matter-settings-dialog [data-slot='dialog-title'] { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
+.matter-settings-dialog [data-slot='dialog-description'] { font-size: 12px; line-height: 1.6; }
+.matter-settings-dialog [data-slot='dialog-close'] { display: grid; place-items: center; width: 28px; height: 28px; right: 16px; top: 16px; border-radius: 7px; }
+.matter-settings-dialog [data-slot='dialog-close']:hover { background: var(--theme-hover); }
+.thread-graph-settings-dialog.matter-settings-dialog .thread-graph-settings-card { padding: 12px 14px; background: var(--theme-panel); }
+.thread-graph-settings-dialog.matter-settings-dialog :is(.thread-graph-theme-mode-group, .thread-graph-settings-tabs) { background: var(--theme-surface); border: 1px solid var(--theme-border); padding: 3px; }
+.thread-graph-settings-dialog.matter-settings-dialog :is(.thread-graph-theme-mode-button, .thread-graph-settings-tab-button) { font-size: 12px; min-height: 32px; padding: 6px 12px; }
+.thread-graph-settings-dialog.matter-settings-dialog :is(.thread-graph-theme-mode-button.is-selected, .thread-graph-settings-tab-button.is-active) { background: var(--theme-panel); color: var(--theme-accent-strong); box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
+.thread-graph-settings-dialog.matter-settings-dialog .thread-graph-settings-body dl > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); column-gap: 12px; padding-block: 9px; margin: 0; border-bottom: 1px solid var(--theme-border); font-size: 12px; line-height: 1.6; }
+.thread-graph-settings-dialog.matter-settings-dialog .thread-graph-settings-body dl > div:last-child { border-bottom: 0; }
+.thread-graph-settings-dialog.matter-settings-dialog .thread-graph-settings-body dd { margin-top: 0; min-width: 0; }
+.thread-graph-settings-dialog.matter-settings-dialog :is(input, select, textarea) { accent-color: var(--theme-accent-solid); border-color: var(--theme-border-strong); }
+.thread-graph-settings-dialog.matter-settings-dialog :is(button, input, select, textarea):focus-visible { outline: 2px solid var(--theme-focus-ring); outline-offset: 2px; }
+@media (max-width: 639px) {
+  .thread-graph-dialog.matter-settings-dialog { padding: 18px; }
+  .thread-graph-settings-dialog.matter-settings-dialog .thread-graph-settings-body dl > div { grid-template-columns: 80px minmax(0, 1fr); }
+}
+.matter-thread-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  line-height: 18px;
+  font-size: 12px;
+}
+.matter-thread-copy > * {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.matter-thread-copy small {
+  font-size: 10.5px;
+  color: var(--theme-fg-muted);
+}
+.matter-status-dot {
+  flex-shrink: 0;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--theme-border-contrast);
+  background: transparent;
+}
+.matter-status-dot[data-status='running'] {
+  width: 12px;
+  height: 12px;
+  border-width: 2.5px;
+  border-color: oklch(0.48 0.19 255);
+  border-top-color: transparent;
+  animation: matter-running 1s linear infinite;
+}
+.thread-ui-shell[data-theme-effective='dark'] .matter-status-dot[data-status='running'] {
+  border-color: oklch(0.8 0.12 245);
+  border-top-color: transparent;
+}
+.matter-status-dot[data-status='agents-running'] {
+  width: 10px;
+  height: 10px;
+  border-color: #8066cd;
+  background: radial-gradient(circle, #8066cd 0 2px, transparent 2.5px);
+  animation: matter-agents-running 1.8s ease-in-out infinite;
+}
+.thread-ui-shell[data-theme-effective='dark'] .matter-status-dot[data-status='agents-running'] {
+  border-color: #b39af2;
+  background: radial-gradient(circle, #b39af2 0 2px, transparent 2.5px);
+}
+.matter-status-dot[data-status='unread'] {
+  background: var(--theme-accent-strong);
+  border-color: var(--theme-accent-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-accent-strong) 12%, transparent);
+}
+.matter-status-dot:is([data-status='failed'], [data-status='error']) {
+  background: #d56b62;
+  border-color: #d56b62;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+.matter-status-dot[data-status='unknown'] { border-style: dotted; opacity: .6; }
+/* Interrupted is the stop sign: a solid amber square, unlike the hollow idle ring. */
+.matter-status-dot[data-status='interrupted'] { border-color: #c08a3e; background: #c08a3e; border-radius: 1.5px; }
+@keyframes matter-running { to { transform: rotate(360deg); } }
+@keyframes matter-agents-running { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .matter-status-dot:is([data-status='running'], [data-status='agents-running']) { animation: none; } }
+/* Hidden unless a theme preset gives it an image. */
+.matter-thread-avatar { display: none; }
+.matter-sidebar-footer {
+  margin-top: auto;
+  padding: 20px 8px 0;
+  font-size: 11px;
+  color: var(--theme-fg-muted);
+}
+.matter-main {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--theme-bg);
+}
+.matter-tabs-row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex-shrink: 0;
+  background: var(--theme-surface);
+  border-bottom: 1px solid var(--theme-border);
+}
+/* Search, tabs, New thread and tools; an open search covers them, never pushes them. */
+.matter-tabs-main { position: relative; display: flex; flex: 1; min-width: 0; }
+.matter-tabs-search { display: flex; flex: none; align-items: stretch; width: 38px; border-right: 1px solid var(--theme-border); }
+.thread-ui-shell .matter-workbench .matter-tabs-search .matter-search-trigger {
+  display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 0;
+  border: 0; border-radius: 0; background: transparent; color: var(--theme-fg-soft);
+}
+.thread-ui-shell .matter-workbench .matter-tabs-search .matter-search-trigger:hover { background: var(--theme-hover); color: var(--theme-fg); }
+.matter-tabs-search .matter-search-trigger > span { display: none; }
+.matter-tabs-search .matter-search-trigger svg { width: 16px; height: 16px; }
+.matter-tabs-search .workbench-search.is-open {
+  position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; padding: 0 8px;
+  background: var(--theme-surface); animation: matter-tabs-search-in 120ms ease-out;
+}
+/* The field fits the row and takes the room the tabs had. */
+.matter-tabs-search .workbench-search.is-open .workbench-search-field { flex: 1; max-width: 640px; height: 28px; }
+@keyframes matter-tabs-search-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .matter-tabs-search .workbench-search.is-open { animation: none; } }
+/* Connection and notifications close the row on the right. */
+.matter-tabs-end { display: flex; flex: none; align-items: center; gap: 2px; padding: 0 6px; border-left: 1px solid var(--theme-border); }
+.matter-tabs-end .matter-connection:empty { display: none; }
+.thread-ui-shell .matter-workbench .matter-tabs-end > button {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--theme-fg-soft);
+}
+.thread-ui-shell .matter-workbench .matter-tabs-end > button:hover { background: var(--theme-hover); color: var(--theme-fg); }
+.matter-tabs-end > button svg { width: 16px; height: 16px; }
+/* Desktop navigation strip: the sidebar switch, Back and Forward. Heading the
+   sidebar it is level with the tabs row and continues its line; with the sidebar
+   folded it leads the tabs row. */
+.matter-nav-strip { display: flex; flex: none; align-items: center; gap: 2px; height: 35px; padding: 0 8px; border-bottom: 1px solid var(--theme-border); }
+.matter-tabs-row > .matter-nav-strip { height: auto; border-bottom: 0; border-right: 1px solid var(--theme-border); }
+.thread-ui-shell .matter-workbench .matter-nav-strip > :is(button, a) {
+  display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--theme-fg-soft);
+}
+.thread-ui-shell .matter-workbench .matter-nav-strip > :is(button, a):hover { background: var(--theme-hover); color: var(--theme-fg); }
+.matter-nav-strip > :is(button, a) svg { width: 16px; height: 16px; }
+.matter-toolbar-toggle {
+  flex-shrink: 0;
+  width: 36px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--theme-fg-soft);
+  border-left: 1px solid var(--theme-border);
+}
+.matter-toolbar-toggle svg { width: 16px; height: 16px; }
+.matter-toolbar-toggle:active { background: var(--theme-hover); }
+.matter-thread-tabs {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--theme-surface);
+}
+.matter-thread-tabs > a,
+.matter-group-tab {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 9px;
+  min-width: 76px;
+  max-width: 180px;
+  padding: 0 10px;
+  border-right: 1px solid var(--theme-border);
+  font-size: 12px;
+  color: var(--theme-fg-soft);
+}
+.matter-thread-tabs > a > span:last-child,
+.matter-group-tab > span:last-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.matter-thread-tabs > a[aria-current='page'],
+.matter-group-tab[aria-current='page'] {
+  background: var(--theme-bg);
+  color: var(--theme-fg);
+  box-shadow: inset 0 -2px var(--theme-accent-solid);
+}
+.matter-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 0 8px;
+  border-right: 1px solid var(--theme-border);
+  color: var(--theme-fg-soft);
+  font-size: 12px;
+}
+.matter-group-toggle:hover { background: var(--theme-hover); }
+/* A tab: [icon][agents][title]. Where a theme shows icons, the icon carries the
+   status: a mark on its lower-right corner, a breathing ring while it runs, nothing
+   when idle. Agent threads are a small count in the slot right after the icon. */
+.matter-thread-group { position: relative; }
+.matter-group-tab { position: relative; }
+.matter-tab-agents-slot { flex: none; align-self: stretch; }
+/* The count sits close between icon and title (the tab's gap less 5px on each
+   side), plain on the tab: no fill of its own, only on hover. */
+.matter-thread-group > .matter-group-tab > .matter-tab-agents-slot { margin-inline: -5px; }
+.thread-ui-shell .matter-workbench .matter-thread-group > .matter-group-toggle.is-badge {
+  position: absolute; top: 50%; left: var(--tab-agents-x, 0); z-index: 1; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 1px; height: 17px; padding: 0 1px;
+  border: 0; border-radius: 4px; background: transparent;
+  color: var(--theme-fg-muted); font-size: 10.5px; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.thread-ui-shell .matter-workbench .matter-thread-group > .matter-group-toggle.is-badge:is(:hover, [aria-expanded='true']) { background: var(--theme-hover); color: var(--theme-fg); }
+.matter-thread-group > .matter-group-toggle.is-badge > svg { width: 11px; height: 11px; }
+.matter-thread-group[data-avatar] > .matter-group-tab > .matter-thread-avatar + .matter-status-dot {
+  position: absolute; left: var(--tab-icon-right); top: var(--tab-icon-bottom); translate: -70% -70%;
+  width: 8px; height: 8px; margin: 0; box-shadow: 0 0 0 2px var(--theme-surface);
+}
+.matter-thread-group[data-avatar] > .matter-group-tab[aria-current='page'] > .matter-thread-avatar + .matter-status-dot { box-shadow: 0 0 0 2px var(--theme-bg); }
+.matter-thread-group[data-avatar] > .matter-group-tab > .matter-thread-avatar + .matter-status-dot:is([data-status='idle'], [data-status='running'], [data-status='agents-running']) { visibility: hidden; }
+/* With an icon, working shows as a ring around it: the accent while the thread
+   itself runs, pink-violet while only its agent threads do. */
+.matter-thread-group[data-avatar] > .matter-group-tab { --tab-agents-ring: #b65bd3; }
+.thread-ui-shell[data-theme-effective='dark'] .matter-thread-group[data-avatar] > .matter-group-tab { --tab-agents-ring: #d99cf3; }
+.matter-thread-group[data-avatar] > .matter-group-tab:has(> .matter-status-dot[data-status='running']) > .matter-thread-avatar { --tab-ring: var(--theme-accent-solid); animation: matter-tab-running 1.8s ease-in-out infinite; }
+.matter-thread-group[data-avatar] > .matter-group-tab:has(> .matter-status-dot[data-status='agents-running']) > .matter-thread-avatar { --tab-ring: var(--tab-agents-ring); animation: matter-tab-running 1.8s ease-in-out infinite; }
+@keyframes matter-tab-running {
+  0%, 100% { box-shadow: 0 0 0 2px var(--tab-ring); }
+  50% { box-shadow: 0 0 0 2px var(--tab-ring), 0 0 0 4.5px color-mix(in srgb, var(--tab-ring) 28%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .matter-thread-group[data-avatar] > .matter-group-tab:has(> .matter-status-dot:is([data-status='running'], [data-status='agents-running'])) > .matter-thread-avatar { animation: none; box-shadow: 0 0 0 2px var(--tab-ring); }
+}
+
+/* Desktop tabs are open conversations, closed with a ✕. The open tab keeps its ✕
+   in place; any other shows it only when pointed at, floating over the tab's end
+   on a near-opaque chip, so it takes no room. Without hover it always shows. */
+.matter-thread-group:has(> .matter-tab-close) { border-right: 1px solid var(--theme-border); }
+.matter-thread-group:has(> .matter-tab-close) > :is(.matter-group-tab, .matter-group-toggle) { border-right: 0; }
+.matter-thread-group:has(> .matter-tab-close):has(> .matter-group-tab[aria-current='page']) { background: var(--theme-bg); }
+.matter-thread-group:has(> .matter-tab-close):has(> .matter-group-tab[aria-current='page']) > .matter-group-tab { padding-right: 4px; }
+.thread-ui-shell .matter-workbench .matter-thread-group:not(:has(> .matter-group-tab[aria-current='page'])) > .matter-tab-close {
+  position: absolute; top: 50%; right: 4px; z-index: 2; margin: 0; transform: translateY(-50%);
+  background: color-mix(in srgb, var(--theme-surface) 92%, transparent); box-shadow: 0 0 0 1px var(--theme-border), -6px 0 8px var(--theme-surface);
+}
+/* However long its name, a tab stays at most 200px with its count and ✕; the
+   name gives way, ended with an ellipsis. */
+.matter-thread-group { max-width: 200px; }
+.matter-thread-group > .matter-group-tab { flex: 0 1 auto; min-width: 0; max-width: none; }
+.matter-thread-group > .matter-group-tab > span:last-child { min-width: 0; }
+.matter-thread-group > :is(.matter-group-toggle, .matter-tab-close) { flex: none; }
+.thread-ui-shell .matter-workbench .matter-tab-close {
+  display: flex; flex: none; align-items: center; justify-content: center; align-self: center; width: 22px; height: 22px;
+  margin: 0 6px 0 2px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--theme-fg-muted); opacity: 0;
+}
+.matter-tab-close svg { width: 13px; height: 13px; }
+.matter-thread-group:is(:hover, :has(:focus-visible), :has(> .matter-group-tab[aria-current='page'])) > .matter-tab-close { opacity: 1; }
+.thread-ui-shell .matter-workbench .matter-tab-close:hover { background: var(--theme-hover); color: var(--theme-fg); }
+@media (hover: none) { .thread-ui-shell .matter-workbench .matter-tab-close { opacity: 1; } }
+.matter-new-thread {
+  align-self: center;
+  margin: 0 6px;
+}
+/* New thread sits at the right end of the tab strip, outside its scroll area,
+   so it stays in reach however many tabs there are. */
+.matter-tab-add { display: flex; flex: none; align-items: center; height: 34px; }
+.matter-new-thread svg {
+  width: 16px;
+  height: 16px;
+}
+/* Thread tools open as a second row of the tab bar, so they push the conversation
+   and file panels down instead of covering their headers. */
+.matter-breadcrumb {
+  order: 10;
+  flex: 0 0 100%;
+  min-width: 0;
+  background: var(--theme-surface);
+  border-top: 1px solid var(--theme-border);
+  display: flex;
+  align-items: center;
+  height: 40px;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 0 16px;
+  font-size: 11.5px;
+  color: var(--theme-fg-soft);
+}
+.matter-workspace-path {
+  flex: 0 1 45%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, monospace;
+}
+.matter-current-title {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.matter-breadcrumb > svg {
+  flex-shrink: 0;
+  width: 12px !important;
+}
+.matter-breadcrumb button[aria-pressed='true'] {
+  color: var(--theme-accent-strong);
+}
+/* Touch browsers keep :hover after a tap. Only show pressed feedback there. */
+@media (hover: none) {
+  .thread-ui-shell .matter-workbench .matter-breadcrumb :is(button, a):not(:active) {
+    background: transparent;
+    box-shadow: none;
+  }
+  .thread-ui-shell .matter-workbench .matter-breadcrumb :is(button, a):active {
+    background: var(--theme-hover);
+  }
+}
+.matter-thread-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.matter-thread-actions > div {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.matter-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.matter-chat {
+  --matter-reading-width: max(880px, 78%);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.matter-content.has-explorer .matter-chat { --matter-reading-width: 100%; }
+.matter-chat > div {
+  height: 100%;
+}
+.matter-explorer {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(var(--explorer-width, 360px), max(260px, calc(100% - 320px)));
+  min-height: 0;
+  border-left: 1px solid var(--theme-border);
+  background: var(--theme-surface);
+}
+.matter-explorer-resize { position: absolute; z-index: 5; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; }
+.matter-explorer-resize:hover, .matter-explorer-resize:focus-visible { background: color-mix(in srgb, var(--theme-focus-ring) 30%, transparent); outline: none; }
+.matter-notification-summary { margin: 5px 0; color: var(--theme-fg-soft); font-size: 12px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.thread-ui-shell .matter-workbench .thread-graph-message-time-row .thread-graph-message-time { opacity: 1; color: var(--theme-fg-muted); }
+.thread-ui-shell .matter-workbench .animate-pulse.rounded-full { background: var(--theme-accent-strong); }
+.thread-ui-shell .matter-workbench .thread-graph-composer-stop-button { right: 0 !important; top: 0 !important; width: 32px !important; height: 32px !important; border-radius: 50%; background: color-mix(in srgb, #c83b42 12%, var(--theme-panel)); color: #b62f38; border: 1px solid color-mix(in srgb, #c83b42 30%, var(--theme-border)) !important; box-shadow: none; }
+.thread-ui-shell[data-theme-effective='dark'] .matter-workbench .thread-graph-composer-stop-button { color: #ff9b9f; }
+.thread-ui-shell .matter-workbench .thread-graph-composer-stop-button:hover { background: color-mix(in srgb, #c83b42 22%, var(--theme-panel)); }
+.thread-ui-shell .matter-workbench :is(.thread-graph-composer-stop-button, .thread-graph-composer-send-button) { min-width: 32px !important; min-height: 32px !important; }
+.matter-explorer > :last-child {
+  flex: 1;
+  min-height: 0;
+}
+.matter-explorer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--theme-border);
+  font-size: 12px;
+}
+.matter-workbench.is-sidebar-hidden {
+  grid-template-columns: 49px 0 minmax(0, 1fr);
+}
+.matter-workbench.is-sidebar-hidden .matter-sidebar {
+  visibility: hidden;
+  padding: 0;
+}
+.thread-ui-shell .matter-workbench .matter-mobile-close,
+.matter-sidebar-scrim {
+  display: none;
+}
+.matter-popover-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 69;
+  cursor: default;
+}
+.matter-notifications {
+  position: absolute;
+  top: 44px;
+  right: 12px;
+  z-index: 70;
+  width: min(360px, calc(100vw - 24px));
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 12px;
+  background: var(--theme-panel);
+  box-shadow: var(--matter-composer-shadow);
+}
+.matter-notifications-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--theme-border);
+  font-weight: 600;
+}
+.matter-notifications > p {
+  padding: 24px 18px;
+  font-size: 13px;
+  color: var(--theme-fg-muted);
+  line-height: 1.6;
+}
+.matter-notifications > a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid var(--theme-border);
+}
+/* An agent thread's notifications sit under their conversation, indented like
+   agent threads in the sidebar. */
+.matter-notification-group { border-bottom: 1px solid var(--theme-border); }
+.matter-notification-root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 4px;
+  color: var(--theme-fg-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+.matter-notification-root > svg { flex: none; width: 14px; height: 14px; }
+.matter-notification-root > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.matter-notification-group > a:not(.matter-notification-root) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 21px;
+  padding: 10px 14px 10px 12px;
+  border-left: 1px solid var(--theme-border);
+}
+.matter-notifications small {
+  display: block;
+  margin-top: 5px;
+  color: var(--theme-fg-muted);
+  font-size: 11px;
+}
+/* A real overlay: the scroll viewport continues behind the composer. */
+.thread-ui-shell .matter-workbench .thread-graph-composer-host {
+  position: absolute;
+  inset: auto 0 32px;
+  z-index: 30;
+  pointer-events: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-layer {
+  width: 100%;
+  max-width: var(--matter-reading-width);
+  margin: 0 auto;
+  padding: 0 28px;
+  background: transparent;
+  border: 0;
+  pointer-events: none;
+}
+/* Only painted controls own hits. The full-width navigation strip and the
+   form's transparent padding must pass clicks to the transcript underneath. */
+.thread-ui-shell .matter-workbench .thread-graph-composer-layer > .thread-composer-pending-queue,
+.thread-ui-shell .matter-workbench .thread-graph-composer-form > * {
+  pointer-events: auto;
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-form {
+  pointer-events: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-shell {
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--theme-panel) 86%, transparent);
+  backdrop-filter: blur(24px) saturate(135%);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  box-shadow: inset 0 1px 0 var(--matter-glass-highlight), var(--matter-composer-shadow);
+  padding: 12px 14px 10px;
+}
+/* Phone split: the two conversations sit left of the turn navigation above the composer. */
+.thread-pane-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 28px;
+  max-width: min(9rem, calc((100vw - 9.75rem) / 2));
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--theme-panel) 52%, transparent);
+  color: var(--theme-fg-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1;
+  pointer-events: auto;
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  box-shadow: inset 0 1px 0 var(--matter-glass-highlight), 0 0 0 1px color-mix(in srgb, var(--theme-border) 70%, transparent), 0 3px 10px rgb(18 32 25 / 14%);
+  transition: color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+/* A 44px touch target around the compact pill. */
+.thread-pane-switch::after { content: ''; position: absolute; inset: -8px -3px; }
+.thread-pane-switch > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-pane-switch-glyph { width: 13px; height: 13px; flex: none; opacity: 0.8; }
+.thread-pane-switch:hover { color: var(--theme-fg); }
+.thread-pane-switch[aria-pressed='true'] {
+  color: var(--theme-accent-strong);
+  background: var(--theme-accent-soft);
+  box-shadow: inset 0 1px 0 var(--matter-glass-highlight), 0 0 0 1px color-mix(in srgb, var(--theme-accent-strong) 38%, transparent), 0 3px 10px rgb(18 32 25 / 14%);
+}
+.thread-pane-switch[aria-pressed='true'] .thread-pane-switch-glyph { opacity: 1; }
+.thread-pane-switch:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: 2px; }
+.workbench-pane-switch-fallback { display: flex; justify-content: center; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--theme-border); }
+@media (prefers-reduced-transparency: reduce) {
+  .thread-pane-switch { background: var(--theme-panel); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+.matter-thread-entry { display: flex; align-items: center; min-width: 0; position: relative; }
+.matter-thread-entry > .matter-thread-row { flex: 1; min-width: 0; padding-right: 32px; }
+.matter-thread-entry > .recent-thread-actions { position: absolute; right: 3px; }
+/* A conversation's agent threads: a small robot and count inside its row, left
+   of its menu; they open under the row, on a guide line. */
+.matter-thread-entry:has(> .matter-agent-toggle) > .matter-thread-row { padding-right: 70px; }
+.thread-ui-shell .matter-workbench .matter-agent-toggle {
+  position: absolute; right: 34px; display: inline-flex; align-items: center; gap: 1px; height: 22px; padding: 0 2px;
+  border: 0; border-radius: 4px; background: transparent; color: var(--theme-fg-muted);
+  font-size: 11px; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.thread-ui-shell .matter-workbench .matter-agent-toggle:hover { background: var(--theme-hover); color: var(--theme-fg); }
+.thread-ui-shell .matter-workbench .matter-agent-toggle[aria-expanded='true'] { color: var(--theme-fg-soft, var(--theme-fg)); }
+.thread-ui-shell .matter-workbench .matter-agent-toggle > svg { width: 12px; height: 12px; }
+.thread-ui-shell .matter-workbench .matter-agent-toggle > .matter-agent-toggle-chevron { width: 10px; height: 10px; transition: transform 140ms ease; }
+.thread-ui-shell .matter-workbench .matter-agent-toggle[aria-expanded='true'] > .matter-agent-toggle-chevron { transform: rotate(90deg); }
+/* Agents still running: the robot takes the running colour. */
+.thread-ui-shell .matter-workbench .matter-agent-toggle[data-running] > svg:first-child { color: #20bc87; }
+.matter-agent-children { position: relative; margin: 0 0 4px 22px; padding-left: 6px; }
+.matter-agent-children::before { content: ''; position: absolute; top: 2px; bottom: 6px; left: 0; width: 1px; background: var(--theme-border); }
+@media (prefers-reduced-motion: reduce) { .thread-ui-shell .matter-workbench .matter-agent-toggle > .matter-agent-toggle-chevron { transition: none; } }
+@media (prefers-reduced-transparency: reduce) {
+  .thread-ui-shell .matter-workbench .thread-graph-composer-shell { background: var(--theme-panel); backdrop-filter: none; }
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-shell:has(:focus-visible, input:focus, textarea:focus, select:focus, [contenteditable="true"]:focus) {
+  border-color: var(--theme-focus-ring);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--theme-focus-ring) 18%, transparent),
+    var(--matter-composer-shadow);
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-input-group {
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-input {
+  min-height: 64px;
+  max-height: 200px;
+  padding: 3px 42px 8px 2px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-prompt-region {
+  padding: 0;
+  border: 0;
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-toolbar {
+  padding: 5px 0 0;
+  margin: 0;
+  border: 0;
+  gap: 5px;
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-icon-button {
+  background: var(--theme-surface-strong);
+  border: 0;
+  width: 32px;
+  height: 32px;
+  box-shadow: none;
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-chip-button {
+  background: transparent;
+  border: 0;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: none;
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-send-button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--theme-accent-solid);
+  color: var(--theme-accent-solid-fg);
+  box-shadow: none;
+}
+.thread-ui-shell .matter-workbench .thread-graph-composer-send-button:disabled {
+  background: var(--theme-surface-strong);
+  color: var(--theme-fg-muted);
+}
+.thread-ui-shell
+  .matter-workbench
+  .thread-graph-composer-toolbar
+  [data-action="switch-to-shell"] {
+  display: none;
+}
+.thread-ui-shell .matter-workbench .thread-chat-usage-footer {
+  display: none;
+}
+.thread-ui-shell .matter-workbench .thread-timeline-surface {
+  background: var(--theme-bg);
+}
+.thread-ui-shell .matter-workbench .thread-graph-history-group {
+  padding: 6px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.thread-ui-shell .matter-workbench .thread-graph-history-group-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px 0;
+}
+.thread-ui-shell .matter-workbench .thread-graph-history-group-icon > span {
+  width: 18px;
+  height: 24px;
+  background: transparent;
+  border: 0;
+  color: var(--theme-fg-muted);
+  box-shadow: none;
+}
+.thread-ui-shell
+  .matter-workbench
+  .thread-graph-history-group-icon
+  > span
+  > span {
+  display: none;
+}
+.thread-ui-shell .matter-workbench .thread-graph-history-group-summary > span {
+  color: var(--theme-fg-soft);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.thread-ui-shell .matter-workbench .thread-graph-history-group-list {
+  margin-top: 2px;
+  padding: 0;
+  margin-left: -28px;
+  border-top: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+.thread-ui-shell .matter-workbench .thread-graph-history-detail-row {
+  position: relative;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px 8px;
+  box-shadow: none;
+}
+.thread-ui-shell .matter-workbench .thread-graph-history-detail-row::before {
+  content: none;
+  position: absolute;
+  top: 17px;
+  left: -18px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--theme-accent-solid);
+}
+.thread-ui-shell .matter-workbench .thread-graph-history-detail-row:hover {
+  background: var(--theme-surface);
+}
+.thread-ui-shell .matter-workbench .thread-graph-chat-panel,
+.thread-ui-shell .matter-workbench .thread-graph-scroll-container {
+  background: var(--theme-bg);
+}
+.thread-ui-shell[data-theme-effective='light'] .matter-workbench .thread-graph-code-block {
+  background: var(--theme-panel);
+  border-color: var(--theme-border);
+}
+.thread-ui-shell .matter-workbench .thread-graph-message-list {
+  width: 100%;
+  max-width: var(--matter-reading-width);
+  padding-inline: 28px;
+  margin: 0 auto;
+}
+.thread-ui-shell .matter-workbench .thread-graph-turn {
+  padding-inline: 0;
+}
+.thread-ui-shell .matter-workbench .thread-graph-worked-summary {
+  color: var(--theme-fg-soft);
+  font-size: 12px;
+}
+.thread-ui-shell .matter-workbench .thread-graph-worked-rule {
+  display: none;
+}
+.thread-ui-shell .matter-workbench .thread-graph-worked-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+.thread-ui-shell .matter-workbench .thread-execution-timeline .thread-graph-message-bubble {
+  font-size: 13px;
+  line-height: 1.6;
+  padding-block: 2px;
+}
+.thread-ui-shell .matter-workbench .thread-graph-history-group-toggle {
+  padding-block: 5px;
+  min-height: 28px;
+}
+.thread-ui-shell .matter-workbench .matter-command-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  text-align: left;
+  line-height: 20px;
+  font-size: 11px;
+  color: var(--theme-fg-soft);
+  transition: background-color 150ms;
+}
+.matter-command-step:hover { background: var(--theme-hover); }
+.thread-ui-shell .matter-workbench .thread-graph-history-group-list > .matter-command-step { margin-block: 0; }
+.matter-step-number { font-size: 10px; font-variant-numeric: tabular-nums; color: var(--theme-fg-muted); }
+.matter-step-title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--theme-fg); }
+.matter-step-status { display: flex; flex-shrink: 0; }
+.matter-step-status.is-completed { color: var(--theme-fg-soft); }
+.matter-step-status.is-failed { color: #d56b62; }
+.matter-step-status.is-pending { color: #418ad4; }
+.matter-step-time { flex-shrink: 0; font-size: 10px; font-variant-numeric: tabular-nums; color: var(--theme-fg-muted); }
+.matter-step-chevron { flex-shrink: 0; color: var(--theme-fg-muted); opacity: 0; }
+.thread-diff { font: 12px/1.7 ui-monospace, monospace; min-width: max-content; }
+.thread-diff-line { display: flex; min-height: 1.7em; padding-right: 12px; }
+.thread-diff-number { width: 4ch; text-align: right; margin-right: 1ch; color: var(--theme-fg-muted); user-select: none; }
+.thread-diff-sign { width: 2ch; flex-shrink: 0; }
+.thread-diff-line.is-add { background: light-dark(oklch(91% .045 150), oklch(29% .05 150)); }
+.thread-diff-line.is-remove { background: light-dark(oklch(91% .04 25), oklch(29% .05 25)); }
+.thread-diff-line.is-add .thread-diff-sign { color: light-dark(oklch(40% .12 150), oklch(77% .14 150)); }
+.thread-diff-line.is-remove .thread-diff-sign { color: light-dark(oklch(43% .16 25), oklch(77% .12 25)); }
+.thread-diff-line.is-meta { color: var(--theme-fg-muted); }
+.thread-history-direct-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 0; font-size: 11px; color: var(--theme-fg-soft); }
+.thread-history-direct-action { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-align: left; border-radius: 6px; padding: 4px 2px; }
+.thread-history-direct-action:hover { background: var(--theme-hover); }
+.thread-history-direct-action:focus-visible { outline: 2px solid var(--theme-focus-ring); }
+.thread-history-direct-action .thread-graph-history-tool-icon { display: flex; flex-shrink: 0; width: 18px; }
+.thread-history-direct-preview { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-history-direct-preview.is-path { direction: rtl; text-align: left; }
+.thread-history-direct-preview.is-expanded { direction: ltr; white-space: pre-wrap; overflow-wrap: anywhere; }
+.thread-ui-shell .matter-workbench .thread-graph-history-group-icon { margin-top: 0; }
+.thread-ui-shell .matter-workbench .thread-graph-history-group-verb { font-weight: 500; }
+.matter-command-step:is(:hover, :focus-visible) .matter-step-chevron { opacity: 1; }
+@media (max-width: 1000px) and (min-width: 640px) {
+  .thread-ui-shell .matter-workbench {
+    grid-template-columns: 43px var(--matter-sidebar-width, 200px) minmax(0, 1fr);
+  }
+  .thread-ui-shell .matter-workbench.is-sidebar-hidden {
+    grid-template-columns: 43px 0 minmax(0, 1fr);
+  }
+  .matter-topbar-brand {
+    display: none;
+  }
+  .matter-workspace-path {
+    max-width: 25%;
+  }
+  .matter-current-title {
+    display: none;
+  }
+}
+@media (max-width: 639px) {
+  .thread-ui-shell .matter-workbench,
+  .thread-ui-shell .matter-workbench.is-sidebar-hidden {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: calc(44px + env(safe-area-inset-top)) minmax(0, 1fr);
+  }
+  .matter-topbar {
+    grid-column: 1;
+    padding: env(safe-area-inset-top) 4px 0;
+    gap: 0;
+  }
+  .matter-topbar-brand,
+  .matter-topbar-separator,
+  .matter-search-trigger span,
+  .matter-topbar [data-action="go-forward"] {
+    display: none;
+  }
+  .thread-ui-shell .matter-workbench .matter-topbar [data-action="go-forward"] {
+    display: none;
+  }
+  .thread-ui-shell .matter-workbench .matter-topbar .matter-search-trigger {
+    width: 36px;
+    padding: 0;
+    margin: 0;
+  }
+  .matter-rail {
+    padding-top: env(safe-area-inset-top);
+  }
+  .matter-main {
+    grid-column: 1;
+  }
+  .thread-ui-shell .matter-workbench .matter-sidebar {
+    position: fixed;
+    top: 44px;
+    bottom: 0;
+    left: 0;
+    width: min(270px, calc(100vw - 56px));
+    z-index: 65;
+    visibility: hidden;
+    transform: translateX(-120%);
+    transition: transform 160ms;
+    padding: 12px;
+  }
+  .thread-ui-shell .matter-workbench .matter-sidebar.is-open {
+    visibility: visible;
+    transform: none;
+  }
+  .thread-ui-shell .matter-workbench .matter-mobile-close {
+    display: inline-flex;
+  }
+  .matter-sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 44px 0 0 0;
+    background: rgb(0 0 0 / 25%);
+    z-index: 64;
+  }
+  .matter-thread-tabs {
+    scrollbar-width: none;
+    height: 36px;
+  }
+  .matter-thread-tabs > a,
+  .matter-group-tab {
+    min-width: 64px;
+    max-width: 140px;
+    padding: 0 8px;
+  }
+  .matter-thread-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .matter-breadcrumb {
+    height: 42px;
+    padding: 0 5px;
+    gap: 1px;
+  }
+  .matter-current-title,
+  .matter-breadcrumb > svg {
+    display: none;
+  }
+  .matter-workspace-path {
+    flex: 1;
+    max-width: none;
+    font-size: 10px;
+  }
+  .thread-ui-shell .matter-workbench .matter-breadcrumb button {
+    width: 32px;
+    height: 36px;
+  }
+  .matter-thread-actions,
+  .matter-thread-actions > div {
+    gap: 0;
+  }
+  .thread-ui-shell .matter-workbench .thread-graph-composer-host {
+    bottom: max(
+      22px,
+      calc(env(safe-area-inset-bottom) + 14px),
+      calc(var(--thread-composer-keyboard-inset, 0px) + 14px)
+    );
+  }
+  .thread-ui-shell .matter-workbench .thread-graph-composer-layer {
+    padding: 0 9px;
+  }
+  .thread-ui-shell .matter-workbench .thread-graph-composer-form {
+    padding-top: 0 !important;
+  }
+  .thread-ui-shell .matter-workbench .thread-graph-message-list {
+    padding-inline: 9px;
+  }
+  .thread-ui-shell .matter-workbench .thread-graph-composer-shell {
+    padding: 10px;
+    border-radius: 18px;
+  }
+  .thread-ui-shell .matter-workbench .thread-graph-composer-input {
+    font-size: 16px;
+    min-height: 54px;
+  }
+  .thread-ui-shell .matter-workbench .thread-graph-composer-toolbar {
+    flex-wrap: wrap;
+  }
+  .thread-ui-shell
+    .matter-workbench
+    .thread-graph-composer-toolbar
+    > div:last-child {
+    gap: 1px;
+  }
+  .matter-explorer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    z-index: 40;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .matter-workbench *,
+  .matter-workbench *::before {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Finite workbench templates; each conversation owns its scroll container. */
+.workbench-panels { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.workbench-panels :is(.workbench-pane-heading, .workbench-mobile-views, .workbench-collaboration, .workbench-reference-status) button { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 32px; padding: 5px 9px; border-radius: 7px; font-size: 12px; color: var(--theme-fg-soft); }
+.workbench-panels :is(.workbench-pane-heading, .workbench-mobile-views, .workbench-collaboration, .workbench-reference-status) button:hover { background: var(--theme-hover); }
+.workbench-content { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
+/* Conversations and the bottom panel share one column, like VS Code's editor
+   area and panel; the Files drawer stays a full-height column beside them. */
+.workbench-main-column { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.workbench-pane-grid { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.workbench-primary, .workbench-reference { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; flex: 1; }
+.workbench-pane-grid.has-reference > .workbench-primary { flex: 0 0 clamp(360px, var(--primary-ratio), calc(100% - 365px)); --matter-reading-width: 100%; }
+.workbench-reference { background: var(--theme-bg); --matter-reading-width: 100%; }
+.workbench-pane-heading { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 12px; border-bottom: 1px solid var(--theme-border); }
+.workbench-pane-heading > div { flex: 1; min-width: 0; }
+.workbench-pane-heading strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--theme-fg); }
+.workbench-pane-eyebrow { display: block; margin-bottom: 4px; font-size: 10px; color: var(--theme-accent-strong); }
+.workbench-pane-meta { max-width: 35%; font-size: 11px; color: var(--theme-fg-muted); text-align: right; }
+.workbench-pane-body { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.workbench-pane-body > .thread-detail-surface { height: 100%; }
+.workbench-pane-resize { width: 5px; flex-shrink: 0; cursor: col-resize; touch-action: none; background: var(--theme-border); }
+.workbench-pane-resize:hover, .workbench-pane-resize:focus-visible { background: var(--theme-accent-solid); }
+.workbench-panels [hidden] { display: none !important; }
+.workbench-mobile-views { display: flex; gap: 4px; padding: 4px 12px; border-bottom: 1px solid var(--theme-border); }
+.workbench-mobile-views button { flex: 1; }
+.workbench-mobile-views button[aria-pressed='true'] { background: var(--theme-accent-soft); color: var(--theme-accent-strong); }
+.workbench-panels.is-compact .workbench-primary { flex: 1; }
+.workbench-panels.is-compact .workbench-pane-resize { display: none; }
+.workbench-panels.is-compact .workbench-pane-heading { padding-inline: 12px; }
+.workbench-collaboration { overflow-y: auto; padding: 18px; gap: 18px; }
+.workbench-collaboration h3 { font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+.workbench-collaboration p { color: var(--theme-fg-muted); font-size: 11px; line-height: 1.7; }
+.workbench-collaboration article { padding: 12px; margin-bottom: 8px; border: 1px solid var(--theme-border); border-radius: 10px; background: var(--theme-panel); }
+.workbench-collaboration article header { display: flex; align-items: center; gap: 10px; justify-content: space-between; font-size: 12px; }
+.workbench-collaboration article strong { overflow-wrap: anywhere; }
+.workbench-collaboration article footer { display: flex; gap: 5px; margin-top: 8px; }
+.workbench-collaboration [data-status='failed'] { color: #d1555f; }
+.workbench-collaboration [data-status='running'] { color: var(--theme-accent-strong); }
+.workbench-reference-status, .workbench-persistence-notice { padding: 10px 16px; color: var(--theme-fg-muted); font-size: 11px; }
+.workbench-reference .thread-graph-message-list { padding-bottom: 32px; }
+/* The reference header already names this region. Keep its compact tree toolbar
+   for actions rather than squeezing a duplicate heading into a vertical column. */
+.workbench-files .thread-graph-explorer-header h2 { display: none; }
+@media (max-width: 639px) {
+  .workbench-panels :is(.workbench-pane-heading, .workbench-mobile-views, .workbench-collaboration, .workbench-reference-status) button { min-height: 44px; }
+  .workbench-pane-heading { min-height: 48px; }
+}
+
+.workbench-composer-target { display: flex; gap: 8px; justify-content: space-between; padding: 3px 12px; font-size: 11px; color: var(--theme-fg-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.workbench-composer-target span { font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
+.workbench-mobile-views button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 639px) {
+  .workbench-composer-target span { display: none; }
+}
+
+/* Compact, portal-mounted split navigation. */
+.workbench-thread-picker-actions { display: inline-flex; align-items: center; gap: 2px; }
+.workbench-thread-picker-trigger { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--theme-fg-muted); cursor: pointer; }
+.workbench-thread-picker-trigger:hover, .workbench-thread-picker-trigger[aria-expanded='true'] { background: var(--theme-hover); color: var(--theme-fg); }
+.workbench-thread-picker-trigger.is-active { color: var(--theme-accent-strong); background: var(--theme-accent-soft); }
+.workbench-thread-picker-trigger:disabled { opacity: .45; cursor: default; }
+.workbench-thread-picker-popover { position: fixed; z-index: 250; display: flex; flex-direction: column; width: min(372px, calc(100vw - 24px)); min-height: 0; overflow: hidden; border: 1px solid var(--theme-border-strong); border-radius: 14px; background: var(--theme-panel); color: var(--theme-fg); box-shadow: 0 18px 56px rgb(0 0 0 / .2), 0 3px 10px rgb(0 0 0 / .08); font-family: inherit; animation: workbench-picker-enter .12s ease-out; }
+.workbench-thread-picker-popover button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.workbench-thread-picker-popover button:focus-visible, .workbench-thread-picker-trigger:focus-visible { outline: 2px solid var(--theme-accent-strong); outline-offset: -2px; }
+.workbench-thread-picker-heading { display: flex; align-items: center; gap: 10px; flex-shrink: 0; padding: 14px 14px 12px; border-bottom: 1px solid var(--theme-border); }
+.workbench-thread-picker-heading > svg { color: var(--theme-accent-strong); }
+.workbench-thread-picker-heading > div { flex: 1; min-width: 0; }
+.workbench-thread-picker-heading strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.workbench-thread-picker-heading small { display: block; margin-top: 3px; color: var(--theme-fg-muted); font-size: 11px; }
+.workbench-thread-picker-heading button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; color: var(--theme-fg-muted); }
+.workbench-thread-picker-heading button:hover { background: var(--theme-hover); }
+.workbench-thread-picker-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 5px 6px 10px; }
+.workbench-thread-picker-section-label { padding: 13px 9px 6px; font-size: 10px; line-height: 1.4; font-weight: 600; letter-spacing: .045em; color: var(--theme-fg-muted); }
+.workbench-thread-picker-popover .workbench-thread-picker-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 49px; padding: 8px 9px; border-radius: 8px; text-align: left; }
+.workbench-thread-picker-row:hover, .workbench-thread-picker-row:focus-visible { background: var(--theme-hover); }
+.workbench-thread-picker-row[aria-current='true'] { background: var(--theme-accent-soft); }
+.workbench-thread-picker-row > svg { flex-shrink: 0; color: var(--theme-fg-muted); }
+.workbench-thread-picker-row-icon { display: flex; align-items: center; justify-content: center; flex: 0 0 30px; height: 30px; border: 1px solid var(--theme-border); border-radius: 8px; color: var(--theme-fg-muted); background: var(--theme-surface); }
+.workbench-thread-picker-row-icon.is-favorite, .workbench-thread-picker-row > .workbench-thread-picker-favorite { color: var(--theme-accent-strong); }
+.workbench-thread-picker-row-label { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
+.workbench-thread-picker-row-label strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
+.workbench-thread-picker-row-label small { display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--theme-fg-muted); font-size: 10px; }
+.workbench-thread-picker-row > .workbench-thread-picker-check { color: var(--theme-accent-strong); }
+.workbench-split-status { width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: var(--theme-fg-muted); opacity: .55; }
+.workbench-split-status:is(.is-running, .is-recovering, .is-connected) { background: var(--theme-accent-strong); opacity: 1; }
+.workbench-split-status:is(.is-failed, .is-error) { background: #d1555f; opacity: 1; }
+.workbench-thread-picker-state { display: flex; align-items: center; gap: 7px; padding: 11px 10px; margin: 0; font-size: 11px; line-height: 1.5; color: var(--theme-fg-muted); }
+.workbench-thread-picker-error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; color: var(--theme-fg-soft); font-size: 11px; }
+.workbench-thread-picker-error span { flex: 1; min-width: 100px; overflow-wrap: anywhere; }
+.workbench-thread-picker-error button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; border-radius: 6px; background: var(--theme-hover); }
+.workbench-thread-picker-popover footer { flex-shrink: 0; padding: 6px; border-top: 1px solid var(--theme-border); }
+.workbench-thread-picker-popover footer button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px; border-radius: 7px; font-size: 11px; color: var(--theme-fg-muted); }
+.workbench-thread-picker-popover footer button svg:last-child { margin-left: auto; }
+.workbench-thread-picker-popover footer button:hover { background: var(--theme-hover); }
+.workbench-thread-picker-popover .is-spinning { animation: workbench-picker-spin .9s linear infinite; }
+@keyframes workbench-picker-enter { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes workbench-picker-spin { to { transform: rotate(360deg); } }
+.workbench-panels { position: relative; }
+.workbench-tool-drawer { position: relative; display: flex; flex: 0 0 min(var(--workbench-tool-width, 560px), calc(100% - 280px)); flex-direction: column; width: min(var(--workbench-tool-width, 560px), calc(100% - 280px)); min-width: 0; min-height: 0; border-left: 1px solid var(--theme-border-strong); background: var(--theme-panel); }
+.workbench-tool-drawer > header { display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 5px 12px; border-bottom: 1px solid var(--theme-border); }
+.workbench-tool-drawer > header strong { flex: 1; font-size: 12px; font-weight: 600; }
+.workbench-tool-drawer > header button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 7px; color: var(--theme-fg-muted); }
+.workbench-tool-drawer > header button:hover { background: var(--theme-hover); }
+.workbench-primary[data-focused='true'], .workbench-reference[data-focused='true'] { box-shadow: inset 0 2px 0 var(--theme-accent-soft); }
+@media (max-width: 639px) {
+  .workbench-thread-picker-trigger { width: 34px; min-height: 36px; }
+  .workbench-thread-picker-popover .workbench-thread-picker-row { min-height: 54px; }
+  .workbench-thread-picker-heading button { width: 34px; height: 34px; }
+  .workbench-tool-drawer > header { min-height: 48px; }
+  .workbench-tool-drawer > header button { width: 40px; height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workbench-thread-picker-popover, .workbench-thread-picker-popover .is-spinning { animation: none; }
+}
+
+.workbench-tool-drawer > header > div { flex: 1; min-width: 0; }
+.workbench-tool-drawer > header small { display: block; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--theme-fg-muted); }
+
+@media (max-width: 639px) {
+  .matter-topbar-end { gap: 0; }
+  .thread-ui-shell .matter-workbench .matter-topbar-end > button,
+  .thread-ui-shell .matter-workbench .matter-topbar-end > [data-slot='dialog-trigger'] { width: 34px; min-width: 34px; margin: 0; padding: 0; }
+  .matter-topbar-end .matter-connection:empty { display: none; }
+}
+
+/* Keep the drawer boundary draggable even when its contents fill the panel. */
+.workbench-tool-resize { position: absolute; inset: 0 auto 0 -4px; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; user-select: none; }
+/* Minimized, the files view is its tree in a strip at the right edge, and its editor
+   a tab on the strip's left edge that brings it back. */
+.workbench-tool-drawer[data-minimized] { flex: 0 0 236px; width: 236px; }
+.workbench-tool-drawer[data-minimized] > .workbench-tool-resize { display: none; }
+.workbench-files-restore {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 56px;
+  transform: translateY(-50%);
+  border: 1px solid var(--theme-border-strong);
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+  background: var(--theme-panel);
+  color: var(--theme-fg-muted);
+  box-shadow: -2px 0 10px rgb(0 0 0 / 10%);
+  transition: width 120ms ease, color 120ms ease;
+}
+.workbench-files-restore:hover { width: 22px; color: var(--theme-fg); }
+.workbench-files-restore:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: 1px; }
+.workbench-tool-resize::after { content: ''; position: absolute; inset: 0 auto 0 3px; width: 2px; background: transparent; transition: background 120ms; }
+.workbench-tool-resize:hover::after, .workbench-tool-resize:focus-visible::after { background: var(--theme-accent-solid); }
+.workbench-tool-resize:focus-visible { outline: none; }
+.workbench-panels.is-compact .workbench-tool-drawer { position: absolute; inset: 0; z-index: 90; width: 100%; }
+
+/* Bottom tool panel. It takes height from the conversations instead of covering
+   them; only an explicit maximize lays it over the (still mounted) chat. */
+.workbench-bottom-panel { position: relative; display: flex; flex: 0 0 var(--workbench-panel-height, 320px); flex-direction: column; min-width: 0; min-height: 0; border-top: 1px solid var(--theme-border-strong); background: var(--theme-panel); }
+.workbench-bottom-panel.is-collapsed { flex-basis: auto; }
+.workbench-bottom-panel.is-maximized { position: absolute; inset: 0; z-index: 6; border-top: 0; }
+/* Hidden, not unmounted: scroll positions and drafts survive a maximize, and
+   floating chat controls cannot show through the terminal. */
+.workbench-main-column.has-maximized-panel > .workbench-pane-grid { visibility: hidden; }
+.workbench-panel-sash { position: absolute; inset: -4px 0 auto; z-index: 4; height: 8px; cursor: row-resize; touch-action: none; user-select: none; }
+.workbench-panel-sash::after { content: ''; position: absolute; inset: 3px 0 auto; height: 2px; background: transparent; transition: background 120ms; }
+.workbench-panel-sash:hover::after, .workbench-panel-sash:focus-visible::after, .workbench-panel-sash:active::after { background: var(--theme-accent-solid); }
+.workbench-panel-sash:focus-visible { outline: none; }
+/* Touch: an in-flow grab bar, large enough for a thumb and visible without hover. */
+.workbench-panels.is-compact .workbench-panel-sash { position: relative; inset: auto; display: flex; flex: 0 0 18px; align-items: center; justify-content: center; height: 18px; margin-top: -1px; }
+.workbench-panels.is-compact .workbench-panel-sash::after { position: static; width: 36px; height: 4px; border-radius: 2px; background: var(--theme-border-strong); }
+.workbench-panels.is-compact .workbench-panel-sash:active::after { background: var(--theme-accent-solid); }
+@media (pointer: coarse) {
+  .workbench-panel-sash { inset: -10px 0 auto; height: 20px; }
+  .workbench-panel-sash::after { inset: 9px 0 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workbench-panel-sash::after { transition: none; }
+}
+
+/* Shortcuts can be put in order: a dragged row lifts and follows the pointer,
+   the others make room. A long press is the drag on touch, not a link menu. */
+.matter-shortcut-list { position: relative; }
+.matter-shortcut { position: relative; -webkit-touch-callout: none; user-select: none; }
+.matter-shortcut-list[data-reordering] .matter-shortcut { transition: transform 160ms ease; }
+.matter-shortcut-list[data-reordering] .matter-shortcut[data-dragging] { z-index: 2; transition: none; }
+.thread-ui-shell .matter-workbench .matter-shortcut[data-dragging] .matter-thread-row {
+  background: var(--theme-panel);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 24%), 0 0 0 1px var(--theme-border);
+}
+.matter-shortcut-list[data-reordering] { cursor: grabbing; }
+@media (prefers-reduced-motion: reduce) {
+  .matter-shortcut-list[data-reordering] .matter-shortcut { transition: none; }
+}
+/* This workspace's conversations, in tabs and lists, go where they are dragged.
+   A touch first rests still (useDragReorder); the item shows the wait filling. */
+.matter-thread-group, .matter-thread-group-entry[data-reorder-key] { -webkit-touch-callout: none; user-select: none; }
+.matter-thread-group-entry[data-reorder-key] { position: relative; }
+:is(.matter-thread-tabs, .matter-thread-section)[data-reordering] :is(.matter-thread-group, .matter-thread-group-entry) { transition: transform 160ms ease; }
+:is(.matter-thread-tabs, .matter-thread-section)[data-reordering] :is(.matter-thread-group, .matter-thread-group-entry)[data-dragging] { z-index: 3; transition: none; }
+:is(.matter-thread-tabs, .matter-thread-section)[data-reordering] { cursor: grabbing; }
+.thread-ui-shell .matter-workbench .matter-thread-group[data-dragging] {
+  border-radius: 10px 10px 0 0; background: var(--theme-panel);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 28%), 0 0 0 1px var(--theme-border);
+}
+.thread-ui-shell .matter-workbench .matter-thread-group-entry[data-dragging] > .matter-thread-entry > .matter-thread-row {
+  background: var(--theme-panel);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 24%), 0 0 0 1px var(--theme-border);
+}
+/* Holding: the item sinks a little under a tint that deepens until it lifts. */
+:is(.matter-thread-group, .matter-thread-group-entry, .matter-shortcut)[data-pressing] { position: relative; animation: matter-reorder-sink 700ms ease-out forwards; }
+:is(.matter-thread-group, .matter-thread-group-entry, .matter-shortcut)[data-pressing]::after {
+  content: ''; position: absolute; inset: 0; border-radius: 10px; pointer-events: none;
+  background: var(--theme-accent-solid); opacity: 0; animation: matter-reorder-tint 700ms ease-in forwards;
+}
+@keyframes matter-reorder-sink { to { transform: scale(.975); } }
+@keyframes matter-reorder-tint { to { opacity: .16; } }
+@media (prefers-reduced-motion: reduce) {
+  :is(.matter-thread-tabs, .matter-thread-section)[data-reordering] :is(.matter-thread-group, .matter-thread-group-entry) { transition: none; }
+  :is(.matter-thread-group, .matter-thread-group-entry, .matter-shortcut)[data-pressing] { animation: none; }
+  :is(.matter-thread-group, .matter-thread-group-entry, .matter-shortcut)[data-pressing]::after { animation: none; opacity: .12; }
+}
+/* On a phone the split picker is a bottom sheet over a scrim, like share and export. */
+.workbench-thread-picker-scrim { position: fixed; inset: 0; z-index: 249; background: var(--overlay-scrim, rgb(0 0 0 / 45%)); backdrop-filter: blur(6px); }
+.workbench-thread-picker-popover.is-sheet { border-bottom: 0; border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom); animation: workbench-picker-rise .18s ease-out; }
+@keyframes workbench-picker-rise { from { transform: translateY(24px); opacity: 0; } }
+/* The workspace path with its copy button; the path takes the room, shortened. */
+.matter-workspace-path-chip { display: inline-flex; flex: 0 1 45%; align-items: center; gap: 2px; min-width: 0; }
+.matter-workspace-path-chip > .matter-workspace-path { flex: 1 1 auto; }
+
+/* Thread tools: a dropdown under their toggle (ThreadToolsMenu). The head is the
+   workspace path and the thread, beside its shortcut star; the host's actions
+   below are labelled from their accessible names. */
+.thread-ui-shell .matter-thread-tools-menu {
+  position: fixed; z-index: 120; width: 304px; max-width: calc(100vw - 16px); padding: 6px;
+  border: 1px solid var(--theme-border-strong, var(--theme-border)); border-radius: 12px;
+  background: var(--theme-panel); color: var(--theme-fg); font-size: 13px;
+  box-shadow: 0 12px 32px -8px rgb(0 0 0 / 28%), 0 2px 6px rgb(0 0 0 / 10%);
+}
+/* Closed, it stays mounted for the windows its controls opened, unseen. */
+.thread-ui-shell .matter-thread-tools-menu:not([data-open]) { visibility: hidden; pointer-events: none; }
+.thread-ui-shell .matter-thread-tools-menu[data-open] { animation: matter-thread-tools-in 140ms ease-out; }
+@keyframes matter-thread-tools-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .thread-ui-shell .matter-thread-tools-menu[data-open] { animation: none; } }
+.thread-ui-shell .matter-thread-tools-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 6px; align-items: center;
+  margin-bottom: 4px; padding: 6px 4px 10px 10px; border-bottom: 1px solid var(--theme-border);
+}
+.thread-ui-shell .matter-thread-tools-path { display: flex; align-items: center; gap: 7px; min-width: 0; font: 12.5px/1.3 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.thread-ui-shell .matter-thread-tools-path > svg { flex: none; width: 16px; height: 16px; color: var(--theme-fg-muted); }
+.thread-ui-shell .matter-thread-tools-path { gap: 0; }
+.thread-ui-shell .matter-thread-tools-path > svg:first-child { margin-right: 7px; }
+.thread-ui-shell .matter-thread-tools-path-head { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-ui-shell .matter-thread-tools-path-tail { flex: none; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-ui-shell .matter-thread-tools-copy { margin-left: 6px; }
+.thread-ui-shell .matter-thread-tools-copy { flex: none; width: 24px; height: 24px; color: var(--theme-fg-muted); }
+.thread-ui-shell .matter-thread-tools-title { min-width: 0; padding-left: 23px; overflow: hidden; color: var(--theme-fg-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.thread-ui-shell .matter-thread-tools-star {
+  grid-column: 2; grid-row: 1 / span 2; display: grid; place-items: center; width: 34px; height: 34px;
+  border-radius: 8px; color: var(--theme-fg-muted);
+}
+.thread-ui-shell .matter-thread-tools-star:hover { background: var(--theme-hover); color: var(--theme-fg); }
+.thread-ui-shell .matter-thread-tools-star[aria-pressed='true'] { color: #e3a33b; }
+.thread-ui-shell .matter-thread-tools-star svg { width: 17px; height: 17px; }
+/* The thread's panels follow the actions, set apart by a hairline. */
+.thread-ui-shell .matter-thread-tools-panels { position: relative; margin-top: 5px; padding-top: 5px; }
+.thread-ui-shell .matter-thread-tools-panels::before { content: ''; position: absolute; top: 0; left: 4px; right: 4px; height: 1px; background: var(--theme-border); }
+.thread-ui-shell :is(.matter-thread-tools-items, .matter-thread-tools-panels) { display: flex; flex-direction: column; }
+.thread-ui-shell :is(.matter-thread-tools-items, .matter-thread-tools-panels) :is(div, span):has(> :is(button, a)) { display: contents; }
+.thread-ui-shell .matter-thread-tools-menu :is(.matter-thread-tools-items, .matter-thread-tools-panels) :is(button, a)[aria-label] {
+  display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; height: auto; min-height: 36px; padding: 0 10px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--theme-fg); font-size: 13px; text-align: left;
+}
+.thread-ui-shell :is(.matter-thread-tools-items, .matter-thread-tools-panels) :is(button, a)[aria-label]::after { content: attr(aria-label); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-ui-shell :is(.matter-thread-tools-items, .matter-thread-tools-panels) :is(button, a)[aria-label] > svg { flex: none; width: 16px; height: 16px; color: var(--theme-fg-soft, var(--theme-fg-muted)); }
+.thread-ui-shell :is(.matter-thread-tools-items, .matter-thread-tools-panels) :is(button, a)[aria-label]:is(:hover, :focus-visible):not(:disabled) { background: var(--theme-hover); outline: none; }
+.thread-ui-shell :is(.matter-thread-tools-items, .matter-thread-tools-panels) :is(button, a)[aria-label]:disabled { opacity: .45; }
+/* Port mappings (remote devices only) last, set apart. */
+.thread-ui-shell .matter-thread-tools-items :is(button, a):has([data-icon='ports']) { order: 10; margin-top: 5px; position: relative; }
+.thread-ui-shell .matter-thread-tools-items :is(button, a):has([data-icon='ports'])::before { content: ''; position: absolute; top: -3px; left: 4px; right: 4px; height: 1px; background: var(--theme-border); }
+.thread-ui-shell .matter-toolbar-toggle[aria-expanded='true'] { background: var(--theme-hover); color: var(--theme-fg); }

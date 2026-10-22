@@ -1,5 +1,5 @@
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, CSSProperties } from 'react';
 import { cn } from './utils';
 
 function TooltipProvider({
@@ -33,8 +33,9 @@ function TooltipContent({
   children,
   className,
   sideOffset = 0,
+  arrowStyle,
   ...props
-}: ComponentProps<typeof TooltipPrimitive.Content>) {
+}: ComponentProps<typeof TooltipPrimitive.Content> & { arrowStyle?: CSSProperties }) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
@@ -47,7 +48,7 @@ function TooltipContent({
         {...props}
       >
         {children}
-        <TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground" />
+        <TooltipPrimitive.Arrow data-slot="tooltip-arrow" width={10} height={5} className="fill-foreground" style={arrowStyle} />
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   );

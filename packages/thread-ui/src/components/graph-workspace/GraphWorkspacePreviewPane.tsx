@@ -1,34 +1,52 @@
+import type { WorkspaceDocuments } from "./explorer/useWorkspaceDocuments";
+import { isProtected, downloadDraft } from "./explorer/workspaceDocuments";
+import { getLocale, en, type TranslationKey } from '../../i18n';
+import { translate, useI18n } from '../../i18n';
 import { externalLinkProps } from '../externalLinkProps';
 import { WorkspaceFileLink } from '../WorkspaceFileLink';
-import { ZoomableImage as GraphWorkspaceZoomableImage } from '../ZoomableImage';
+import { WorkspaceImagePreview, ZoomableImage as GraphWorkspaceZoomableImage } from '../ZoomableImage';
 import {
+  createContext,
+  useContext,
   lazy,
   memo,
   Suspense,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
 import {
+  ArrowLeft,
+  ArrowRight,
   BookOpen,
-  ChevronRight,
   Code2,
   Download,
+  ExternalLink,
+  FileQuestion,
+  FileText,
   Pencil,
   PanelLeftOpen,
+  MoreHorizontal,
   PanelRightClose,
   Save,
   X,
 } from 'lucide-react';
-import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
+import { useFilePanel } from '../workbench/FilePanelContext';
+import { WorkspaceFileActions } from './WorkspaceFileMenu';
+import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import { localFileHref, relativeWorkspacePath, normalizeFileSystemPath } from '../workspacePaths';
+import { confirmAsync } from '../menu/confirmAsync';
 import remarkGfm from 'remark-gfm';
+import { markdownHtmlPlugins } from '../markdownHtml';
+import { MarkdownImageLinkContext } from '../ZoomableImage';
 import type { HighlighterCore } from 'shiki/core';
 
 import type { ThreadWorkspaceFilePreview } from '../../adapters';
 import type { PluginContextValue } from '../../plugins/plugin-context';
-import { getGraphChatHighlighter } from '../graph-chat/graphChatShiki';
+import { getGraphChatHighlighter, syntaxThemeFor } from '../graph-chat/graphChatShiki';
+import { useThemeFeature } from '../themeHooks';
 import {
   MOLECULAR_EXTENSIONS,
   buildMoleculePreviewSnapshot,
@@ -38,6 +56,8 @@ import {
 } from './workspaceTree';
 import { WorkspaceInfoCard } from './GraphWorkspaceCards';
 import { GraphMoleculeViewer } from './GraphMoleculeViewer';
+import { GraphDrawioPreview } from './GraphDrawioPreview';
+import { isDrawioPath } from './explorer/filePreviewPolicy';
 import {
   WorkspaceFileTabs,
   type WorkspaceFileTab,
@@ -55,40 +75,101 @@ export type GraphWorkspacePreviewTarget =
   | { kind: 'meta'; node: WorkspaceTreeNode }
   | null;
 
-function DownloadFilePreview({ node, onDownload }: {
+// Linked host files are opened by absolute path; they never use safe editing.
+const isHostFilePath = (path: string) => path.startsWith('/') || /^[a-z]:[\\/]/i.test(path);
+
+function fileSizeLabel(size: number | undefined) {
+  return size === undefined ? null : size < 1024 ? `${size} B`
+    : size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB`
+    : `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Chrome on Android reports false: it has no PDF viewer inside a frame. */
+export function canShowInlinePdf(nav: { pdfViewerEnabled?: boolean } | undefined =
+  typeof navigator === 'undefined' ? undefined : navigator) {
+  return nav?.pdfViewerEnabled !== false;
+}
+
+function WorkspacePdfPreview({ src, node }: { src: string; node: WorkspaceTreeNode }) {
+  useI18n();
+  const name = node.name || node.path.split('/').pop() || node.path;
+  if (canShowInlinePdf()) {
+    return (
+      <div className="thread-graph-file-preview-frame min-h-0 flex-1 overflow-hidden">
+        <iframe src={src} title={translate("files.pDFPreview", { value1: node.path || node.name })} className="h-full w-full border-0" />
+      </div>
+    );
+  }
+  const sizeLabel = fileSizeLabel(node.size);
+  return (
+    <div className="thread-graph-download-preview" data-testid="workspace-pdf-actions">
+      <FileText aria-hidden="true" className="thread-graph-download-preview-icon" />
+      <strong>{name}</strong>
+      {sizeLabel ? <span>{sizeLabel}</span> : null}
+      <p>{translate("files.pdfOpenOrDownload")}</p>
+      <div className="thread-graph-download-preview-actions">
+        <a href={src} target="_blank" rel="noopener" aria-label={translate("files.openPdfInNewTab", { value1: name })}>
+          <ExternalLink aria-hidden="true" size={16} />{translate("files.openPdf")}
+        </a>
+        <a href={src} download={name} aria-label={translate("files.download", { value1: name })}>
+          <Download aria-hidden="true" size={16} />{translate("files.downloadFile")}
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function DownloadFilePreview({ node, onDownload, readOnlyReason }: {
+  readOnlyReason?: string;
   node: WorkspaceTreeNode;
   onDownload?: () => Promise<void> | void;
 }) {
+  const { locale: i18nLocale } = useI18n();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const size = node.size;
-  const sizeLabel = size === undefined ? null : size < 1024 ? `${size} B`
-    : size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB`
-    : `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  const sizeLabel = fileSizeLabel(node.size);
   return (
     <div className="thread-graph-download-preview">
       <Download aria-hidden="true" className="thread-graph-download-preview-icon" />
       <strong>{node.name}</strong>
       {sizeLabel ? <span>{sizeLabel}</span> : null}
-      <p>This file is available to download.</p>
+      <p>{translate("files.thisFileIsAvailableToDownload")}</p>
+      {readOnlyReason ? <p>{translateReadOnly(readOnlyReason)}</p> : null}
       {onDownload ? (
-        <button type="button" disabled={pending} aria-label={`Download ${node.name}`}
+        <button type="button" disabled={pending} aria-label={translate("files.download", { value1: node.name })}
           onClick={async () => {
             setPending(true);
             setError(null);
             try { await onDownload(); }
-            catch (caught) { setError(caught instanceof Error ? caught.message : 'Download failed. Please try again.'); }
+            catch (caught) { setError(caught instanceof Error ? caught.message : translate("files.downloadFailedPleaseTryAgain")); }
             finally { setPending(false); }
           }}>
           <Download aria-hidden="true" size={16} />
-          {pending ? 'Downloading…' : 'Download file'}
+          {pending ? translate("files.downloading") : translate("files.downloadFile")}
         </button>
-      ) : <span>Downloads are unavailable for this connection.</span>}
+      ) : <span>{translate("files.downloadsAreUnavailableForThisConnection")}</span>}
       {error ? <p role="alert">{error}</p> : null}
     </div>
   );
 }
 
+function AlertDownloadButton({ name, onDownload }: { name: string; onDownload: () => Promise<void> | void }) {
+  const [pending, setPending] = useState(false);
+  return (
+    <button type="button" className="workspace-file-alert-download" disabled={pending}
+      aria-label={translate('files.download', { value1: name })}
+      onClick={async () => { setPending(true); try { await onDownload(); } catch { /* the dialog reports it */ } finally { setPending(false); } }}>
+      <Download aria-hidden="true" size={14} />
+      {pending ? translate('files.downloading') : translate('files.downloadShort')}
+    </button>
+  );
+}
+
+function translateReadOnly(reason: string) {
+  const key = `files.safeReason.${reason}`;
+  return Object.hasOwn(en,key) ? translate(key as TranslationKey) : reason;
+}
+const WorkspaceDocumentDiff = lazy(() => import('./GraphWorkspaceMonacoDiff'));
 const SMALL_TEXT_FILE_MAX_BYTES = 50 * 1024;
 const SMALL_TEXT_FILE_MAX_LINES = 1000;
 const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown']);
@@ -121,6 +202,33 @@ export function resolveWorkspaceMarkdownPath({ markdownPath, resourceUrl, worksp
   if (base === null) return null;
   const directory = base.slice(0, Math.max(0, base.lastIndexOf('/')));
   return relativeWorkspacePath(directory ? `${directory}/${path}` : path, workspaceRootPath);
+}
+
+/**
+ * A linked Markdown file is a host file outside the workspace that the owner
+ * opened by absolute path. Its relative resources resolve beside it, to absolute
+ * host paths that the adapter serves as linked files. Absolute and external
+ * resources stay unresolved, as for workspace documents.
+ */
+export function resolveLinkedMarkdownPath({ markdownPath, resourceUrl, workspaceRootPath = '' }: {
+  markdownPath: string; resourceUrl: string; workspaceRootPath?: string;
+}) {
+  const markdown = normalizeFileSystemPath(markdownPath);
+  const prefix = /^[a-z]:\//i.exec(markdown)?.[0] ?? (markdown.startsWith('/') && !markdown.startsWith('//') ? '/' : null);
+  if (!prefix || (workspaceRootPath && relativeWorkspacePath(markdown, workspaceRootPath) !== null)) return null;
+  const raw = localFileHref(resourceUrl, typeof window === 'undefined' ? undefined : window.location.origin);
+  const path = raw?.split('#')[0] ?? '';
+  if (!path || path.startsWith('/') || /^[a-z]:\//i.test(path)) return null;
+  const segments: string[] = [];
+  const parts = markdown.slice(prefix.length).split('/');
+  for (const part of [...parts.slice(0, -1), ...path.split('/')]) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (!segments.length) return null;
+      segments.pop();
+    } else segments.push(part);
+  }
+  return segments.length ? prefix + segments.join('/') : null;
 }
 
 function isSmallEditableTextFile(file: ThreadWorkspaceFilePreview) {
@@ -170,6 +278,7 @@ const GraphWorkspaceCodePreview = memo(function GraphWorkspaceCodePreview({
   focusLine?: number | null;
   language?: string;
 }) {
+  const { locale: i18nLocale } = useI18n();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [highlighter, setHighlighter] = useState<HighlighterCore | null>(null);
   const [dark, setDark] = useState(false);
@@ -209,6 +318,7 @@ const GraphWorkspaceCodePreview = memo(function GraphWorkspaceCodePreview({
     return () => observer.disconnect();
   }, []);
 
+  const syntaxTheme = syntaxThemeFor(dark, useThemeFeature('code.cssSyntaxPalette'));
   const highlightedHtml = useMemo(() => {
     if (!highlighter) {
       return '';
@@ -222,18 +332,18 @@ const GraphWorkspaceCodePreview = memo(function GraphWorkspaceCodePreview({
       return transparentHighlightBackground(
         highlighter.codeToHtml(content, {
           lang: resolvedLanguage,
-          theme: dark ? 'ayu-dark' : 'ayu-light',
+          theme: syntaxTheme,
         }),
       );
     } catch {
       return transparentHighlightBackground(
         highlighter.codeToHtml(content, {
           lang: 'text',
-          theme: dark ? 'ayu-dark' : 'ayu-light',
+          theme: syntaxTheme,
         }),
       );
     }
-  }, [content, dark, highlighter, language]);
+  }, [content, highlighter, language, syntaxTheme]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -256,7 +366,7 @@ const GraphWorkspaceCodePreview = memo(function GraphWorkspaceCodePreview({
       ref={rootRef}
       className="thread-graph-code-preview min-h-0 flex-1 overflow-auto"
       role="region"
-      aria-label="Source code"
+      aria-label={translate("files.sourceCode")}
     >
       {highlightedHtml ? (
         <div
@@ -290,87 +400,140 @@ const GraphWorkspaceCodePreview = memo(function GraphWorkspaceCodePreview({
   );
 });
 
+type MarkdownResourceContextValue = {
+  markdownPath: string;
+  workspaceRootPath?: string;
+  onOpenWorkspaceFile?: (path: string) => void;
+  resolveWorkspaceFileUrl?: (path: string) => string | null;
+};
+const MarkdownResourceContext = createContext<MarkdownResourceContextValue>({ markdownPath: '' });
+
+function markdownResourcePath(markdownPath: string, resourceUrl: string, workspaceRootPath = '') {
+  return resolveWorkspaceMarkdownPath({ markdownPath, resourceUrl, workspaceRootPath })
+    ?? resolveLinkedMarkdownPath({ markdownPath, resourceUrl, workspaceRootPath });
+}
+
+// Stable component types keep image state alive when Explorer updates its callbacks.
+// Defining these inside the preview remounted every image (and closed its lightbox).
+const workspaceMarkdownComponents: Components = {
+  a({ href, children: originalChildren, node: _node, ...props }) {
+    const { markdownPath, workspaceRootPath, onOpenWorkspaceFile } = useContext(MarkdownResourceContext);
+    const children = <MarkdownImageLinkContext.Provider value={true}>{originalChildren}</MarkdownImageLinkContext.Provider>;
+    const workspacePath = href ? markdownResourcePath(markdownPath, href, workspaceRootPath) : null;
+    if (workspacePath && onOpenWorkspaceFile) {
+      return <WorkspaceFileLink path={workspacePath} onOpen={({ path }) => onOpenWorkspaceFile(path)}>{children}</WorkspaceFileLink>;
+    }
+    return <a {...props} {...externalLinkProps(href)} href={href}>{children}</a>;
+  },
+  img({ src, alt, ...props }) {
+    const { markdownPath, workspaceRootPath, resolveWorkspaceFileUrl } = useContext(MarkdownResourceContext);
+    const workspacePath = src ? markdownResourcePath(markdownPath, src, workspaceRootPath) : null;
+    const resolvedSrc = workspacePath ? (resolveWorkspaceFileUrl?.(workspacePath) ?? src) : src;
+    return resolvedSrc ? <GraphWorkspaceZoomableImage src={resolvedSrc} alt={alt ?? ''} loading="lazy"
+      className={props.className} width={props.width} height={props.height} /> : null;
+  },
+};
+
 const GraphWorkspaceMarkdownPreview = memo(
   function GraphWorkspaceMarkdownPreview({
     content,
     markdownPath,
+    readingPositions,
     onOpenWorkspaceFile,
     resolveWorkspaceFileUrl,
     workspaceRootPath,
   }: {
     content: string;
     markdownPath: string;
+    readingPositions?: Map<string, number>;
     onOpenWorkspaceFile?: (path: string) => void;
     resolveWorkspaceFileUrl?: (path: string) => string | null;
     workspaceRootPath?: string;
   }) {
-    const resolvePath = (resourceUrl: string | undefined) =>
-      resourceUrl
-        ? resolveWorkspaceMarkdownPath({
-            markdownPath,
-            resourceUrl,
-            workspaceRootPath: workspaceRootPath ?? '',
-          })
-        : null;
-
+  const { locale: i18nLocale } = useI18n();
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+    const lastScrollTop = useRef(0);
+    useLayoutEffect(() => {
+      const element = scrollRef.current;
+      if (!element) return;
+      const target = readingPositions?.get(markdownPath) ?? 0;
+      lastScrollTop.current = target;
+      let restoring = true;
+      const restore = () => { if (restoring) element.scrollTop = target; };
+      restore();
+      // Images and fonts can change document height after the first layout.
+      const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(restore);
+      if (element.firstElementChild) observer?.observe(element.firstElementChild);
+      const stop = () => { restoring = false; observer?.disconnect(); };
+      for (const type of ['wheel', 'touchstart', 'pointerdown', 'keydown']) element.addEventListener(type, stop, { passive: true });
+      element.addEventListener('load', restore, true);
+      return () => {
+        readingPositions?.set(markdownPath, lastScrollTop.current);
+        observer?.disconnect();
+        for (const type of ['wheel', 'touchstart', 'pointerdown', 'keydown']) element.removeEventListener(type, stop);
+        element.removeEventListener('load', restore, true);
+      };
+    }, [markdownPath, readingPositions]);
     return (
-      <div className="thread-graph-markdown thread-graph-markdown-preview min-h-0 flex-1 overflow-auto px-5 py-4 sm:px-7 sm:py-6">
+      <div ref={scrollRef} onScroll={event => { lastScrollTop.current = event.currentTarget.scrollTop; readingPositions?.set(markdownPath, lastScrollTop.current); }} className="thread-graph-markdown thread-graph-markdown-preview min-h-0 flex-1 overflow-auto px-5 py-4 sm:px-7 sm:py-6">
+        <div className="thread-graph-markdown-document">
+        <MarkdownResourceContext.Provider value={{ markdownPath, workspaceRootPath, onOpenWorkspaceFile, resolveWorkspaceFileUrl }}>
         <ReactMarkdown
           urlTransform={url => localFileHref(url, typeof window === 'undefined' ? undefined : window.location.origin) ? url : defaultUrlTransform(url)}
           remarkPlugins={[remarkGfm]}
-          components={{
-            a({ href, children, ...props }) {
-              const workspacePath = resolvePath(href);
-              if (workspacePath && onOpenWorkspaceFile) {
-                return (
-                  <WorkspaceFileLink path={workspacePath} onOpen={({path})=>onOpenWorkspaceFile(path)}>{children}</WorkspaceFileLink>
-                );
-              }
-              return (
-                <a {...props} {...externalLinkProps(href)} href={href}>
-                  {children}
-                </a>
-              );
-            },
-            img({ src, alt, ...props }) {
-              const workspacePath = resolvePath(src);
-              const resolvedSrc = workspacePath
-                ? (resolveWorkspaceFileUrl?.(workspacePath) ?? src)
-                : src;
-              if (!resolvedSrc) {
-                return null;
-              }
-              return (
-                <GraphWorkspaceZoomableImage
-                  src={resolvedSrc}
-                  alt={alt ?? ''}
-                  loading="lazy"
-                  className={props.className}
-                />
-              );
-            },
-          }}
+          rehypePlugins={[...markdownHtmlPlugins]}
+          components={workspaceMarkdownComponents}
         >
           {content}
         </ReactMarkdown>
+        </MarkdownResourceContext.Provider>
+        </div>
       </div>
     );
   },
 );
 
+/** A link's target that is not on this device: what and where, and its path to copy. */
+function MissingLinkedFile({ path }: { path: string }) {
+  const [copied, setCopied] = useState(false);
+  const name = path.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) || path;
+  return (
+    <div className="workspace-missing-file" role="status">
+      <FileQuestion className="workspace-missing-file-icon" aria-hidden="true" />
+      <p className="workspace-missing-file-title">{translate('files.linkMissingTitle', { name })}</p>
+      <p className="workspace-missing-file-hint">{translate('files.linkMissingHint')}</p>
+      <code className="workspace-missing-file-path">{path}</code>
+      <button type="button" className="workspace-missing-file-copy" onClick={() => {
+        void navigator.clipboard?.writeText(path).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1500); }, () => undefined);
+      }}>{copied ? translate('files.copied') : translate('files.copyPathShort')}</button>
+    </div>
+  );
+}
+
 export function GraphWorkspacePreviewPane({
   activeFilePath,
   dirtyFilePaths = new Set(),
   error,
+  missingPath = null,
   fileTabs = [],
   focusLine,
   downloadOnly,
+  downloadReason = null,
   onDownloadFile,
   imageUrl,
   loadingMore,
-  onSaveFile,
+  documents,
+  resourceScopeKey,
+  canSaveDocument,
+  onSaveAndClose,
+  onReturnToFiles,
   onCloseFileTab,
   onDirtyChange,
+  mobileNavigation = false,
+  readingPositions,
+  onNavigateBack,
+  previousFilePath,
+  onNavigateForward,
   onExpandExplorer,
   onOpenWorkspaceFile,
   onLoadMore,
@@ -387,18 +550,28 @@ export function GraphWorkspacePreviewPane({
   activeFilePath?: string | null;
   dirtyFilePaths?: ReadonlySet<string>;
   error?: string | null;
+  /** A linked file or folder that is not on this device. */
+  missingPath?: string | null;
   fileTabs?: WorkspaceFileTab[];
   focusLine?: number | null;
   downloadOnly?: boolean;
+  /** Why the file is offered as a download, when known (e.g. it is not text). */
+  downloadReason?: string | null;
   onDownloadFile?: () => Promise<void> | void;
   imageUrl?: string | null;
   loadingMore?: boolean;
-  onSaveFile?: (input: {
-    path: string;
-    content: string;
-  }) => Promise<void> | void;
+  documents?: WorkspaceDocuments;
+  resourceScopeKey?: string;
+  canSaveDocument?: boolean;
+  onSaveAndClose?: (path: string) => Promise<void>;
+  onReturnToFiles?: () => void;
   onCloseFileTab?: (path: string) => void;
   onDirtyChange?: (path: string, dirty: boolean) => void;
+  mobileNavigation?: boolean;
+  readingPositions?: Map<string, number>;
+  onNavigateBack?: () => void;
+  previousFilePath?: string;
+  onNavigateForward?: () => void;
   onExpandExplorer?: () => void;
   onOpenWorkspaceFile?: (path: string) => void;
   onLoadMore?: () => void;
@@ -412,11 +585,20 @@ export function GraphWorkspacePreviewPane({
   selectedTarget: GraphWorkspacePreviewTarget;
   workspaceRootPath?: string;
 }) {
+  const { locale: i18nLocale } = useI18n();
+  const filePanel = useFilePanel();
   const surfaceRef = useRef<HTMLElement | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [draftContent, setDraftContent] = useState('');
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const document = previewFile ? documents?.documents.get(previewFile.path) : undefined;
+  const editing = document?.editing ?? false;
+  const draftContent = document?.content ?? previewFile?.content ?? '';
+  const saving = document?.phase === 'saving';
+  const saveError = document?.error;
+  const setDraftContent = (content: string) => { if (previewFile) documents?.change(previewFile.path,content); };
+  const setEditing = (value: boolean) => { if (previewFile) documents?.setEditing(previewFile.path,value); };
+  const actionTrigger = useRef<HTMLButtonElement>(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [showConflict, setShowConflict] = useState(true);
+  const [diffMode, setDiffMode] = useState<'draftDisk'|'baseDraft'|'baseDisk'>('draftDisk');
   const [markdownView, setMarkdownView] = useState<'preview' | 'source'>(
     'preview',
   );
@@ -432,6 +614,8 @@ export function GraphWorkspacePreviewPane({
     ? plugins.renderArtifact({
         artifact: activeNode.artifact,
         expanded: true,
+        // ElAgente: scientific renderers lay out for the workspace pane.
+        presentation: 'workspace',
         onToggleExpanded: () => undefined,
       })
     : null;
@@ -440,9 +624,11 @@ export function GraphWorkspacePreviewPane({
     previewFile?.language || languageForPath(previewFile?.path ?? '');
   const extension = previewFile ? extensionOf(previewFile.path) : '';
   const isMarkdownFile = MARKDOWN_EXTENSIONS.has(extension);
+  const isDrawioFile = isDrawioPath(previewFile?.path ?? '');
+  const renderedViewLabel = isDrawioFile ? translate("files.diagram") : 'Markdown';
   const title = previewTargetTitle(selectedTarget);
   const canEditFile =
-    Boolean(previewFile && onSaveFile) &&
+    Boolean(previewFile && canSaveDocument && document && !document.snapshot.readOnlyReason && document.snapshot.contentHash) &&
     !(previewFile && MOLECULAR_EXTENSIONS.has(extension)) &&
     isSmallEditableTextFile(previewFile!);
   const isLiveArtifactPreview = selectedTarget?.kind === 'live-molecule';
@@ -482,84 +668,28 @@ export function GraphWorkspacePreviewPane({
   }, []);
 
   useEffect(() => {
-    setEditing(false);
-    setDraftContent(previewFile?.content ?? '');
-    setSaveError(null);
-    setMarkdownView('preview');
-  }, [previewFile?.path, previewFile?.content]);
-
+    setMarkdownView('preview'); setShowConflict(true); setDiffMode('draftDisk'); setActionsOpen(false);
+  }, [activeNode?.path]);
   useEffect(() => {
-    if (!previewFile) {
-      return;
-    }
-    onDirtyChange?.(
-      previewFile.path,
-      editing && draftContent !== previewFile.content,
-    );
-  }, [draftContent, editing, onDirtyChange, previewFile]);
-
+    if (!actionsOpen) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || (event.target instanceof HTMLElement && event.target.closest('.monaco-editor'))) return;
+      event.preventDefault(); event.stopPropagation(); setActionsOpen(false); actionTrigger.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener('keydown', escape, true);
+    return () => window.removeEventListener('keydown', escape, true);
+  }, [actionsOpen]);
   async function handleSaveFile() {
-    if (!previewFile || !onSaveFile) {
-      return;
-    }
-
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await onSaveFile({
-        path: previewFile.path,
-        content: draftContent,
-      });
-      setEditing(false);
-    } catch (error) {
-      setSaveError(
-        error instanceof Error ? error.message : 'Failed to save file.',
-      );
-    } finally {
-      setSaving(false);
-    }
+    if (previewFile) await documents?.save(previewFile.path);
   }
 
-  const breadcrumbSegments = previewFile
-    ? previewFile.path
-        .replace(workspaceRootPath ?? '', '')
-        .split('/')
-        .filter(Boolean)
-    : [];
   const fileToolbar =
-    previewFile && (isMarkdownFile || canEditFile) ? (
+    previewFile && (isMarkdownFile || isDrawioFile || canEditFile) ? (
       <div className="flex shrink-0 items-center gap-1">
-        {isMarkdownFile && !editing ? (
-          <div
-            className="thread-graph-markdown-view-switch inline-flex items-center rounded border p-px"
-            role="group"
-            aria-label="Markdown view"
-          >
-            <button
-              type="button"
-              onClick={() => setMarkdownView('preview')}
-              className={`inline-flex h-5 w-5 items-center justify-center rounded transition ${
-                markdownView === 'preview' ? 'is-active' : ''
-              }`}
-              aria-pressed={markdownView === 'preview'}
-              title="Markdown preview"
-              aria-label="Markdown preview"
-            >
-              <BookOpen className="h-3 w-3" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setMarkdownView('source')}
-              className={`inline-flex h-5 w-5 items-center justify-center rounded transition ${
-                markdownView === 'source' ? 'is-active' : ''
-              }`}
-              aria-pressed={markdownView === 'source'}
-              title="Markdown source"
-              aria-label="Markdown source"
-            >
-              <Code2 className="h-3 w-3" />
-            </button>
-          </div>
+        {(isMarkdownFile || isDrawioFile) && !editing ? (
+          <button type="button" className="thread-graph-editor-toolbar-button workspace-mobile-view-toggle" aria-label={translate(markdownView==='preview' ? 'files.source' : 'files.preview', { value1: renderedViewLabel })} title={translate(markdownView==='preview' ? 'files.source' : 'files.preview', { value1: renderedViewLabel })} onClick={() => setMarkdownView(view => view==='preview'?'source':'preview')}>
+            {markdownView==='preview' ? <Code2 data-icon="source" size={16}/> : <BookOpen data-icon="preview" size={16}/>}
+          </button>
         ) : null}
         {canEditFile ? (
           <div className="flex shrink-0 items-center gap-0.5">
@@ -567,59 +697,73 @@ export function GraphWorkspacePreviewPane({
               <>
                 <button
                   type="button"
-                  onClick={() => {
-                    setDraftContent(previewFile.content);
+                  onClick={async () => {
+                    if (document && isProtected(document) && !(await confirmAsync({ title: translate('files.safeDiscardTitle'), description: translate('files.safeDiscard'), confirmLabel: translate('files.safeDiscardAction') }))) return;
+                    setDraftContent(document?.baseContent ?? previewFile.content);
                     setEditing(false);
-                    setSaveError(null);
                   }}
-                  disabled={saving}
+                  disabled={saving || document?.phase === 'unknown'}
                   className="thread-graph-editor-toolbar-button flex h-6 w-6 items-center justify-center rounded transition disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Cancel edits"
-                  aria-label="Cancel edits"
+                  title={translate("files.cancelEdits")}
+                  aria-label={translate("files.cancelEdits")}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X data-icon="close" className="h-3.5 w-3.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => void handleSaveFile()}
-                  disabled={saving || draftContent === previewFile.content}
+                  disabled={saving || document?.phase === 'unknown' || draftContent === document?.baseContent}
                   className="thread-graph-editor-toolbar-button flex h-6 w-6 items-center justify-center rounded transition disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Save file"
-                  aria-label="Save file"
+                  title={translate("files.saveFile")}
+                  aria-label={translate("files.saveFile")}
                 >
-                  <Save className="h-3.5 w-3.5" />
+                  <Save data-icon="save" className="h-3.5 w-3.5" />
                 </button>
               </>
             ) : (
               <button
                 type="button"
                 onClick={() => {
-                  setDraftContent(previewFile.content);
                   setMarkdownView('source');
                   setEditing(true);
-                  setSaveError(null);
                 }}
                 className="thread-graph-editor-toolbar-button flex h-6 w-6 items-center justify-center rounded transition"
-                title="Edit file"
-                aria-label="Edit file"
+                title={translate("files.editFile")}
+                aria-label={translate("files.editFile")}
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Pencil data-icon="edit" className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
         ) : null}
       </div>
     ) : null;
+  const documentState = document ? translate(document.snapshot.readOnlyReason ? 'files.safeReadOnly' : document.needsVerification && document.phase==='clean' ? 'files.safeAdoptedSnapshot' : `files.safePhase.${document.phase}`, { reason: document.snapshot.readOnlyReason ? translateReadOnly(document.snapshot.readOnlyReason) : '' }) : null;
+  const documentMetadata = document ? `${documentState} · ${document.snapshot.encoding==='utf-8' ? 'UTF-8' : translate('files.safeUnknownEncoding')}${document.snapshot.bom ? ' BOM' : ''} · ${document.snapshot.eol.toUpperCase()}` : undefined;
+  const inlineStatus = document && <span role="status" data-testid="workspace-document-status" className="sr-only" data-phase={document.phase}>{documentState}</span>;
+  const backLabel = previousFilePath ? translate('files.backToDocument', { name: previousFilePath.split('/').pop() ?? previousFilePath }) : translate('workbench.goBack');
+  const navigationControls = <>
+    {onNavigateForward && <button type="button" onClick={onNavigateForward} aria-label={translate('files.goForward')} title={translate('files.goForward')} className="thread-graph-editor-toolbar-button flex h-6 w-6 shrink-0 items-center justify-center rounded"><ArrowRight data-icon="forward" size={14} /></button>}
+  </>;
+  const copyPath = activeNode?.path && !/^(?:\/|[a-z]:[\\/])/i.test(activeNode.path) && workspaceRootPath ? `${workspaceRootPath.replace(/[\\/]+$/, '')}/${activeNode.path}` : activeNode?.path ?? '';
+  const fileActions = activeNode && <WorkspaceFileActions path={copyPath} relativePath={workspaceRootPath ? relativeWorkspacePath(copyPath, workspaceRootPath) : null} key={activeNode.path} {...((documentMetadata || filePanel?.label) ? { metadata:[filePanel?.label, documentMetadata].filter(Boolean).join(' · ') } : {})}
+    {...(document ? {onDownload:()=>{ if (!isProtected(document) && onDownloadFile) void onDownloadFile(); else downloadDraft(document); }, onRefresh: async () => {
+      const previous = document.snapshot.contentHash;
+      await documents?.checkDisk(document.snapshot.path);
+      const current = documents?.documents.get(document.snapshot.path);
+      if (current?.error) throw new Error(current.error);
+      return translate(current?.phase==='conflict' ? 'files.safePhase.conflict' : current?.snapshot.contentHash===previous ? 'files.fileAlreadyCurrent' : 'files.fileReloaded');
+    }} : onDownloadFile ? {onDownload:()=>void onDownloadFile()} : {})}>{fileToolbar}{inlineStatus}{navigationControls}</WorkspaceFileActions>;
   const viewerPaneToggle = onExpandExplorer ? (
     <button
       type="button"
       onClick={onExpandExplorer}
       data-testid="expand-explorer"
       className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--theme-fg-muted)] transition hover:bg-[var(--theme-hover)] hover:text-[var(--theme-fg)]"
-      title="Show Explorer"
-      aria-label="Show Explorer"
+      title={translate("files.showExplorer")}
+      aria-label={translate("files.showExplorer")}
     >
-      <PanelLeftOpen className="h-3.5 w-3.5" />
+      <PanelLeftOpen data-icon="expand-explorer" className="h-3.5 w-3.5" />
     </button>
   ) : onCollapse ? (
     <button
@@ -627,12 +771,15 @@ export function GraphWorkspacePreviewPane({
       onClick={onCollapse}
       data-testid="collapse-viewer"
       className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--theme-fg-muted)] transition hover:bg-[var(--theme-hover)] hover:text-[var(--theme-fg)]"
-      title="Hide Editor"
-      aria-label="Hide Editor"
+      title={translate("files.hideEditor")}
+      aria-label={translate("files.hideEditor")}
     >
-      <PanelRightClose className="h-3.5 w-3.5" />
+      <PanelRightClose data-icon="collapse-viewer" className="h-3.5 w-3.5" />
     </button>
   ) : null;
+
+  const previewNavigation = (onNavigateBack || onReturnToFiles || onExpandExplorer) && <button type="button" className="workspace-preview-back" onClick={onNavigateBack ?? onReturnToFiles ?? onExpandExplorer} aria-label={onNavigateBack ? backLabel : translate('files.backToFiles')} title={onNavigateBack ? backLabel : translate('files.backToFiles')} data-testid="expand-explorer"><ArrowLeft data-icon="back" size={18}/></button>;
+  const previewActions = <button ref={actionTrigger} type="button" className="thread-graph-editor-toolbar-button workspace-file-more" aria-label={translate('files.fileActions')} title={translate('files.fileActions')} aria-expanded={actionsOpen} onClick={() => setActionsOpen(open => !open)}><MoreHorizontal data-icon="more" size={18}/></button>;
 
   return (
     <section
@@ -640,14 +787,17 @@ export function GraphWorkspacePreviewPane({
       className="thread-graph-viewer flex h-full min-h-0 flex-col overflow-hidden rounded-md"
       data-preview-target-kind={selectedTarget?.kind ?? 'none'}
     >
-      {selectedTarget?.kind !== 'workspace-file' ? (
+      {!mobileNavigation && selectedTarget?.kind !== 'workspace-file' ? (
         <div className="thread-graph-viewer-header flex h-9 shrink-0 items-center justify-between gap-2 border-b px-2.5">
           <span className="min-w-0 truncate text-xs font-medium text-[var(--theme-fg)]">
-            {title ?? 'Preview'}
+            {title ?? translate("files.preview_f1fbb2")}
           </span>
           {viewerPaneToggle}
         </div>
       ) : null}
+      {fileTabs.length === 0 && <div className="workspace-file-toolbar flex min-h-9 shrink-0 items-center justify-between border-b px-1">
+        <div className="workspace-file-navigation flex items-center">{previewNavigation}</div><span className="min-w-0 flex-1 truncate text-xs" title={filePanel?.label}>{title}</span><div className="flex shrink-0 items-center">{previewActions}</div>
+      </div>}
       {fileTabs.length > 0 && onCloseFileTab && onSelectFileTab ? (
         <WorkspaceFileTabs
           activePath={activeFilePath ?? null}
@@ -655,93 +805,80 @@ export function GraphWorkspacePreviewPane({
           onClose={onCloseFileTab}
           onSelect={onSelectFileTab}
           tabs={fileTabs}
-          trailingAction={
-            fileToolbar || viewerPaneToggle ? (
-              <>
-                {fileToolbar}
-                {viewerPaneToggle}
-              </>
-            ) : null
-          }
+          {...(onSaveAndClose ? { onSaveAndClose } : {})}
+          blockedClosePaths={new Set([...documents?.documents ?? []].filter(([,doc]) => ['saving','unknown'].includes(doc.phase)).map(([path]) => path))}
+          leadingAction={previewNavigation}
+          trailingAction={previewActions}
         />
       ) : null}
+      {actionsOpen && fileActions}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {error ? (
-          <div className="border-b border-rose-200 bg-rose-50 px-5 py-3 text-sm text-rose-700 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-200">
-            {error}
+          <div role="alert" className="workspace-file-alert flex items-center gap-3 border-b border-[color-mix(in_srgb,#e11d48_30%,var(--theme-border))] bg-[color-mix(in_srgb,#e11d48_8%,var(--theme-panel))] text-sm text-[color-mix(in_srgb,#e11d48_58%,var(--theme-fg))] px-5 py-3">
+            <span className="min-w-0 flex-1">{translateReadOnly(error)}</span>
+            {/* The file may still be useful: its download sits beside the error. */}
+            {onDownloadFile && selectedTarget?.kind === 'workspace-file'
+              ? <AlertDownloadButton name={selectedTarget.node.name} onDownload={onDownloadFile} /> : null}
           </div>
         ) : null}
-        {!selectedTarget ? (
+        {!selectedTarget && missingPath ? (
+          <MissingLinkedFile path={missingPath} />
+        ) : !selectedTarget ? (
           <div className="flex min-h-0 flex-1 items-center justify-center px-5 text-center text-sm text-slate-400 dark:text-slate-500">
-            Pick a live molecule, workspace file, artifact, or thread event to
-            preview it.
-          </div>
+            {translate("files.pickALiveMoleculeWorkspaceFileArtifact")}</div>
         ) : selectedTarget.kind === 'workspace-file' && previewLoading ? (
           <div className="flex min-h-0 flex-1 items-center justify-center px-5 text-center text-sm text-slate-400 dark:text-slate-500">
-            Loading file preview...
-          </div>
+            {translate("files.loadingFilePreview")}</div>
         ) : selectedTarget.kind === 'workspace-file' && downloadOnly ? (
-          <DownloadFilePreview key={selectedTarget.node.path} node={selectedTarget.node} onDownload={onDownloadFile} />
+          <DownloadFilePreview key={selectedTarget.node.path} node={selectedTarget.node} onDownload={onDownloadFile} {...(downloadReason ? { readOnlyReason: downloadReason } : activeFilePath && documents?.documents.get(activeFilePath)?.snapshot.readOnlyReason ? {readOnlyReason:documents.documents.get(activeFilePath)!.snapshot.readOnlyReason!}: {})} />
         ) : selectedTarget.kind === 'workspace-file' && moleculeSnapshot ? (
           <div className="thread-graph-molecule-preview min-h-0 flex-1 overflow-hidden">
             <GraphMoleculeViewer
               source={moleculeSnapshot}
               moleculeId={moleculeSnapshot.uuid ?? selectedTarget.node.path}
-              title="PyMOL-style (PDB/CIF)"
+              title={selectedTarget.node.name}
             />
           </div>
         ) : selectedTarget.kind === 'workspace-file' && imageUrl ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-5">
-            <GraphWorkspaceZoomableImage
-              src={imageUrl}
-              alt={selectedTarget.node.path || selectedTarget.node.name}
-              className="max-h-full max-w-full object-contain"
-            />
-          </div>
+          <WorkspaceImagePreview key={imageUrl} src={imageUrl} alt={selectedTarget.node.path || selectedTarget.node.name} />
         ) : selectedTarget.kind === 'workspace-file' && pdfUrl ? (
-          <div className="thread-graph-file-preview-frame min-h-0 flex-1 overflow-hidden">
-            <iframe
-              src={pdfUrl}
-              title={`PDF preview: ${
-                selectedTarget.node.path || selectedTarget.node.name
-              }`}
-              className="h-full w-full border-0"
-            />
-          </div>
+          <WorkspacePdfPreview key={pdfUrl} src={pdfUrl} node={selectedTarget.node} />
         ) : selectedTarget.kind === 'workspace-file' && previewFile ? (
           <div className="flex min-h-0 flex-1 flex-col">
-            {breadcrumbSegments.length > 1 ||
-            (fileTabs.length === 0 && fileToolbar) ? (
-              <div className="thread-graph-editor-breadcrumbs flex h-7 shrink-0 items-center border-b px-2 text-[11px]">
-                <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
-                  {breadcrumbSegments.map((segment, index, segments) => (
-                    <span
-                      key={`${segment}:${index}`}
-                      className="flex shrink-0 items-center gap-0.5"
-                    >
-                      <span
-                        className={
-                          index === segments.length - 1
-                            ? 'text-[var(--theme-fg)]'
-                            : ''
-                        }
-                      >
-                        {segment}
-                      </span>
-                      {index < segments.length - 1 ? (
-                        <ChevronRight
-                          aria-hidden="true"
-                          className="h-3 w-3 text-[var(--theme-fg-muted)]"
-                        />
-                      ) : null}
-                    </span>
-                  ))}
+            {document && (document.snapshot.readOnlyReason || ['conflict','unknown','error'].includes(document.phase)) ? (
+              <div className="workspace-document-status" role="status">
+                <span>{document.snapshot.readOnlyReason ? translate('files.safeReadOnly', {reason: translateReadOnly(document.snapshot.readOnlyReason)}) : translate(document.needsVerification && document.phase==='clean' ? 'files.safeAdoptedSnapshot':`files.safePhase.${document.phase}`)} · {document.snapshot.encoding==='utf-8' ? 'UTF-8':translate('files.safeUnknownEncoding')}{document.snapshot.bom ? ' BOM' : ''} · {document.snapshot.eol.toUpperCase()} · r{document.revision}</span>
+                <div className="workspace-document-actions">
+                  {document.phase === 'unknown' ? <button type="button" onClick={() => void documents?.reconcile(document.snapshot.path)}>{translate('files.safeVerifySave')}</button> : null}
+                  {document.phase === 'unknown' && document.conflict ? <button type="button" disabled={document.operationPending} onClick={async () => {if(await confirmAsync({ title: translate('files.safeUseCheckedBase'), description: translate('files.safeManualRebase'), confirmLabel: translate('files.safeUseCheckedBase') })) documents?.acceptVerifiedDisk(document.snapshot.path);}}>{translate('files.safeUseCheckedBase')}</button> : null}
+                  {document.phase === 'conflict' && !showConflict ? <button type="button" onClick={() => setShowConflict(true)}>{translate('files.safeViewConflict')}</button> : null}
                 </div>
-                {fileTabs.length === 0 ? fileToolbar : null}
+              </div>
+            ) : !document && canSaveDocument ? <div className="workspace-document-status">{translate(isHostFilePath(previewFile.path) ? 'files.linkedFileReadOnly' : 'files.safeUnavailable')}</div> : null}
+            {document && (document.phase === 'conflict' || (document.phase === 'unknown' && document.conflict)) && showConflict ? (
+              <div className="workspace-document-conflict" data-testid="workspace-document-conflict">
+                <strong>{translate(document.phase==='unknown' ? 'files.safePhase.unknown':'files.safeConflictTitle')}</strong>
+                <p>{translate(document.phase==='unknown' ? 'files.safeUnknown' : document.conflictFrom==='check' ? 'files.safeChangedBody' : 'files.safeConflictBody')}</p>
+                <div className="workspace-document-actions">
+                  <button type="button" onClick={() => setShowConflict(false)}>{translate('files.safeKeepDraft')}</button>
+                  <button type="button" disabled={document.phase==='unknown' || document.conflict?.content == null} onClick={async () => {const revision=document.revision; if(await confirmAsync({ title: translate('files.safeAdoptDisk'), description: translate('files.safeDiscard'), confirmLabel: translate('files.safeAdoptDisk') })) documents?.adoptDisk(document.snapshot.path,revision);}}>{translate('files.safeAdoptDisk')}</button>
+                  <button type="button" disabled={document.phase==='unknown' || !document.conflict?.contentHash || Boolean(document.conflict.readOnlyReason)} onClick={async () => {if(await confirmAsync({ title: translate('files.safeOverwriteShown'), description: translate('files.safeOverwriteConfirm'), confirmLabel: translate('files.safeOverwriteShown') })) void documents?.save(document.snapshot.path,true);}}>{translate('files.safeOverwriteShown')}</button>
+                  <button type="button" disabled={document.conflict?.content == null} onClick={() => downloadDraft(document,true)}>{translate('files.safeDownloadDisk')}</button>
+                </div>
+                {document.conflict?.content != null ? <>
+                  <label>{translate('files.safeCompare')} <select value={diffMode} onChange={e => setDiffMode(e.target.value as typeof diffMode)}>
+                    <option value="draftDisk">{translate('files.safeDraftDisk')}</option><option value="baseDraft">{translate('files.safeBaseDraft')}</option><option value="baseDisk">{translate('files.safeBaseDisk')}</option>
+                  </select></label>
+                  <div className="workspace-document-diff"><Suspense fallback={<span>{translate('files.loadingEditor')}</span>}><WorkspaceDocumentDiff
+                    original={diffMode==='draftDisk' ? document.content : document.baseContent}
+                    modified={diffMode==='baseDraft' ? document.content : document.conflict.content}
+                    language={fileLanguage} dark={dark} compact={compactViewer} /></Suspense></div>
+                  <p className="workspace-document-snapshot">{translate('files.safeFixedSnapshot')} · {document.conflict.contentHash?.slice(0,23)}</p>
+                </> : <p>{translate('files.safeMissing')}</p>}
               </div>
             ) : null}
             {saveError ? (
-              <div className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-200">
+              <div role="alert" className="workspace-file-alert border-b border-[color-mix(in_srgb,#e11d48_30%,var(--theme-border))] bg-[color-mix(in_srgb,#e11d48_8%,var(--theme-panel))] text-sm text-[color-mix(in_srgb,#e11d48_58%,var(--theme-fg))] px-4 py-2">
                 {saveError}
               </div>
             ) : null}
@@ -750,13 +887,17 @@ export function GraphWorkspacePreviewPane({
                 value={draftContent}
                 onChange={(event) => setDraftContent(event.currentTarget.value)}
                 spellCheck={false}
-                aria-label="Workspace file editor"
+                aria-label={translate("files.workspaceFileEditor")}
                 className="thread-graph-file-editor min-h-0 flex-1 resize-none border-0 bg-transparent p-4 font-mono text-[12px] leading-5 text-slate-900 outline-none dark:text-slate-100"
               />
+            ) : isDrawioFile && markdownView === 'preview' && !editing ? (
+              <GraphDrawioPreview content={previewFile.content} name={previewFile.name} truncated={previewFile.truncated} />
             ) : isMarkdownFile && markdownView === 'preview' && !editing ? (
               <GraphWorkspaceMarkdownPreview
+                key={previewFile.path}
                 content={previewFile.content}
                 markdownPath={previewFile.path}
+                {...(readingPositions ? { readingPositions } : {})}
                 {...(onOpenWorkspaceFile ? { onOpenWorkspaceFile } : {})}
                 {...(resolveWorkspaceFileUrl
                   ? { resolveWorkspaceFileUrl }
@@ -773,12 +914,13 @@ export function GraphWorkspacePreviewPane({
               <Suspense
                 fallback={
                   <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--theme-fg-muted)]">
-                    Loading editor...
-                  </div>
+                    {translate("files.loadingEditor")}</div>
                 }
               >
                 <GraphWorkspaceMonacoEditor
-                  key={previewFile.path}
+                  key={document?.key ?? `${resourceScopeKey}:${previewFile.path}`}
+                  resourceKey={document?.key ?? `${resourceScopeKey}:${previewFile.path}`}
+                  retainModel={Boolean(document)}
                   content={editing ? draftContent : previewFile.content}
                   dark={dark}
                   focusLine={focusLine}
@@ -790,21 +932,22 @@ export function GraphWorkspacePreviewPane({
                 />
               </Suspense>
             )}
+            {previewFile.truncated && !onLoadMore ? <div className="workspace-document-status">{translate("files.safeFirstPreview")}</div> : null}
             {previewFile.truncated && onLoadMore ? (
               <div className="thread-graph-file-preview-footer flex justify-center border-t px-4 py-3">
                 <button
                   type="button"
                   onClick={onLoadMore}
                   disabled={loadingMore}
-                  title="Load more workspace preview"
-                  aria-label="Load more workspace preview"
+                  title={translate("files.loadMoreWorkspacePreview")}
+                  aria-label={translate("files.loadMoreWorkspacePreview")}
                   className="thread-graph-load-more-button rounded-md px-4 py-1.5 text-xs disabled:opacity-50"
                 >
                   {loadingMore
-                    ? 'Loading...'
-                    : `Load more (${(
+                    ? translate("files.loading")
+                    : translate("files.loadMoreBytesRemaining", { value1: (
                         previewFile.size - previewFile.nextOffset
-                      ).toLocaleString()} bytes remaining)`}
+                      ).toLocaleString(getLocale()) })}
                 </button>
               </div>
             ) : null}
@@ -824,7 +967,7 @@ export function GraphWorkspacePreviewPane({
         ) : selectedTarget.kind === 'meta' ? (
           <div className="min-h-0 flex-1 overflow-auto p-3">
             <div className="grid gap-3">
-              <WorkspaceInfoCard label="Workspace Data">
+              <WorkspaceInfoCard label={translate("files.workspaceData")}>
                 <GraphWorkspaceCodePreview
                   content={selectedTarget.node.detail ?? ''}
                 />

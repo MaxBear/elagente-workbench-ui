@@ -1,5 +1,9 @@
+import { translate, useI18n } from '../../i18n';
 import { useRef, useState } from 'react';
 import { GraphWorkspaceImageLightbox } from '../ZoomableImage';
+import { X } from 'lucide-react';
+import { AttachmentCard, FloatingCard, ViewAction } from '../attachments/AttachmentTile';
+import type { FileFamily } from '../attachments/attachmentFiles';
 import type {
   ClipboardEvent,
   DragEvent,
@@ -8,13 +12,13 @@ import type {
   RefObject,
 } from 'react';
 
-import { InputGroupButton } from '../graph-ui/InputGroup';
-
 interface ComposerPromptEditorProps {
   promptRef: RefObject<HTMLDivElement | null>;
   prompt: string;
   disabled: boolean;
   promptPlaceholder: string;
+  /** How to send, shown after the placeholder where there is a keyboard. */
+  promptPlaceholderHint?: string;
   canInterrupt: boolean;
   interruptLabel: string;
   composerPromptRegionClassName: string;
@@ -49,11 +53,9 @@ export function ComposerPromptEditor({
   prompt,
   disabled,
   promptPlaceholder,
-  canInterrupt,
-  interruptLabel,
+  promptPlaceholderHint = '',
   composerPromptRegionClassName,
   graphChatInputClassName,
-  onInterrupt,
   onInput,
   onPointerDown,
   onPaste,
@@ -66,42 +68,48 @@ export function ComposerPromptEditor({
   onDragLeave,
   onDrop,
 }: ComposerPromptEditorProps) {
+  useI18n();
   const previewTrigger = useRef<HTMLElement | null>(null);
   const [preview, setPreview] = useState<{src: string; alt: string} | null>(null);
-  function attachmentImage(target: EventTarget | null) {
-    const chip = target instanceof Element ? target.closest<HTMLElement>('[data-segment-type="attachment"]') : null;
-    if (chip?.querySelector('img')) previewTrigger.current = chip;
-    return chip?.querySelector('img');
+  // An attachment tile opens its card: name, kind, size, and view or remove.
+  const [details, setDetails] = useState<HTMLElement | null>(null);
+  function attachmentTile(target: EventTarget | null) {
+    return target instanceof Element ? target.closest<HTMLElement>('[data-segment-type="attachment"]') : null;
   }
+  const detailsImage = details?.querySelector('img');
+  const view = details && detailsImage ? () => {
+    previewTrigger.current = details;
+    setDetails(null);
+    setPreview({ src: detailsImage.src, alt: details.dataset.name ?? '' });
+  } : undefined;
   return (
     <div
       data-slot="input-group-control"
-      className={`${composerPromptRegionClassName} relative w-full ${canInterrupt ? "z-[90]" : ""}`}
+      className={`${composerPromptRegionClassName} relative w-full`}
     >
       <div className={graphChatInputClassName}>
         {prompt.length === 0 && promptPlaceholder && (
           <span
-            className={`pointer-events-none absolute left-3 top-3 truncate text-slate-500 sm:left-4 sm:top-4 dark:text-slate-400 ${
-              canInterrupt ? 'right-12' : 'right-3 sm:right-4'
-            }`}
+            className={`thread-composer-placeholder pointer-events-none absolute left-3 top-3 truncate text-slate-500 sm:left-4 sm:top-4 dark:text-slate-400 right-3 sm:right-4`}
           >
             {promptPlaceholder}
+            {promptPlaceholderHint ? <span className="thread-composer-placeholder-hint">{promptPlaceholderHint}</span> : null}
           </span>
         )}
         <div
           ref={promptRef}
           role="textbox"
-          aria-label="Prompt"
+          aria-label={translate("chat.prompt")}
           aria-multiline="true"
-          contentEditable={!disabled}
+          contentEditable={disabled ? false : 'plaintext-only'}
           inputMode="text"
           suppressContentEditableWarning
           onClick={event => {
-            const image = attachmentImage(event.target);
-            if (image) { event.preventDefault(); setPreview({src: image.src, alt: image.alt}); }
+            const tile = attachmentTile(event.target);
+            if (tile) { event.preventDefault(); setDetails(current => current === tile ? null : tile); }
           }}
           onPointerDown={(event) => {
-            if (attachmentImage(event.target)) { event.preventDefault(); return; }
+            if (attachmentTile(event.target)) { event.preventDefault(); return; }
             if (
               !disabled &&
               document.activeElement !== event.currentTarget &&
@@ -124,9 +132,9 @@ export function ComposerPromptEditor({
           onPaste={onPaste}
           onKeyDown={event => {
             if (event.currentTarget.dataset.imeComposing === 'true' || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
-            const image = attachmentImage(event.target);
-            if (image && (event.key === 'Enter' || event.key === ' ')) {
-              event.preventDefault(); setPreview({src: image.src, alt: image.alt}); return;
+            const tile = attachmentTile(event.target);
+            if (tile && (event.key === 'Enter' || event.key === ' ')) {
+              event.preventDefault(); setDetails(tile); return;
             }
             onKeyDown(event);
           }}
@@ -137,34 +145,28 @@ export function ComposerPromptEditor({
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
-          className={`relative z-[1] min-h-[4.25rem] whitespace-pre-wrap break-words pb-2 outline-none sm:min-h-[4.25rem] ${
-            canInterrupt ? 'pr-12' : ''
-          } ${disabled ? 'cursor-not-allowed text-slate-500' : ''}`}
+          className={`relative z-[1] min-h-[4.25rem] whitespace-pre-wrap break-words pb-2 outline-none sm:min-h-[4.25rem] ${disabled ? 'cursor-not-allowed text-slate-500' : ''}`}
         />
       </div>
+      {details?.isConnected ? (
+        <FloatingCard anchor={details} onClose={() => setDetails(null)}>
+          <AttachmentCard name={details.dataset.name ?? ''} family={(details.dataset.family ?? 'other') as FileFamily}
+            size={details.dataset.size ? Number(details.dataset.size) : undefined} thumbnail={detailsImage?.src} onView={view}
+            actions={<>
+              {view ? <ViewAction onClick={view} /> : null}
+              <button type="button" className="is-danger" onClick={() => {
+                details.remove();
+                setDetails(null);
+                onInput();
+                promptRef.current?.focus({ preventScroll: true });
+              }}><X aria-hidden="true" />{translate('chat.attachmentRemove')}</button>
+            </>} />
+        </FloatingCard>
+      ) : null}
       {preview ? <GraphWorkspaceImageLightbox src={preview.src} alt={preview.alt} onClose={() => {
         setPreview(null);
         previewTrigger.current?.focus({preventScroll: true});
       }} /> : null}
-      {canInterrupt ? (
-        <InputGroupButton
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label={interruptLabel}
-          title={interruptLabel}
-          onClick={(event) => {
-            event.preventDefault();
-            void onInterrupt?.();
-          }}
-          className="thread-graph-composer-stop-button ui-action-danger absolute right-2 top-2 z-[90] h-8 w-8 rounded-full text-sm font-medium pointer-events-auto"
-        >
-          <span
-            aria-hidden="true"
-            className="block h-2.5 w-2.5 rounded-[2px] bg-current"
-          />
-        </InputGroupButton>
-      ) : null}
     </div>
   );
 }
