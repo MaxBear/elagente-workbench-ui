@@ -71,7 +71,7 @@ describe('unconfirmed running turn label', () => {
     host = null;
   });
 
-  it('marks a frozen running time as a lower bound while reconnecting, and a live one as running', async () => {
+  it('marks a frozen running time as an unconfirmed estimate while reconnecting, never a proven minimum', async () => {
     const { TurnHead } = await import('./TurnHead');
     const turn = { id: 't', status: 'inProgress', startedAt, completedAt: null, items: [], error: null } as never;
     const show = (clock: TurnClock) => {
@@ -83,8 +83,9 @@ describe('unconfirmed running turn label', () => {
     };
     let view = show({ now: () => server + 9_000, frozenAt: server + 9_000 });
     expect(view.querySelector('[data-unconfirmed]')).not.toBeNull();
-    expect(view.querySelector('.thread-turn-head-took')?.textContent).toBe('9s+');
-    expect(view.innerHTML).toContain('reconnecting · ran at least 9s');
+    expect(view.querySelector('.thread-turn-head-took')?.textContent).toBe('~9s?');
+    expect(view.innerHTML).toContain('reconnecting · elapsed time unconfirmed (about 9s when the connection was lost)');
+    expect(view.innerHTML).not.toMatch(/at least/);
     act(() => root?.unmount()); host?.remove();
     view = show({ now: () => server + 9_000 });
     expect(view.querySelector('[data-unconfirmed]')).toBeNull();

@@ -616,5 +616,5 @@ export const chatZhCN = {
   "chat.policyDone": "完成",
   "chat.policyChip": "模型：{{value1}}",
   "chat.policyConfirm": "请确认模型",
-  "chat.turnHeadUnconfirmed": "正在重新连接 · 至少运行了 {{elapsed}}",
+  "chat.turnHeadUnconfirmed": "正在重新连接 · 运行时间未确认（断开连接时约 {{elapsed}}）",
 } as const;

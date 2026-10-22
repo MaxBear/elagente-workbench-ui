@@ -1351,7 +1351,7 @@ var chatEn = {
   "chat.policyDone": "Done",
   "chat.policyChip": "Models: {{value1}}",
   "chat.policyConfirm": "Confirm models",
-  "chat.turnHeadUnconfirmed": "reconnecting \xB7 ran at least {{elapsed}}"
+  "chat.turnHeadUnconfirmed": "reconnecting \xB7 elapsed time unconfirmed (about {{elapsed}} when the connection was lost)"
 };
 
 // src/i18n/common.en.ts
@@ -5344,7 +5344,7 @@ var chatZhCN = {
   "chat.policyDone": "\u5B8C\u6210",
   "chat.policyChip": "\u6A21\u578B\uFF1A{{value1}}",
   "chat.policyConfirm": "\u8BF7\u786E\u8BA4\u6A21\u578B",
-  "chat.turnHeadUnconfirmed": "\u6B63\u5728\u91CD\u65B0\u8FDE\u63A5 \xB7 \u81F3\u5C11\u8FD0\u884C\u4E86 {{elapsed}}"
+  "chat.turnHeadUnconfirmed": "\u6B63\u5728\u91CD\u65B0\u8FDE\u63A5 \xB7 \u8FD0\u884C\u65F6\u95F4\u672A\u786E\u8BA4\uFF08\u65AD\u5F00\u8FDE\u63A5\u65F6\u7EA6 {{elapsed}}\uFF09"
 };
 
 // src/i18n/common.zh-CN.ts

@@ -110,9 +110,11 @@ export function normalizePlanStepStatus(status: string) {
     so `now` should be server time on a monotonic base: then a phone whose
     clock is off does not add its error to a running timer. While the host
     cannot confirm that a turn is still running (its live connection is down),
-    `frozenAt` holds the last confirmed moment and running timers stop there
-    instead of counting time nobody observed. Completed turns always use their
-    own recorded start and end. Without a provider, the device clock is used. */
+    `frozenAt` holds the moment it noticed the loss and running timers stop
+    there instead of counting time nobody observed. That value is an
+    unconfirmed estimate: the turn may have finished earlier or still be
+    running. Completed turns always use their own recorded start and end.
+    Without a provider, the device clock is used. */
 export interface TurnClock {
   now: () => number;
   frozenAt?: number | null;
@@ -305,7 +307,7 @@ export function TurnStatusBar({
           {elapsedLabel ? (
             unconfirmed
               ? <span data-unconfirmed="true" title={translate('chat.turnHeadUnconfirmed', { elapsed: elapsedLabel })}
-                  aria-label={translate('chat.turnHeadUnconfirmed', { elapsed: elapsedLabel })}>{elapsedLabel}+</span>
+                  aria-label={translate('chat.turnHeadUnconfirmed', { elapsed: elapsedLabel })}>~{elapsedLabel}?</span>
               : <span aria-label={translate("chat.runningFor", { value1: elapsedLabel })}>{elapsedLabel}</span>
           ) : null}
         </div>

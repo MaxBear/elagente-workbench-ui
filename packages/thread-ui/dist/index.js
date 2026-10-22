@@ -41,7 +41,7 @@ import {
   useMenuKeyboard,
   useModalFocus,
   useTabScrollEdges
-} from "./chunk-B45XDV5E.js";
+} from "./chunk-K6KITLCU.js";
 import {
   Button,
   Tooltip,
@@ -75,7 +75,7 @@ import {
   t,
   translate,
   useI18n
-} from "./chunk-AE727MCJ.js";
+} from "./chunk-YW4S7OP5.js";
 
 // #style-inject:#style-inject
 function styleInject(css, { insertAt } = {}) {
@@ -8879,8 +8879,9 @@ function TurnStatusBar({
           title: translate("chat.turnHeadUnconfirmed", { elapsed: elapsedLabel2 }),
           "aria-label": translate("chat.turnHeadUnconfirmed", { elapsed: elapsedLabel2 }),
           children: [
+            "~",
             elapsedLabel2,
-            "+"
+            "?"
           ]
         }
       ) : /* @__PURE__ */ jsx35("span", { "aria-label": translate("chat.runningFor", { value1: elapsedLabel2 }), children: elapsedLabel2 }) : null })
@@ -17422,7 +17423,7 @@ function TurnHead({ turn, active, added, onBeforeResize }) {
   const unconfirmed = active && turnClock?.frozenAt != null;
   const started = turn.startedAt;
   const elapsed = formatElapsedDuration(started, active ? now : Date.parse(turn.completedAt ?? ""));
-  const took = elapsed && unconfirmed ? `${elapsed}+` : elapsed;
+  const took = elapsed && unconfirmed ? `~${elapsed}?` : elapsed;
   const usage = turn.tokenUsage?.total;
   const speed = turn.tokenUsage?.generationSpeed;
   const rate2 = active ? speed?.averageOutputTokensPerSecond : speed?.averageOutputTokensPerSecond ?? speed?.averageTokensPerSecond;

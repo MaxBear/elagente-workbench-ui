@@ -1,12 +1,12 @@
 import {
   editorThemeFor
-} from "./chunk-FAIRPXQ2.js";
+} from "./chunk-63NAVPUC.js";
 import {
   useDocumentThemeRevision
 } from "./chunk-TZIQBT3H.js";
 import {
   translate
-} from "./chunk-AE727MCJ.js";
+} from "./chunk-YW4S7OP5.js";
 
 // src/components/graph-workspace/GraphWorkspaceMonacoDiff.tsx
 import { useEffect, useRef } from "react";

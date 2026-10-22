@@ -44,13 +44,14 @@ export function TurnHead({ turn, active, added, onBeforeResize }: {
   const [open, setOpen] = useState(false);
   const [withDate, setWithDate] = useState(false);
   const now = useSecondClock(active);
-  // While the host cannot confirm the turn is running, its time is a lower
-  // bound from the last confirmed moment, not live work: say so.
+  // While the host cannot confirm the turn is running, its time is the
+  // elapsed time when the loss was noticed: an unconfirmed estimate (the turn
+  // may already have finished), not live work and not a proven minimum.
   const turnClock = useContext(TurnClockContext);
   const unconfirmed = active && turnClock?.frozenAt != null;
   const started = turn.startedAt;
   const elapsed = formatElapsedDuration(started, active ? now : Date.parse(turn.completedAt ?? ''));
-  const took = elapsed && unconfirmed ? `${elapsed}+` : elapsed;
+  const took = elapsed && unconfirmed ? `~${elapsed}?` : elapsed;
   const usage = turn.tokenUsage?.total;
   const speed = turn.tokenUsage?.generationSpeed;
   // While the turn works, the speed so far counts only model calls whose output
