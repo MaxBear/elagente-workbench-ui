@@ -53,6 +53,7 @@ export {
   type ThreadComposerProps,
   type ComposerSendShortcut,
 } from './components/ThreadComposer';
+export { TurnClockContext, type TurnClock } from './components/timeline/turnStatus';
 export type {
   ComposerModelPolicyProps,
   ModelPolicyDisplay,

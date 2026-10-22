@@ -1,6 +1,6 @@
 import { translate, useI18n } from '../../i18n';
 import { Bot, Hourglass } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../graph-ui/Tooltip';
 
 import {
@@ -106,19 +106,37 @@ export function normalizePlanStepStatus(status: string) {
   return 'other' as const;
 }
 
+/** A host's clock for running-turn timers. Turn times come from the server,
+    so `now` should be server time on a monotonic base: then a phone whose
+    clock is off does not add its error to a running timer. While the host
+    cannot confirm that a turn is still running (its live connection is down),
+    `frozenAt` holds the last confirmed moment and running timers stop there
+    instead of counting time nobody observed. Completed turns always use their
+    own recorded start and end. Without a provider, the device clock is used. */
+export interface TurnClock {
+  now: () => number;
+  frozenAt?: number | null;
+}
+export const TurnClockContext = createContext<TurnClock | null>(null);
+
 export function useSecondClock(enabled: boolean) {
   const { locale: i18nLocale } = useI18n();
-  const [now, setNow] = useState(() => Date.now());
+  const clock = useContext(TurnClockContext);
+  const read = () => clock ? clock.frozenAt ?? clock.now() : Date.now();
+  const [now, setNow] = useState(read);
 
   useEffect(() => {
     if (!enabled) {
       return;
     }
 
-    setNow(Date.now());
-    const interval = window.setInterval(() => setNow(Date.now()), 1_000);
+    setNow(read());
+    if (clock?.frozenAt != null) return;
+    const interval = window.setInterval(() => setNow(read()), 1_000);
     return () => window.clearInterval(interval);
-  }, [enabled]);
+    // `read` follows `clock`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, clock]);
 
   return now;
 }
