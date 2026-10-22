@@ -185,7 +185,7 @@ describe('playground smoke', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the thread UI, opens the slash menu, and attaches the mocked shell', async () => {
+  it('renders the thread UI and opens the slash menu', async () => {
     flushSync(() => {
       root?.render(<PlaygroundApp />);
     });
@@ -208,9 +208,22 @@ describe('playground smoke', () => {
       slashButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(textContent()).toContain(
-      'No tool shortcuts are configured for this thread.',
-    );
+    // The playground host has plan mode and no tool shortcuts: the toolbox offers /plan.
+    expect(
+      document.body.querySelector('[data-toolbox-action="plan"]'),
+    ).not.toBeNull();
+
+  });
+
+  // Not changed for ELA-207: the reused layout opens terminals from its own Terminal navigation.
+  // This keeps the playground's metadata shell switch visible as a separate result.
+  it('attaches the mocked shell from the playground metadata switch', async () => {
+    flushSync(() => {
+      root?.render(<PlaygroundApp />);
+    });
+    await vi.waitFor(() => {
+      expect(host?.querySelector('[data-testid="chat-composer"]')).not.toBeNull();
+    });
 
     const shellButton = Array.from(
       host?.querySelectorAll<HTMLButtonElement>('button') ?? [],
@@ -301,8 +314,8 @@ describe('playground smoke', () => {
 
     await vi.waitFor(() => {
       expect(
-        jumpButton?.closest('.thread-jump-latest-badge')?.className,
-      ).toContain('is-active');
+        jumpButton?.closest('.thread-jump-latest-badge')?.hasAttribute('data-following'),
+      ).toBe(true);
     });
 
     scrollContainer!.scrollTop = 200;
@@ -324,8 +337,8 @@ describe('playground smoke', () => {
 
     await vi.waitFor(() => {
       expect(
-        jumpButton?.closest('.thread-jump-latest-badge')?.className,
-      ).not.toContain('is-active');
+        jumpButton?.closest('.thread-jump-latest-badge')?.hasAttribute('data-following'),
+      ).toBe(false);
     });
 
     flushSync(() => {
@@ -334,8 +347,8 @@ describe('playground smoke', () => {
 
     await vi.waitFor(() => {
       expect(
-        jumpButton?.closest('.thread-jump-latest-badge')?.className,
-      ).toContain('is-active');
+        jumpButton?.closest('.thread-jump-latest-badge')?.hasAttribute('data-following'),
+      ).toBe(true);
     });
   });
 

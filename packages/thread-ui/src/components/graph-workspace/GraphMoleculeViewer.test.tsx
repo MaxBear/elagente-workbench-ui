@@ -273,6 +273,19 @@ it('measures canonical atoms locally without changing scientific selection or su
   ).toContain('1.000 Å');
 });
 
+it.each(['light', 'dark'])('draws measurement values readable on their own label background (%s)', async (theme) => {
+  await act(async () => root.render(<div data-theme={theme}><GraphMoleculeViewer source={{content: [first], target}} /></div>));
+  await click('Measure distance');
+  await act(async () => runtime.click({index: 0}, runtime.viewer));
+  await act(async () => runtime.click({index: 1}, runtime.viewer));
+  const call = vi.mocked(runtime.viewer.addLabel).mock.calls.find(([text]) => String(text).includes('1.000 Å'));
+  expect(call).toBeDefined();
+  const style = call![1] as {fontColor: string; backgroundColor: string};
+  expect(style.fontColor.toLowerCase()).not.toBe(style.backgroundColor.toLowerCase());
+  expect(['white', '#ffffff']).toContain(theme === 'light' ? style.backgroundColor : 'white');
+  if (theme === 'light') expect(['white', '#fff', '#ffffff']).not.toContain(style.fontColor.toLowerCase());
+});
+
 it('keeps keyboard undo and redo available when measurement controls disappear or disable', async () => {
   await act(async () => root.render(<GraphMoleculeViewer source={{content: [first], target}} />));
   await click('Measure distance');

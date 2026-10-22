@@ -1478,7 +1478,8 @@ function GraphMoleculeViewer({
           position,
           fontSize: 12,
           backgroundColor: dark ? "#1a2026" : "white",
-          fontColor: dark ? "#f0f1f5" : "#ffffff",
+          // Readable on its own background in both themes (light was white on white).
+          fontColor: dark ? "#f0f1f5" : "#121416",
           inFront: true
         },
         void 0,
