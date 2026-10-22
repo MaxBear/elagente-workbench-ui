@@ -3104,6 +3104,8 @@
 .thread-ui-shell .thread-graph-message-bubble:has(:focus-visible) .thread-graph-message-copy-desktop { opacity: 1; pointer-events: auto; }
 .thread-ui-shell .thread-graph-code-block:has(:focus-visible) .thread-graph-code-copy { opacity: .6; pointer-events: auto; }
 @media (hover: hover) and (pointer: fine) {
+  /* A pointer click can hit-test before moving the mouse to trigger :hover. */
+  .thread-ui-shell .thread-graph-code-copy { pointer-events: auto; }
   .thread-ui-shell .thread-graph-message-bubble:hover .thread-graph-message-copy-desktop { opacity: 1; pointer-events: auto; }
   .thread-ui-shell .thread-graph-code-block:hover .thread-graph-code-copy { opacity: .6; pointer-events: auto; }
 }

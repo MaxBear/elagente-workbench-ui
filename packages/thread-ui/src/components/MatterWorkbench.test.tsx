@@ -242,6 +242,23 @@ describe('one-handed phone dock', () => {
     expect(more.hasAttribute('inert')).toBe(false);
   });
 
+  it('makes the open drawer a modal dialog and hands focus back to More when it closes', async () => {
+    render();
+    expect(drawer().hasAttribute('inert')).toBe(true);
+    expect(drawer().getAttribute('role')).toBeNull();
+    act(() => button('More actions')!.click());
+    act(() => button('Workspace and shortcuts')!.click());
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
+    expect(drawer().getAttribute('role')).toBe('dialog');
+    expect(drawer().getAttribute('aria-modal')).toBe('true');
+    expect(drawer().hasAttribute('inert')).toBe(false);
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Close sidebar');
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); });
+    expect(drawer().getAttribute('role')).toBeNull();
+    expect(drawer().hasAttribute('inert')).toBe(true);
+    expect(document.activeElement).toBe(host.querySelector('.matter-phone-more'));
+  });
+
   it('hides the More sheet behind a modal dialog but keeps it for popovers', () => {
     vi.useFakeTimers();
     render(<><button aria-label="Split" aria-haspopup="dialog" aria-expanded="false" /><button aria-label="Settings dialog" data-slot="dialog-trigger" aria-expanded="false" /></>);
