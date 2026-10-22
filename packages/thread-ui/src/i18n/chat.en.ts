@@ -616,4 +616,5 @@ export const chatEn = {
   "chat.policyDone": "Done",
   "chat.policyChip": "Models: {{value1}}",
   "chat.policyConfirm": "Confirm models",
+  "chat.turnHeadUnconfirmed": "reconnecting · ran at least {{elapsed}}",
 } as const;

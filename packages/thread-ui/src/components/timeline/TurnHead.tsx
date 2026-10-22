@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore, type MouseEvent } from 'react';
+import { useState, useSyncExternalStore, type MouseEvent, useContext } from 'react';
 import { getLocale, translate, useI18n } from '../../i18n';
 import { formatLongTimestamp } from '../threadPresentation';
 import { AddedPromptIcon } from './AddedPromptIcon';
@@ -6,7 +6,7 @@ import { Collapse } from './Collapse';
 import type { TimelineTurn } from './timelineItems';
 import { TokenSpeedDetails } from './TokenSpeedDetails';
 import { TokenUsageCost } from './TokenUsageCost';
-import { formatElapsedDuration, useSecondClock } from './turnStatus';
+import { formatElapsedDuration, TurnClockContext, useSecondClock } from './turnStatus';
 import { TurnModels } from './TurnModels';
 
 export { shortModelName } from './TurnModels';
@@ -44,8 +44,13 @@ export function TurnHead({ turn, active, added, onBeforeResize }: {
   const [open, setOpen] = useState(false);
   const [withDate, setWithDate] = useState(false);
   const now = useSecondClock(active);
+  // While the host cannot confirm the turn is running, its time is a lower
+  // bound from the last confirmed moment, not live work: say so.
+  const turnClock = useContext(TurnClockContext);
+  const unconfirmed = active && turnClock?.frozenAt != null;
   const started = turn.startedAt;
-  const took = formatElapsedDuration(started, active ? now : Date.parse(turn.completedAt ?? ''));
+  const elapsed = formatElapsedDuration(started, active ? now : Date.parse(turn.completedAt ?? ''));
+  const took = elapsed && unconfirmed ? `${elapsed}+` : elapsed;
   const usage = turn.tokenUsage?.total;
   const speed = turn.tokenUsage?.generationSpeed;
   // While the turn works, the speed so far counts only model calls whose output
@@ -58,10 +63,10 @@ export function TurnHead({ turn, active, added, onBeforeResize }: {
     setOpen(value => !value);
   };
 
-  const worked = took ? translate(active ? 'chat.turnHeadRunning' : 'chat.turnHeadWorked', { elapsed: took }) : null;
+  const worked = elapsed ? translate(unconfirmed ? 'chat.turnHeadUnconfirmed' : active ? 'chat.turnHeadRunning' : 'chat.turnHeadWorked', { elapsed }) : null;
   const dot = <>
     <i className="thread-turn-head-dot" aria-hidden="true" />
-    {took ? <span className="thread-turn-head-took">{took}</span> : null}
+    {took ? <span className="thread-turn-head-took" title={unconfirmed ? worked ?? undefined : undefined}>{took}</span> : null}
   </>;
   const cost = usage || turn.priceEstimate ? <TokenUsageCost usage={usage} price={turn.priceEstimate} /> : null;
   const more = <>
@@ -83,7 +88,7 @@ export function TurnHead({ turn, active, added, onBeforeResize }: {
 
   if (wide) return (
     <div className="thread-turn-head-block">
-      <div className="thread-turn-head is-wide" data-active={active || undefined} data-status={turn.status}>
+      <div className="thread-turn-head is-wide" data-active={active || undefined} data-unconfirmed={unconfirmed || undefined} data-status={turn.status}>
         <span className="thread-turn-head-main" role={worked ? 'img' : undefined} aria-label={worked ?? undefined}>{dot}</span>
         {cost}
         {more}
@@ -93,7 +98,7 @@ export function TurnHead({ turn, active, added, onBeforeResize }: {
 
   return (
     <div className="thread-turn-head-block">
-      <div className="thread-turn-head" data-active={active || undefined} data-status={turn.status} onClick={toggle}>
+      <div className="thread-turn-head" data-active={active || undefined} data-unconfirmed={unconfirmed || undefined} data-status={turn.status} onClick={toggle}>
         <button type="button" className="thread-turn-head-main" aria-expanded={open} title={translate('chat.turnHeadDetails')}
           aria-label={worked ?? translate('chat.turnHeadDetails')}>
           {dot}

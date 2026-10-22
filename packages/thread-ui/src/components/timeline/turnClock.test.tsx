@@ -59,3 +59,35 @@ describe('running turn clock', () => {
     expect(render(null).textContent).toBe('1m 10s');
   });
 });
+
+describe('unconfirmed running turn label', () => {
+  beforeEach(() => {
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  });
+  afterEach(() => {
+    act(() => root?.unmount());
+    host?.remove();
+    root = null;
+    host = null;
+  });
+
+  it('marks a frozen running time as a lower bound while reconnecting, and a live one as running', async () => {
+    const { TurnHead } = await import('./TurnHead');
+    const turn = { id: 't', status: 'inProgress', startedAt, completedAt: null, items: [], error: null } as never;
+    const show = (clock: TurnClock) => {
+      host = document.createElement('div');
+      document.body.append(host);
+      root = createRoot(host);
+      act(() => root!.render(<TurnClockContext.Provider value={clock}><TurnHead turn={turn} active added={0} /></TurnClockContext.Provider>));
+      return host;
+    };
+    let view = show({ now: () => server + 9_000, frozenAt: server + 9_000 });
+    expect(view.querySelector('[data-unconfirmed]')).not.toBeNull();
+    expect(view.querySelector('.thread-turn-head-took')?.textContent).toBe('9s+');
+    expect(view.innerHTML).toContain('reconnecting · ran at least 9s');
+    act(() => root?.unmount()); host?.remove();
+    view = show({ now: () => server + 9_000 });
+    expect(view.querySelector('[data-unconfirmed]')).toBeNull();
+    expect(view.querySelector('.thread-turn-head-took')?.textContent).toBe('9s');
+  });
+});

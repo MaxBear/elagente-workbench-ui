@@ -3493,6 +3493,7 @@ declare const en: {
     readonly "chat.policyDone": "Done";
     readonly "chat.policyChip": "Models: {{value1}}";
     readonly "chat.policyConfirm": "Confirm models";
+    readonly "chat.turnHeadUnconfirmed": "reconnecting · ran at least {{elapsed}}";
     readonly "auth.ui.signInTitle": "Sign in";
     readonly "auth.ui.registerTitle": "Create your account";
     readonly "auth.ui.or": "or";
@@ -7532,6 +7533,7 @@ declare const zhCN: {
     "chat.policyDone": "完成";
     "chat.policyChip": "模型：{{value1}}";
     "chat.policyConfirm": "请确认模型";
+    "chat.turnHeadUnconfirmed": "正在重新连接 · 至少运行了 {{elapsed}}";
     "auth.ui.signInTitle": "登录";
     "auth.ui.registerTitle": "创建账号";
     "auth.ui.or": "或";
@@ -11593,6 +11595,7 @@ declare const resources: {
         readonly "chat.policyDone": "Done";
         readonly "chat.policyChip": "Models: {{value1}}";
         readonly "chat.policyConfirm": "Confirm models";
+        readonly "chat.turnHeadUnconfirmed": "reconnecting · ran at least {{elapsed}}";
         readonly "auth.ui.signInTitle": "Sign in";
         readonly "auth.ui.registerTitle": "Create your account";
         readonly "auth.ui.or": "or";
@@ -15631,6 +15634,7 @@ declare const resources: {
         "chat.policyDone": "完成";
         "chat.policyChip": "模型：{{value1}}";
         "chat.policyConfirm": "请确认模型";
+        "chat.turnHeadUnconfirmed": "正在重新连接 · 至少运行了 {{elapsed}}";
         "auth.ui.signInTitle": "登录";
         "auth.ui.registerTitle": "创建账号";
         "auth.ui.or": "或";

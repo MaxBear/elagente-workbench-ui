@@ -5,7 +5,7 @@ import {
 import {
   translate,
   useI18n
-} from "./chunk-T32Z7APR.js";
+} from "./chunk-AE727MCJ.js";
 
 // src/components/graph-workspace/GraphWorkspaceMonacoEditor.tsx
 import { useEffect, useRef } from "react";

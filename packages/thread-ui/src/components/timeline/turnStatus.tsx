@@ -266,6 +266,8 @@ export function TurnStatusBar({
   const runtimeSummary = formatTurnRuntimeSummary(turn);
   const active = isActiveTurnStatus(turn.status);
   const now = useSecondClock(active && variant === 'footer');
+  const turnClock = useContext(TurnClockContext);
+  const unconfirmed = active && turnClock?.frozenAt != null;
   const elapsedLabel = formatElapsedDuration(turn.startedAt, active ? now : Date.parse(turn.completedAt ?? turn.startedAt ?? ''));
   const effectiveLastActivityAt = lastActivityAt ?? turn.startedAt;
   const progressAge = effectiveLastActivityAt ? Math.max(0, Math.floor((now - Date.parse(effectiveLastActivityAt)) / 1000)) : null;
@@ -301,7 +303,10 @@ export function TurnStatusBar({
         </div>
         <div className="thread-graph-turn-footer-meta timeline-meta-text flex min-w-0 shrink items-center justify-end gap-1 whitespace-nowrap">
           {elapsedLabel ? (
-            <span aria-label={translate("chat.runningFor", { value1: elapsedLabel })}>{elapsedLabel}</span>
+            unconfirmed
+              ? <span data-unconfirmed="true" title={translate('chat.turnHeadUnconfirmed', { elapsed: elapsedLabel })}
+                  aria-label={translate('chat.turnHeadUnconfirmed', { elapsed: elapsedLabel })}>{elapsedLabel}+</span>
+              : <span aria-label={translate("chat.runningFor", { value1: elapsedLabel })}>{elapsedLabel}</span>
           ) : null}
         </div>
       </div>

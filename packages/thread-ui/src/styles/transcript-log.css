@@ -90,6 +90,9 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--turn-head-dot, #2fb37a) 20%, transparent);
   animation: thread-live-dot 1.6s ease-in-out infinite;
 }
+/* Not confirmed live (connection lost): the dot stops pulsing and the time is a lower bound. */
+.thread-ui-shell .thread-turn-head[data-unconfirmed] .thread-turn-head-dot { animation: none; opacity: 0.45; }
+.thread-ui-shell .thread-turn-head[data-unconfirmed] .thread-turn-head-took { color: var(--theme-fg-muted); }
 .thread-ui-shell .thread-turn-head[data-status='failed']:not([data-active]) .thread-turn-head-dot { background: var(--theme-danger, #e5484d); opacity: 0.85; }
 .thread-ui-shell .thread-turn-head[data-status='interrupted']:not([data-active]) .thread-turn-head-dot { background: var(--theme-fg-muted); }
 .thread-ui-shell .thread-turn-head .thread-usage-cost { flex: none; }
