@@ -37,6 +37,7 @@ import { PhoneDockContext } from './workbench/phoneDockContext';
 import { ShortcutList } from './workbench/ShortcutList';
 import { inOrder, useDragReorder, usePendingOrder } from './workbench/useDragReorder';
 import type { WorkbenchPaneSwitch } from './workbench/paneSwitch';
+import { useModalFocus } from './menu/useModalFocus';
 import { ComposerSubscriptionUsage, visibleSubscriptionWindows } from './composer/ComposerSubscriptionUsage';
 import type { AgentSubscriptionUsageDto } from '@remote-codex/shared';
 import { useAppShellNav } from '../app-shell/AppShellNavContext';
@@ -315,6 +316,20 @@ export function MatterWorkbench({
   }, [dock]);
   const sidebarRef = useRef<HTMLElement>(null);
   const scrimRef = useRef<HTMLButtonElement>(null);
+  // The open phone drawer is modal: focus moves to its close button, Tab stays
+  // inside, Esc closes it and focus returns to the control that opened it.
+  useModalFocus(sidebarRef, mobile && sidebarOpen, () => setSidebarOpen(false), '.matter-mobile-close');
+  // An opener that has gone (the More sheet closes under the drawer) hands focus to More, or to the drawer toggle.
+  const drawerToggleRef = useRef<HTMLButtonElement>(null);
+  const drawerWasOpen = useRef(false);
+  useEffect(() => {
+    if (mobile && sidebarOpen) { drawerWasOpen.current = true; return; }
+    if (!drawerWasOpen.current) return;
+    drawerWasOpen.current = false;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body && active.getClientRects().length && !active.closest('[inert]')) return;
+    (dock ? rootRef.current?.querySelector<HTMLElement>('.matter-phone-more') : drawerToggleRef.current)?.focus({ preventScroll: true });
+  }, [mobile, sidebarOpen, dock]);
   useEffect(() => {
     const root = rootRef.current, drawer = sidebarRef.current;
     if (!dock || !root || !drawer) return;
@@ -832,6 +847,7 @@ export function MatterWorkbench({
         {bell}
       </header> : mobile && <header className={`matter-topbar ${o.searchOpen ? 'is-search-open' : ''}`}>
         <button
+          ref={drawerToggleRef}
           aria-label={translate("workbench.toggleShortcutsSidebar")}
           aria-expanded={mobile ? sidebarOpen : !sidebarHidden}
           onClick={() => {
@@ -896,6 +912,9 @@ export function MatterWorkbench({
         ref={sidebarRef}
         className={`matter-sidebar ${sidebarOpen ? 'is-open' : ''}`}
         aria-label={translate("workbench.threadNavigation")}
+        inert={mobile && !sidebarOpen}
+        role={mobile && sidebarOpen ? 'dialog' : undefined}
+        aria-modal={mobile && sidebarOpen ? true : undefined}
       >
         {!mobile && !sidebarHidden && navStrip}
         {/* The upper half holds this workspace's threads; recent chats from
@@ -1123,7 +1142,7 @@ export function MatterWorkbench({
         <PhoneSheet open={moreOpen} label={translate('workbench.moreActions')} onClose={() => setMoreOpen(false)}
           footer={<nav className="matter-phone-sheet-apps" aria-label={translate('workbench.app')}>
             {openThreadMap && <button type="button" onClick={() => { setMoreOpen(false); openThreadMap(); }}><LayoutDashboard data-icon="thread-map" /><span>{translate('workbench.threadMap')}</span></button>}
-            <button type="button" aria-label={translate('workbench.workspaceAndShortcuts')} onClick={() => setSidebarOpen(true)}><PanelLeft data-icon="sidebar" /><span>{translate('workbench.drawerShort')}</span></button>
+            <button type="button" aria-label={translate('workbench.workspaceAndShortcuts')} onClick={() => { setMoreOpen(false); setSidebarOpen(true); }}><PanelLeft data-icon="sidebar" /><span>{translate('workbench.drawerShort')}</span></button>
             {homeHref && <a href={homeHref} aria-label={translate('workbench.backToWorkspaces')} onClick={goHome}><Home data-icon="home" /><span>{translate('workbench.homeShort')}</span></a>}
             <button type="button" onClick={() => history.back()}><ArrowLeft data-icon="back" /><span>{translate('workbench.goBack')}</span></button>
             <div className="matter-phone-sheet-settings">{settings}<span>{translate('workbench.settings')}</span></div>

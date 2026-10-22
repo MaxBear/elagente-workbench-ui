@@ -56,8 +56,10 @@ try {
     const before = await probe(button);
     assert.equal(before.fine, !scenario.touch);
     assert.equal(before.hover, !scenario.touch);
-    assert.equal(before.opacity, '0');
-    assert.equal(before.pointer, scenario.touch ? 'none' : 'auto');
+    // A mouse finds the hidden target before :hover; touch keeps a faint chip that is always tappable.
+    if (scenario.touch) assert.ok(Number(before.opacity) > 0);
+    else assert.equal(before.opacity, '0');
+    assert.equal(before.pointer, 'auto');
     if (!scenario.touch) {
       // A normal click must succeed without force or a prior hover workaround.
       await button.click({timeout:4000});

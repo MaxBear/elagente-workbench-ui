@@ -215,8 +215,7 @@ describe('playground smoke', () => {
 
   });
 
-  // Not changed for ELA-207: the reused layout opens terminals from its own Terminal navigation.
-  // This keeps the playground's metadata shell switch visible as a separate result.
+  // The reused layout's terminal panel: an empty state with New terminal, then the mocked shell's pane.
   it('attaches the mocked shell from the playground metadata switch', async () => {
     flushSync(() => {
       root?.render(<PlaygroundApp />);
@@ -234,26 +233,25 @@ describe('playground smoke', () => {
       shellButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
+    let newTerminalButton: HTMLButtonElement | null | undefined = null;
     await vi.waitFor(() => {
-      expect(textContent()).toContain('No live shell process');
-    });
-    const newShellButton = Array.from(
-      host?.querySelectorAll<HTMLButtonElement>('button') ?? [],
-    ).find((button) => button.textContent?.includes('New Shell'));
-    expect(newShellButton).not.toBeNull();
-    await vi.waitFor(() => {
-      expect(newShellButton?.disabled).toBe(false);
+      expect(textContent()).toContain('No terminal in this conversation yet');
+      newTerminalButton = host?.querySelector<HTMLButtonElement>('.terminal-empty button');
+      expect(newTerminalButton?.textContent).toContain('New terminal');
+      expect(newTerminalButton?.disabled).toBe(false);
     });
 
     flushSync(() => {
-      newShellButton?.click();
+      newTerminalButton?.click();
     });
 
+    // One live shell shows its pane without the tab list.
     await vi.waitFor(() => {
-      expect(textContent()).toContain('Playground shell');
+      expect(
+        host?.querySelector('[data-testid="terminal-pane"][data-shell-id="shell-playground-1"]'),
+      ).not.toBeNull();
     });
-    expect(textContent()).toContain('1 live');
-    expect(textContent()).toContain('Running · computational-chemistry');
+    expect(host?.querySelector('.terminal-empty')).toBeNull();
   });
 
   it('updates the jump-to-latest state from timeline scroll geometry', async () => {
