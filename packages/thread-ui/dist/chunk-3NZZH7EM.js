@@ -1,11 +1,14 @@
 import {
+  codeLanguage
+} from "./chunk-DCPNHQ2H.js";
+import {
   cssHexVariable,
   useDocumentThemeRevision
-} from "./chunk-TZIQBT3H.js";
+} from "./chunk-TV56ELKX.js";
 import {
   translate,
   useI18n
-} from "./chunk-YW4S7OP5.js";
+} from "./chunk-GQPLSSTB.js";
 
 // src/components/graph-workspace/GraphWorkspaceMonacoEditor.tsx
 import { useEffect, useRef } from "react";
@@ -133,12 +136,8 @@ window.addEventListener("workspace-model-release", (event) => {
   retainedModels.delete(key);
 });
 function monacoLanguage(language) {
-  const aliases = {
-    jsx: "javascript",
-    text: "plaintext",
-    tsx: "typescript"
-  };
-  return aliases[language] ?? (language || "plaintext");
+  const id = codeLanguage(language);
+  return monaco.languages.getLanguages().some((entry) => entry.id === id) ? id : "plaintext";
 }
 function GraphWorkspaceMonacoEditor({
   content,
@@ -269,5 +268,6 @@ function GraphWorkspaceMonacoEditor({
 
 export {
   editorThemeFor,
+  monacoLanguage,
   GraphWorkspaceMonacoEditor
 };

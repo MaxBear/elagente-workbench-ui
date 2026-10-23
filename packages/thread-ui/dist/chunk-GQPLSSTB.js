@@ -735,6 +735,7 @@ var authEn = {
 
 // src/i18n/chat.en.ts
 var chatEn = {
+  "chat.toolArtifacts": "Tool artifacts",
   "chat.turnNotificationOn": "Notify you when this turn ends",
   "chat.turnNotificationOff": "Subscribe to this turn",
   "chat.replyVersion": "Reply version",
@@ -2554,6 +2555,7 @@ var filesEn = {
   "files.copyPathShort": "Copy path",
   "files.downloadShort": "Download",
   "files.safeReason.unsupportedEncodingOrBinaryFile": "This file is not text, so it cannot be previewed.",
+  "files.safeReason.scientificBinaryFile": "This is binary scientific data (for example an ORCA .gbw or PySCF .chk file). Download it to open it with the program that wrote it.",
   "files.terminalMenu": "Terminal",
   "files.terminalCopy": "Copy",
   "files.terminalPaste": "Paste",
@@ -2602,7 +2604,8 @@ var filesEn = {
   "files.propertiesClose": "Close",
   "files.propertiesOlderDevice": "This device's Supervisor does not report file times yet; they show after it updates.",
   "files.downloadZip": "Download as ZIP",
-  "files.showHiddenFiles": "Show hidden files"
+  "files.showHiddenFiles": "Show hidden files",
+  "files.showThreadEvents": "Show thread events (debug)"
 };
 
 // src/i18n/settings.en.ts
@@ -4728,6 +4731,7 @@ var authZhCN = {
 
 // src/i18n/chat.zh-CN.ts
 var chatZhCN = {
+  "chat.toolArtifacts": "\u5DE5\u5177\u4EA7\u7269",
   "chat.turnNotificationOn": "\u7ED3\u675F\u65F6\u901A\u77E5\u4F60",
   "chat.turnNotificationOff": "\u8BA2\u9605\u8FD9\u4E00\u8F6E\u7684\u901A\u77E5",
   "chat.replyVersion": "\u56DE\u590D\u7248\u672C",
@@ -6547,6 +6551,7 @@ var filesZhCN = {
   "files.copyPathShort": "\u590D\u5236\u8DEF\u5F84",
   "files.downloadShort": "\u4E0B\u8F7D",
   "files.safeReason.unsupportedEncodingOrBinaryFile": "\u8FD9\u4E0D\u662F\u6587\u672C\u6587\u4EF6\uFF0C\u65E0\u6CD5\u9884\u89C8\u3002",
+  "files.safeReason.scientificBinaryFile": "\u8FD9\u662F\u4E8C\u8FDB\u5236\u79D1\u5B66\u6570\u636E\uFF08\u4F8B\u5982 ORCA .gbw \u6216 PySCF .chk \u6587\u4EF6\uFF09\uFF0C\u65E0\u6CD5\u9884\u89C8\u3002\u8BF7\u4E0B\u8F7D\u540E\u7528\u751F\u6210\u5B83\u7684\u7A0B\u5E8F\u6253\u5F00\u3002",
   "files.terminalMenu": "\u7EC8\u7AEF",
   "files.terminalCopy": "\u590D\u5236",
   "files.terminalPaste": "\u7C98\u8D34",
@@ -6595,7 +6600,8 @@ var filesZhCN = {
   "files.propertiesClose": "\u5173\u95ED",
   "files.propertiesOlderDevice": "\u8FD9\u53F0\u8BBE\u5907\u7684 Supervisor \u8FD8\u4E0D\u63D0\u4F9B\u6587\u4EF6\u65F6\u95F4\uFF0C\u66F4\u65B0\u540E\u53EF\u89C1\u3002",
   "files.downloadZip": "\u4E0B\u8F7D\u4E3A ZIP",
-  "files.showHiddenFiles": "\u663E\u793A\u9690\u85CF\u6587\u4EF6"
+  "files.showHiddenFiles": "\u663E\u793A\u9690\u85CF\u6587\u4EF6",
+  "files.showThreadEvents": "\u663E\u793A\u7EBF\u7A0B\u4E8B\u4EF6\uFF08\u8C03\u8BD5\uFF09"
 };
 
 // src/i18n/settings.zh-CN.ts

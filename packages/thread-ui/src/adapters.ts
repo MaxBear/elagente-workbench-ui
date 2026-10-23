@@ -33,7 +33,22 @@ export interface ThreadLinkInfo {
  */
 export type DescribeThread = (threadId: string) => ThreadLinkInfo | null | undefined;
 
+/** An artifact a tool reported (`progress.artifactIds`), as the host resolved it. */
+export interface ThreadToolArtifact {
+  id: string;
+  name: string;
+  /** IANA media type, e.g. `image/png`; images with a URL are shown inline. */
+  mediaType?: string | undefined;
+  /** The host's artifact kind (e.g. `file`, `chem.structure`). */
+  kind?: string | undefined;
+  /** A same-origin or https address of the artifact bytes; never a data URL. */
+  url?: string | undefined;
+  size?: number | undefined;
+}
+
 export interface ThreadTimelineAdapter {
+  /** Resolves an artifact a tool reported; null when the host does not know it. */
+  resolveArtifact?: (artifactId: string) => ThreadToolArtifact | null;
   resolveWorkspacePath?: (path: string) => Promise<boolean>;
   workspaceRootPath?: string | undefined;
   getImageAssetUrl?: (input: {
@@ -261,6 +276,8 @@ export interface ThreadShellAdapter {
 
 export interface ThreadDetailUiAdapter {
   openThread(threadId: string): void;
+  /** Resolves artifacts a tool reported, so tool cards can show them (images inline). */
+  resolveArtifact?: (artifactId: string) => ThreadToolArtifact | null;
   getThreadHref?: (threadId: string) => string;
   /**
    * Names linked threads by their titles. With it, a sub-thread (one with a

@@ -2182,6 +2182,7 @@ declare const en: {
     readonly "files.copyPathShort": "Copy path";
     readonly "files.downloadShort": "Download";
     readonly "files.safeReason.unsupportedEncodingOrBinaryFile": "This file is not text, so it cannot be previewed.";
+    readonly "files.safeReason.scientificBinaryFile": "This is binary scientific data (for example an ORCA .gbw or PySCF .chk file). Download it to open it with the program that wrote it.";
     readonly "files.terminalMenu": "Terminal";
     readonly "files.terminalCopy": "Copy";
     readonly "files.terminalPaste": "Paste";
@@ -2237,6 +2238,7 @@ declare const en: {
     readonly "files.propertiesOlderDevice": "This device's Supervisor does not report file times yet; they show after it updates.";
     readonly "files.downloadZip": "Download as ZIP";
     readonly "files.showHiddenFiles": "Show hidden files";
+    readonly "files.showThreadEvents": "Show thread events (debug)";
     readonly "devices.reasonUnmanaged": "This is a source or unmanaged executable. Run the GitHub setup command to install a managed native runtime.";
     readonly "devices.reasonHostManaged": "Host-managed updates require a native installation and a stable native launch command. Run the GitHub setup command first.";
     readonly "devices.reasonRetiredNpmWindows": "This Windows Device Manager device runs the retired npm package. Run the Windows setup command from the Devices page to move it to the native GitHub runtime.";
@@ -2802,6 +2804,7 @@ declare const en: {
         readonly one: "{{count}} item";
         readonly other: "{{count}} items";
     };
+    readonly "chat.toolArtifacts": "Tool artifacts";
     readonly "chat.turnNotificationOn": "Notify you when this turn ends";
     readonly "chat.turnNotificationOff": "Subscribe to this turn";
     readonly 'chat.replyVersion': "Reply version";
@@ -6222,6 +6225,7 @@ declare const zhCN: {
     "files.copyPathShort": "复制路径";
     "files.downloadShort": "下载";
     "files.safeReason.unsupportedEncodingOrBinaryFile": "这不是文本文件，无法预览。";
+    "files.safeReason.scientificBinaryFile": "这是二进制科学数据（例如 ORCA .gbw 或 PySCF .chk 文件），无法预览。请下载后用生成它的程序打开。";
     "files.terminalMenu": "终端";
     "files.terminalCopy": "复制";
     "files.terminalPaste": "粘贴";
@@ -6277,6 +6281,7 @@ declare const zhCN: {
     "files.propertiesOlderDevice": "这台设备的 Supervisor 还不提供文件时间，更新后可见。";
     "files.downloadZip": "下载为 ZIP";
     "files.showHiddenFiles": "显示隐藏文件";
+    "files.showThreadEvents": "显示线程事件（调试）";
     "devices.reasonUnmanaged": "这是源码运行或非托管的可执行文件。运行 GitHub 安装命令，安装托管的原生运行时。";
     "devices.reasonHostManaged": "由主机管理的更新需要原生安装和稳定的原生启动命令。请先运行 GitHub 安装命令。";
     "devices.reasonRetiredNpmWindows": "这台 Windows 设备管理器设备运行的是已停用的 npm 包。请在“设备”页运行 Windows 安装命令，迁移到原生 GitHub 运行时。";
@@ -6842,6 +6847,7 @@ declare const zhCN: {
         readonly one: "{{count}} 项";
         readonly other: "{{count}} 项";
     };
+    "chat.toolArtifacts": "工具产物";
     "chat.turnNotificationOn": "结束时通知你";
     "chat.turnNotificationOff": "订阅这一轮的通知";
     'chat.replyVersion': "回复版本";
@@ -10284,6 +10290,7 @@ declare const resources: {
         readonly "files.copyPathShort": "Copy path";
         readonly "files.downloadShort": "Download";
         readonly "files.safeReason.unsupportedEncodingOrBinaryFile": "This file is not text, so it cannot be previewed.";
+        readonly "files.safeReason.scientificBinaryFile": "This is binary scientific data (for example an ORCA .gbw or PySCF .chk file). Download it to open it with the program that wrote it.";
         readonly "files.terminalMenu": "Terminal";
         readonly "files.terminalCopy": "Copy";
         readonly "files.terminalPaste": "Paste";
@@ -10339,6 +10346,7 @@ declare const resources: {
         readonly "files.propertiesOlderDevice": "This device's Supervisor does not report file times yet; they show after it updates.";
         readonly "files.downloadZip": "Download as ZIP";
         readonly "files.showHiddenFiles": "Show hidden files";
+        readonly "files.showThreadEvents": "Show thread events (debug)";
         readonly "devices.reasonUnmanaged": "This is a source or unmanaged executable. Run the GitHub setup command to install a managed native runtime.";
         readonly "devices.reasonHostManaged": "Host-managed updates require a native installation and a stable native launch command. Run the GitHub setup command first.";
         readonly "devices.reasonRetiredNpmWindows": "This Windows Device Manager device runs the retired npm package. Run the Windows setup command from the Devices page to move it to the native GitHub runtime.";
@@ -10904,6 +10912,7 @@ declare const resources: {
             readonly one: "{{count}} item";
             readonly other: "{{count}} items";
         };
+        readonly "chat.toolArtifacts": "Tool artifacts";
         readonly "chat.turnNotificationOn": "Notify you when this turn ends";
         readonly "chat.turnNotificationOff": "Subscribe to this turn";
         readonly 'chat.replyVersion': "Reply version";
@@ -14323,6 +14332,7 @@ declare const resources: {
         "files.copyPathShort": "复制路径";
         "files.downloadShort": "下载";
         "files.safeReason.unsupportedEncodingOrBinaryFile": "这不是文本文件，无法预览。";
+        "files.safeReason.scientificBinaryFile": "这是二进制科学数据（例如 ORCA .gbw 或 PySCF .chk 文件），无法预览。请下载后用生成它的程序打开。";
         "files.terminalMenu": "终端";
         "files.terminalCopy": "复制";
         "files.terminalPaste": "粘贴";
@@ -14378,6 +14388,7 @@ declare const resources: {
         "files.propertiesOlderDevice": "这台设备的 Supervisor 还不提供文件时间，更新后可见。";
         "files.downloadZip": "下载为 ZIP";
         "files.showHiddenFiles": "显示隐藏文件";
+        "files.showThreadEvents": "显示线程事件（调试）";
         "devices.reasonUnmanaged": "这是源码运行或非托管的可执行文件。运行 GitHub 安装命令，安装托管的原生运行时。";
         "devices.reasonHostManaged": "由主机管理的更新需要原生安装和稳定的原生启动命令。请先运行 GitHub 安装命令。";
         "devices.reasonRetiredNpmWindows": "这台 Windows 设备管理器设备运行的是已停用的 npm 包。请在“设备”页运行 Windows 安装命令，迁移到原生 GitHub 运行时。";
@@ -14943,6 +14954,7 @@ declare const resources: {
             readonly one: "{{count}} 项";
             readonly other: "{{count}} 项";
         };
+        "chat.toolArtifacts": "工具产物";
         "chat.turnNotificationOn": "结束时通知你";
         "chat.turnNotificationOff": "订阅这一轮的通知";
         'chat.replyVersion': "回复版本";

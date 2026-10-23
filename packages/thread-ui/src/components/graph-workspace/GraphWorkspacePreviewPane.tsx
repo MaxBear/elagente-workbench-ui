@@ -177,6 +177,7 @@ const CODE_LANGUAGE_ALIASES: Record<string, string> = {
   cs: 'csharp',
   jsonl: 'json',
   md: 'markdown',
+  py: 'python',
   rb: 'ruby',
   rs: 'rust',
   sh: 'bash',

@@ -25,7 +25,11 @@ vi.mock('./GraphWorkspacePreviewPane', () => ({
     onExpandExplorer,
     pdfUrl,
     previewFile,
+    downloadOnly,
+    downloadReason,
   }: {
+    downloadOnly?: boolean;
+    downloadReason?: string | null;
     pdfUrl?: string | null;
     focusLine?: number | null;
     mobileNavigation?: boolean;
@@ -33,7 +37,8 @@ vi.mock('./GraphWorkspacePreviewPane', () => ({
     onExpandExplorer?: () => void;
     previewFile?: ThreadWorkspaceFilePreview | null;
   }) => (
-    <div data-testid="preview-file" data-focus-line={focusLine ?? undefined} data-pdf-url={pdfUrl ?? undefined}>
+    <div data-testid="preview-file" data-focus-line={focusLine ?? undefined} data-pdf-url={pdfUrl ?? undefined}
+      data-download-only={downloadOnly ? 'true' : undefined} data-download-reason={downloadReason ?? undefined}>
       {previewFile?.path ?? 'none'}
       {onCollapse ? (
         <button type="button" aria-label="Hide Editor" onClick={onCollapse} />
@@ -216,8 +221,10 @@ describe('GraphWorkspaceExplorer', () => {
     await renderExplorer(adapter);
     await vi.waitFor(() => expect(listTree).toHaveBeenCalled());
     const more = () => host?.querySelector<HTMLButtonElement>('button[aria-label="More Explorer actions"]');
-    // Without the host capability there is no toggle, and here no other action either.
-    expect(more()).toBeNull();
+    // Without the host capability there is no hidden-files toggle; only the thread-events debug view.
+    act(() => more()!.click());
+    expect([...host!.querySelectorAll('[role="menuitemcheckbox"]')].map((item) => item.textContent)).toEqual(['Show thread events (debug)']);
+    act(() => more()!.click());
 
     act(() => root?.unmount());
     root = createRoot(host!);
@@ -241,6 +248,62 @@ describe('GraphWorkspaceExplorer', () => {
     expect(host!.querySelector('[role="menuitemcheckbox"]')?.getAttribute('aria-checked')).toBe('true');
   });
 
+  it('hides internal thread events from the file tree unless the debug view is turned on', async () => {
+    const { adapter, listTree } = createAdapter();
+    const withEvents = {
+      ...detail,
+      turns: [{ id: 'turn-1', items: [{ id: 'call-1', kind: 'toolCall', text: 'expert', status: 'completed' }] }],
+    } as unknown as ThreadDetailDto;
+    await act(async () => {
+      root?.render(
+        <GraphWorkspaceExplorer activeView="chat" detail={withEvents} artifacts={[]}
+          plugins={createDefaultPluginContextValue()} status={null} workspaceAdapter={adapter} />,
+      );
+    });
+    await vi.waitFor(() => expect(listTree).toHaveBeenCalled());
+    await vi.waitFor(() => expect(host!.textContent).toContain('README.md'));
+    expect(host!.querySelector('[data-explorer-path="thread-events:"]')).toBeNull();
+    expect(host!.textContent).not.toContain('thread-events');
+
+    const more = () => host!.querySelector<HTMLButtonElement>('button[aria-label="More Explorer actions"]')!;
+    act(() => more().click());
+    const toggle = [...host!.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')]
+      .find((item) => item.textContent?.includes('Show thread events'))!;
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    await act(async () => toggle.click());
+    // Compact folders render the single turn as `thread-events/turn-1`.
+    await vi.waitFor(() => expect(host!.textContent).toContain('thread-events/turn-1'));
+    expect(window.localStorage.getItem('workbench.explorer.showThreadEvents')).toBe('true');
+  });
+
+  it('selects a file when the thread-events view is turned off while an event is selected', async () => {
+    window.localStorage.setItem('workbench.explorer.showThreadEvents', 'true');
+    const { adapter, readFile } = createAdapter();
+    const withEvents = {
+      ...detail,
+      turns: [{ id: 'turn-1', items: [{ id: 'call-1', kind: 'toolCall', text: 'expert', status: 'completed' }] }],
+    } as unknown as ThreadDetailDto;
+    await act(async () => {
+      root?.render(
+        <GraphWorkspaceExplorer activeView="chat" detail={withEvents} artifacts={[]}
+          plugins={createDefaultPluginContextValue()} status={null} workspaceAdapter={adapter} />,
+      );
+    });
+    await vi.waitFor(() => expect(host!.textContent).toContain('thread-events/turn-1'));
+    const eventRow = () => host!.querySelector<HTMLElement>('[data-explorer-path$="-tool-call.json"]');
+    await vi.waitFor(() => expect(eventRow()).not.toBeNull());
+    await act(async () => eventRow()!.click());
+    await vi.waitFor(() => expect(host!.querySelector('[data-testid="preview-file"]')?.textContent).toContain('none'));
+    readFile.mockClear();
+    const more = () => host!.querySelector<HTMLButtonElement>('button[aria-label="More Explorer actions"]')!;
+    act(() => more().click());
+    const toggle = [...host!.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')]
+      .find((item) => item.textContent?.includes('Show thread events'))!;
+    await act(async () => toggle.click());
+    await vi.waitFor(() => expect(host!.querySelector('[data-testid="preview-file"]')?.textContent).toContain('README.md'));
+    expect(host!.textContent).not.toContain('thread-events');
+  });
+
   it('lists an external linked file under its real parent directory, not a virtual folder', async () => {
     const { adapter, listTree } = createAdapter();
     const statLinkedFile = vi.fn(async () => file('/outside/docs/notes.txt'));
@@ -258,6 +321,15 @@ describe('GraphWorkspaceExplorer', () => {
     expect(listTree).toHaveBeenCalledTimes(calls);
     expect(listTree.mock.calls.some(([input]) => String(input.path).startsWith('/outside'))).toBe(false);
     expect(statLinkedFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers an ORCA .gbw as a download with its reason and never reads it as text', async () => {
+    const { adapter, readFile } = createAdapter();
+    await renderExplorer({ ...adapter, listTree: async () => directory('', [file('job.gbw')]) }, { path: 'job.gbw', requestId: 1 });
+    const preview = () => host?.querySelector('[data-testid="preview-file"]');
+    await vi.waitFor(() => expect(preview()?.getAttribute('data-download-only')).toBe('true'));
+    expect(preview()?.getAttribute('data-download-reason')).toBe('scientificBinaryFile');
+    expect(readFile).not.toHaveBeenCalled();
   });
 
   it('previews a PDF from bytes read through the adapter, not from a navigable URL', async () => {

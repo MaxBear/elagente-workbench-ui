@@ -142,6 +142,24 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+it('scales a trackpad pinch on the stage instead of passing it to 3Dmol as wheel notches', async () => {
+  await act(async () =>
+    root.render(
+      <GraphMoleculeViewer
+        source={{ content: [first], target, frameTargets: [target] }}
+        onReady={onReady}
+      />,
+    ),
+  );
+  vi.mocked(runtime.viewer.zoom).mockClear();
+  const stage = document.querySelector<HTMLElement>('[data-testid="molecule-viewer"]')!;
+  const pinch = new WheelEvent('wheel', { deltaY: -3, ctrlKey: true, bubbles: true, cancelable: true });
+  await act(async () => { stage.dispatchEvent(pinch); });
+  expect(pinch.defaultPrevented).toBe(true);
+  expect(runtime.viewer.zoom).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(runtime.viewer.zoom).mock.calls[0]![0]).toBeCloseTo(Math.exp(0.03), 10);
+});
+
 it('local selection remains personal; explicit selection and PNG callbacks carry stable atom/frame provenance', async () => {
   const local = vi.fn(),
     submit = vi.fn(),

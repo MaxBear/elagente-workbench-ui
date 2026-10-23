@@ -5,10 +5,7 @@ import {
   DialogClose,
   DialogContent,
   DialogTitle,
-  IMAGE_EXTENSIONS,
-  MOLECULAR_EXTENSIONS,
   MarkdownImageLinkContext,
-  PDF_EXTENSIONS,
   PathChip,
   RenameDialog,
   ResizableHandle,
@@ -18,54 +15,64 @@ import {
   WorkspaceFileLink,
   WorkspaceImagePreview,
   ZoomableImage,
-  ancestorDirectoryPaths,
-  buildMoleculePreviewSnapshot,
-  collectAncestorPaths,
-  collectArtifacts,
-  collectWorkspaceItems,
   confirmAsync,
   copyText,
   documentListeners,
   documentStores,
   downloadDraft,
   editDraft,
-  extensionOf,
   externalLinkProps,
-  findFirstPreviewNode,
-  findFirstWorkspaceFile,
-  flattenWorkspaceNodes,
   getGraphChatHighlighter,
-  hasWorkspacePath,
   isProtected,
-  languageForPath,
-  localFileHref,
   markdownHtmlPlugins,
   newDraft,
-  normalizeFileSystemPath,
-  relativeWorkspacePath,
   settleSave,
   syntaxThemeFor,
   useFilePanel,
   useLongPress,
   useMenuKeyboard,
-  useTabScrollEdges,
-  workspaceRelativeFocusPath,
-  workspaceTreeNodeToGraphNode
-} from "./chunk-K6KITLCU.js";
+  useTabScrollEdges
+} from "./chunk-ZJW34XWK.js";
 import {
   GraphMoleculeViewer
-} from "./chunk-G22YUBNA.js";
+} from "./chunk-YCAIDCZR.js";
 import "./chunk-5LLLXMOS.js";
 import {
+  DRAWIO_MAX_BYTES,
+  downloadOnlyReason,
+  isBinaryPreview,
+  isDownloadOnlyPath,
+  isDrawioPath
+} from "./chunk-DCPNHQ2H.js";
+import {
+  IMAGE_EXTENSIONS,
+  MOLECULAR_EXTENSIONS,
+  PDF_EXTENSIONS,
+  ancestorDirectoryPaths,
+  buildMoleculePreviewSnapshot,
+  collectAncestorPaths,
+  collectArtifacts,
+  collectWorkspaceItems,
+  extensionOf,
+  findFirstPreviewNode,
+  findFirstWorkspaceFile,
+  flattenWorkspaceNodes,
+  hasWorkspacePath,
+  languageForPath,
+  localFileHref,
+  normalizeFileSystemPath,
+  relativeWorkspacePath,
   shellThemeProps,
-  useThemeFeature
-} from "./chunk-TZIQBT3H.js";
+  useThemeFeature,
+  workspaceRelativeFocusPath,
+  workspaceTreeNodeToGraphNode
+} from "./chunk-TV56ELKX.js";
 import {
   en,
   getLocale,
   translate,
   useI18n
-} from "./chunk-YW4S7OP5.js";
+} from "./chunk-GQPLSSTB.js";
 
 // src/components/ThreadGraphWorkspacePanel.tsx
 import { memo as memo2, useEffect as useEffect12, useMemo as useMemo9, useState as useState11 } from "react";
@@ -630,6 +637,13 @@ function useWorkspaceExplorerController({
     }
   });
   const showHidden = hiddenFilesAvailable && showHiddenPreference;
+  const [showThreadEvents, setShowThreadEventsPreference] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_THREAD_EVENTS_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const listIdentity = useMemo2(
     () => showHidden ? { ...workspaceIdentity, showHidden: true } : workspaceIdentity,
     [showHidden, workspaceIdentity]
@@ -685,8 +699,8 @@ function useWorkspaceExplorerController({
   }, [capabilityAdapter, workspaceIdentity.threadId, capabilityEpoch]);
   const persistence = useWorkspaceExplorerPersistence(workspaceIdentity);
   const fallbackTree = useMemo2(
-    () => collectWorkspaceItems(detail, artifacts, status, activeView),
-    [activeView, artifacts, detail, status, locale]
+    () => collectWorkspaceItems(detail, artifacts, status, activeView, { includeThreadEvents: showThreadEvents }),
+    [activeView, artifacts, detail, status, locale, showThreadEvents]
   );
   const fallbackFirstSelectableNode = findFirstPreviewNode(fallbackTree);
   const initialPersistedState = useRef(persistence.read());
@@ -1232,10 +1246,29 @@ function useWorkspaceExplorerController({
         localStorage.setItem(SHOW_HIDDEN_KEY, String(value));
       } catch {
       }
-    } : void 0
+    } : void 0,
+    showThreadEvents,
+    setShowThreadEvents: (value) => {
+      setShowThreadEventsPreference(value);
+      if (!value && selectedNodeId?.startsWith("event:")) setSelectedNodeId(firstNonEventNode(tree)?.id ?? null);
+      try {
+        localStorage.setItem(SHOW_THREAD_EVENTS_KEY, String(value));
+      } catch {
+      }
+    }
   };
 }
 var SHOW_HIDDEN_KEY = "workbench.explorer.showHidden";
+var SHOW_THREAD_EVENTS_KEY = "workbench.explorer.showThreadEvents";
+function firstNonEventNode(node) {
+  if (node.kind === "file" || node.kind === "artifact" || node.kind === "live-artifact") return node;
+  if (node.kind === "event" || node.id === "thread-events") return null;
+  for (const child of node.children) {
+    const found = firstNonEventNode(child);
+    if (found) return found;
+  }
+  return null;
+}
 var MissingTargetError = class extends Error {
 };
 function isMissingTarget(error) {
@@ -1769,90 +1802,6 @@ function WorkspaceTrashDialog({
 
 // src/components/graph-workspace/explorer/useWorkspaceFilePreview.ts
 import { useLayoutEffect, useRef as useRef3, useState as useState3 } from "react";
-
-// src/components/graph-workspace/explorer/filePreviewPolicy.ts
-var DRAWIO_MAX_BYTES = 8 * 1024 * 1024;
-function isDrawioPath(path) {
-  return ["drawio", "dio"].includes(extensionOf(path));
-}
-var DOWNLOAD_EXTENSIONS = /* @__PURE__ */ new Set([
-  "zip",
-  "7z",
-  "rar",
-  "tar",
-  "gz",
-  "tgz",
-  "bz2",
-  "xz",
-  "zst",
-  "br",
-  "exe",
-  "dll",
-  "so",
-  "dylib",
-  "dmg",
-  "iso",
-  "pkg",
-  "deb",
-  "rpm",
-  "msi",
-  "bin",
-  "wasm",
-  "class",
-  "jar",
-  "pyc",
-  "o",
-  "a",
-  "doc",
-  "docx",
-  "xls",
-  "xlsx",
-  "ppt",
-  "pptx",
-  "odt",
-  "ods",
-  "odp",
-  "db",
-  "sqlite",
-  "sqlite3",
-  "parquet",
-  "arrow",
-  "npy",
-  "npz",
-  "h5",
-  "hdf5",
-  "mp3",
-  "wav",
-  "flac",
-  "ogg",
-  "m4a",
-  "mp4",
-  "mov",
-  "mkv",
-  "webm",
-  "avi",
-  "psd",
-  "ai",
-  "sketch",
-  "heic",
-  "tif",
-  "tiff",
-  "woff",
-  "woff2",
-  "ttf",
-  "otf"
-]);
-function isDownloadOnlyPath(path) {
-  return DOWNLOAD_EXTENSIONS.has(extensionOf(path));
-}
-function isBinaryPreview(content) {
-  if (content.includes("\0")) return true;
-  const sample = content.slice(0, 8e3);
-  const suspicious = sample.match(/[\x01-\x08\x0e-\x1f\ufffd]/g)?.length ?? 0;
-  return suspicious >= 3 && suspicious / sample.length > 0.02;
-}
-
-// src/components/graph-workspace/explorer/useWorkspaceFilePreview.ts
 var PREVIEW_CHUNK_BYTES = 24e3;
 var MAX_MOLECULAR_PREVIEW_BYTES = 10 * 1024 * 1024;
 function useWorkspaceFilePreview({
@@ -1901,6 +1850,7 @@ function useWorkspaceFilePreview({
       try {
         if (isDownloadOnlyPath(currentPath)) {
           setDownloadOnly(true);
+          setDownloadReason(downloadOnlyReason(currentPath));
           return;
         }
         const extension = extensionOf(currentPath);
@@ -2068,7 +2018,8 @@ import {
   Upload,
   X as X2,
   Check as Check2,
-  Eye
+  Eye,
+  ListTree
 } from "lucide-react";
 import {
   useCallback as useCallback4,
@@ -3209,6 +3160,8 @@ function WorkspaceExplorerPanel({
   onCreateFile,
   showHidden,
   onShowHiddenChange,
+  showThreadEvents,
+  onShowThreadEventsChange,
   explorerScrollTopRef,
   explorerScrollerRef,
   selectedNodeId,
@@ -3327,7 +3280,7 @@ function WorkspaceExplorerPanel({
             )
           }
         ),
-        canUpload || onDownloadWorkspace || onDownloadWorkspaceZip || onImportArchive && canImportArchive || onTrashFile || onOpenTrash || onMoveFile || onDeleteFile || onEmptyGarbage || onShowHiddenChange ? /* @__PURE__ */ jsx7(ExplorerMoreMenu, { triggerClassName: iconButtonClassName, children: (close) => /* @__PURE__ */ jsxs6(Fragment5, { children: [
+        canUpload || onDownloadWorkspace || onDownloadWorkspaceZip || onImportArchive && canImportArchive || onTrashFile || onOpenTrash || onMoveFile || onDeleteFile || onEmptyGarbage || onShowHiddenChange || onShowThreadEventsChange ? /* @__PURE__ */ jsx7(ExplorerMoreMenu, { triggerClassName: iconButtonClassName, children: (close) => /* @__PURE__ */ jsxs6(Fragment5, { children: [
           onShowHiddenChange ? /* @__PURE__ */ jsxs6(
             "button",
             {
@@ -3343,6 +3296,24 @@ function WorkspaceExplorerPanel({
                 /* @__PURE__ */ jsx7(Eye, { "data-icon": "show-hidden", className: "h-4 w-4" }),
                 /* @__PURE__ */ jsx7("span", { className: "flex-1", children: translate("files.showHiddenFiles") }),
                 showHidden ? /* @__PURE__ */ jsx7(Check2, { "aria-hidden": "true", className: "h-4 w-4" }) : null
+              ]
+            }
+          ) : null,
+          onShowThreadEventsChange ? /* @__PURE__ */ jsxs6(
+            "button",
+            {
+              type: "button",
+              role: "menuitemcheckbox",
+              "aria-checked": Boolean(showThreadEvents),
+              onClick: () => {
+                close();
+                onShowThreadEventsChange(!showThreadEvents);
+              },
+              className: "flex h-9 w-full items-center gap-2 rounded px-2 text-left text-sm hover:bg-[var(--theme-hover)] focus-visible:bg-[var(--theme-hover)] focus-visible:outline-none",
+              children: [
+                /* @__PURE__ */ jsx7(ListTree, { "data-icon": "show-thread-events", className: "h-4 w-4" }),
+                /* @__PURE__ */ jsx7("span", { className: "flex-1", children: translate("files.showThreadEvents") }),
+                showThreadEvents ? /* @__PURE__ */ jsx7(Check2, { "aria-hidden": "true", className: "h-4 w-4" }) : null
               ]
             }
           ) : null,
@@ -3966,7 +3937,7 @@ function WorkspaceFileTabs({
 // src/components/graph-workspace/GraphWorkspacePreviewPane.tsx
 import { Fragment as Fragment6, jsx as jsx12, jsxs as jsxs10 } from "react/jsx-runtime";
 var GraphWorkspaceMonacoEditor = lazy(
-  () => import("./GraphWorkspaceMonacoEditor-YSX2K52P.js")
+  () => import("./GraphWorkspaceMonacoEditor-CJ5TDHDW.js")
 );
 var isHostFilePath = (path) => path.startsWith("/") || /^[a-z]:[\\/]/i.test(path);
 function fileSizeLabel(size) {
@@ -4065,7 +4036,7 @@ function translateReadOnly(reason) {
   const key = `files.safeReason.${reason}`;
   return Object.hasOwn(en, key) ? translate(key) : reason;
 }
-var WorkspaceDocumentDiff = lazy(() => import("./GraphWorkspaceMonacoDiff-BDMPBZLU.js"));
+var WorkspaceDocumentDiff = lazy(() => import("./GraphWorkspaceMonacoDiff-5K3HZT27.js"));
 var SMALL_TEXT_FILE_MAX_BYTES = 50 * 1024;
 var SMALL_TEXT_FILE_MAX_LINES = 1e3;
 var MARKDOWN_EXTENSIONS = /* @__PURE__ */ new Set(["md", "markdown"]);
@@ -4073,6 +4044,7 @@ var CODE_LANGUAGE_ALIASES = {
   cs: "csharp",
   jsonl: "json",
   md: "markdown",
+  py: "python",
   rb: "ruby",
   rs: "rust",
   sh: "bash",
@@ -4847,7 +4819,9 @@ function GraphWorkspaceExplorer({
     workspaceError,
     workspaceIdentity,
     showHidden,
-    setShowHidden
+    setShowHidden,
+    showThreadEvents,
+    setShowThreadEvents
   } = useWorkspaceExplorerController({
     activeView,
     detail,
@@ -5271,6 +5245,8 @@ function GraphWorkspaceExplorer({
     WorkspaceExplorerPanel,
     {
       ...setShowHidden ? { showHidden, onShowHiddenChange: setShowHidden } : {},
+      showThreadEvents,
+      onShowThreadEventsChange: setShowThreadEvents,
       canEmptyGarbage: Boolean(workspaceAdapter?.emptyGarbage),
       canUpload: canUploadFiles,
       pending,

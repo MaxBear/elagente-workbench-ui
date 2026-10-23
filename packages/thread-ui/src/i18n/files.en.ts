@@ -632,6 +632,7 @@ export const filesEn = {
   "files.copyPathShort": "Copy path",
   "files.downloadShort": "Download",
   "files.safeReason.unsupportedEncodingOrBinaryFile": "This file is not text, so it cannot be previewed.",
+  "files.safeReason.scientificBinaryFile": "This is binary scientific data (for example an ORCA .gbw or PySCF .chk file). Download it to open it with the program that wrote it.",
   "files.terminalMenu": "Terminal",
   "files.terminalCopy": "Copy",
   "files.terminalPaste": "Paste",
@@ -681,4 +682,5 @@ export const filesEn = {
   "files.propertiesOlderDevice": "This device's Supervisor does not report file times yet; they show after it updates.",
   "files.downloadZip": "Download as ZIP",
   "files.showHiddenFiles": "Show hidden files",
+  "files.showThreadEvents": "Show thread events (debug)",
 } as const;

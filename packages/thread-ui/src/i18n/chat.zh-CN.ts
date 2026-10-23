@@ -1,4 +1,5 @@
 export const chatZhCN = {
+  "chat.toolArtifacts": "工具产物",
   "chat.turnNotificationOn": "结束时通知你",
   "chat.turnNotificationOff": "订阅这一轮的通知",
 

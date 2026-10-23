@@ -33,12 +33,12 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => root?.unmount()); container?.remove(); root = null; container = null; });
 
-function render(onDelete = vi.fn(), actions?: ReactNode) {
+function render(onDelete = vi.fn(), actions?: ReactNode, options: Partial<MatterWorkbenchOptions> = {}, newThreadLabel?: string) {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
   flushSync(() => root!.render(
-    <ThreadWorkspaceLayout workbench={workbench} threads={[thread]} currentThreadId="t1"
+    <ThreadWorkspaceLayout workbench={{ ...workbench, ...options }} {...(newThreadLabel ? { newThreadLabel } : {})} threads={[thread]} currentThreadId="t1"
       renderNavigationHeader={({ collapsed }) => <nav aria-label="Agents" data-collapsed={collapsed}>Grafico</nav>}
       settingsSections={[{ id: 'preferences', label: 'Preferences', content: <p>Preferences</p> }]}
       {...(actions ? { threadActionsButton: actions } : {})}
@@ -71,6 +71,16 @@ describe('ThreadWorkspaceLayout host adaptations', () => {
     const nav = view.querySelector('.matter-sidebar nav[aria-label="Agents"]');
     expect(nav?.textContent).toBe('Grafico');
     expect(nav?.getAttribute('data-collapsed')).toBe('false');
+  });
+
+  it('names the conversation section and New Chat after the host scope (B09/B10)', () => {
+    const scoped = render(vi.fn(), undefined, { workspaceSectionLabel: 'Grafico conversations' }, 'New Grafico conversation');
+    const heading = scoped.querySelector('.matter-section-heading-row .matter-section-heading');
+    expect(heading?.textContent).toContain('Grafico conversations');
+    expect(scoped.querySelector('.matter-section-add [aria-label="New Grafico conversation"]')).toBeTruthy();
+    act(() => root?.unmount()); container?.remove();
+    const plain = render();
+    expect(plain.querySelector('.matter-section-heading-row .matter-section-heading')?.textContent).toContain('This workspace');
   });
 
   it("opens the upstream thread menu and deletes through the host", async () => {

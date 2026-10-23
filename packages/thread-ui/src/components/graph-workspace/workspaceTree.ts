@@ -398,6 +398,8 @@ export function collectWorkspaceItems(
   artifacts: ThreadArtifactDto[],
   status: AgentRuntimeStatusDto | null,
   activeView: 'chat' | 'shell',
+  /** Internal tool/reasoning records are a debug view, not workspace files. */
+  { includeThreadEvents = false }: { includeThreadEvents?: boolean } = {},
 ) {
   const root: WorkspaceTreeNode = {
     id: 'root',
@@ -458,6 +460,8 @@ export function collectWorkspaceItems(
     item: ThreadHistoryItemDto,
     live = false,
   ) => {
+    const liveArtifact = live && item.kind === 'artifact' && Boolean(item.artifact);
+    if (!includeThreadEvents && !liveArtifact) return;
     sequence += 1;
     const label = item.kind.replace(/([A-Z])/g, '-$1').toLowerCase();
     const eventPath = `${live ? 'live:' : `thread-events:/${turnId}`}/${String(
@@ -529,7 +533,9 @@ export function collectWorkspaceItems(
   void status;
   void activeView;
 
-  root.children.push(artifactRoot, eventRoot, liveRoot);
+  root.children.push(artifactRoot);
+  if (includeThreadEvents) root.children.push(eventRoot, liveRoot);
+  else if (liveRoot.children.length) root.children.push(liveRoot);
   return sortWorkspaceTree(root);
 }
 

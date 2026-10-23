@@ -130,6 +130,9 @@ export interface MatterWorkbenchOptions {
   harnessSessionUrl?: string | null;
   threads: WorkbenchThread[];
   workspaceThreads?: WorkbenchThread[];
+  /** Heading of the `workspaceThreads` section; hosts that scope it (to one
+      Agent, say) name that scope. Defaults to "This workspace". */
+  workspaceSectionLabel?: string | undefined;
   /** Threads that want the reader, for the running count and its sheet: running
       ones beyond `threads` (other workspaces and devices, threads never opened)
       and finished ones the reader opened before and has not read since. */
@@ -985,7 +988,7 @@ export function MatterWorkbench({
               onClick={() => setWorkspaceOpen(!workspaceOpen)}
             >
               {workspaceOpen ? <ChevronDown /> : <ChevronRight />}
-              <span>{translate("workbench.thisWorkspace")}</span>
+              <span>{o.workspaceSectionLabel ?? translate("workbench.thisWorkspace")}</span>
               <span className="matter-section-count">{groupThreads(workspaceThreads).length}</span>
             </button>
             {newThread ? <div className="matter-section-add">{newThread}</div> : null}
@@ -1112,7 +1115,7 @@ export function MatterWorkbench({
           {/* Both sections fold; this workspace's conversations keep the order dragged into them. */}
           <button type="button" className="matter-section-heading matter-sheet-section-heading" aria-expanded={workspaceOpen} onClick={() => setWorkspaceOpen(!workspaceOpen)}>
             {workspaceOpen ? <ChevronDown /> : <ChevronRight />}
-            <span>{translate('workbench.thisWorkspace')}</span>
+            <span>{o.workspaceSectionLabel ?? translate('workbench.thisWorkspace')}</span>
             <span className="matter-section-count">{groupThreads(tabs).length}</span>
           </button>
           {workspaceOpen && <div ref={sheetListRef} className="matter-thread-section" data-testid="sheet-workspace-threads">{renderThreadGroups(reorderable ? tabs : [...tabs].sort((a, b) => Number(inCurrentGroup(b)) - Number(inCurrentGroup(a)) || attention(a) - attention(b)), reorderable)}</div>}

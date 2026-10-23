@@ -85,6 +85,8 @@ export function GraphWorkspaceExplorer({
     workspaceIdentity,
     showHidden,
     setShowHidden,
+    showThreadEvents,
+    setShowThreadEvents,
   } = useWorkspaceExplorerController({
     activeView,
     detail,
@@ -530,6 +532,8 @@ export function GraphWorkspaceExplorer({
   const explorerPanel = (
     <WorkspaceExplorerPanel
       {...(setShowHidden ? {showHidden, onShowHiddenChange: setShowHidden} : {})}
+      showThreadEvents={showThreadEvents}
+      onShowThreadEventsChange={setShowThreadEvents}
       canEmptyGarbage={Boolean(workspaceAdapter?.emptyGarbage)}
       canUpload={canUploadFiles}
       pending={pending}

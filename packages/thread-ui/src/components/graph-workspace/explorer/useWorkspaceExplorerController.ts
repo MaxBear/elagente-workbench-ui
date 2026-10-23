@@ -88,6 +88,10 @@ export function useWorkspaceExplorerController({
     try { return localStorage.getItem(SHOW_HIDDEN_KEY) === 'true'; } catch { return false; }
   });
   const showHidden = hiddenFilesAvailable && showHiddenPreference;
+  // Internal thread events (tool calls, reasoning) are a debug view: off unless asked for.
+  const [showThreadEvents, setShowThreadEventsPreference] = useState(() => {
+    try { return localStorage.getItem(SHOW_THREAD_EVENTS_KEY) === 'true'; } catch { return false; }
+  });
   const listIdentity = useMemo(
     () => (showHidden ? { ...workspaceIdentity, showHidden: true } : workspaceIdentity),
     [showHidden, workspaceIdentity],
@@ -152,8 +156,8 @@ export function useWorkspaceExplorerController({
   }, [capabilityAdapter, workspaceIdentity.threadId, capabilityEpoch]);
   const persistence = useWorkspaceExplorerPersistence(workspaceIdentity);
   const fallbackTree = useMemo(
-    () => collectWorkspaceItems(detail, artifacts, status, activeView),
-    [activeView, artifacts, detail, status, locale],
+    () => collectWorkspaceItems(detail, artifacts, status, activeView, { includeThreadEvents: showThreadEvents }),
+    [activeView, artifacts, detail, status, locale, showThreadEvents],
   );
   const fallbackFirstSelectableNode = findFirstPreviewNode(fallbackTree);
   const initialPersistedState = useRef(persistence.read());
@@ -807,10 +811,29 @@ export function useWorkspaceExplorerController({
       setShowHiddenPreference(value);
       try { localStorage.setItem(SHOW_HIDDEN_KEY, String(value)); } catch { /* Applies to this page only. */ }
     } : undefined,
+    showThreadEvents,
+    setShowThreadEvents: (value: boolean) => {
+      setShowThreadEventsPreference(value);
+      // Hiding the events must not leave a hidden event selected: show a file instead.
+      if (!value && selectedNodeId?.startsWith('event:')) setSelectedNodeId(firstNonEventNode(tree)?.id ?? null);
+      try { localStorage.setItem(SHOW_THREAD_EVENTS_KEY, String(value)); } catch { /* Applies to this page only. */ }
+    },
   };
 }
 
 const SHOW_HIDDEN_KEY = 'workbench.explorer.showHidden';
+const SHOW_THREAD_EVENTS_KEY = 'workbench.explorer.showThreadEvents';
+
+/** The first file or artifact, outside the thread-events debug view. */
+function firstNonEventNode(node: WorkspaceTreeNode): WorkspaceTreeNode | null {
+  if (node.kind === 'file' || node.kind === 'artifact' || node.kind === 'live-artifact') return node;
+  if (node.kind === 'event' || node.id === 'thread-events') return null;
+  for (const child of node.children) {
+    const found = firstNonEventNode(child);
+    if (found) return found;
+  }
+  return null;
+}
 
 class MissingTargetError extends Error {}
 

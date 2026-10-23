@@ -7,7 +7,7 @@ import {
 } from "./chunk-5LLLXMOS.js";
 import {
   translate
-} from "./chunk-YW4S7OP5.js";
+} from "./chunk-GQPLSSTB.js";
 
 // src/components/graph-workspace/GraphMoleculeViewerCommands.ts
 import {
@@ -1053,6 +1053,77 @@ function createMoleculeRenderViewer(api, host) {
   };
 }
 
+// src/components/graph-workspace/moleculePinchZoom.ts
+var PINCH_ZOOM_RATE = 0.01;
+var PINCH_MAX_STEP = 1.1;
+var LINE_PIXELS = 16;
+var PAGE_PIXELS = 400;
+var clampStep = (factor) => Math.min(PINCH_MAX_STEP, Math.max(1 / PINCH_MAX_STEP, factor));
+function pinchZoomFactor(event) {
+  const unit = event.deltaMode === 1 ? LINE_PIXELS : event.deltaMode === 2 ? PAGE_PIXELS : 1;
+  const pixels = event.deltaY * unit;
+  if (!Number.isFinite(pixels) || pixels === 0) return 1;
+  return clampStep(Math.exp(-pixels * PINCH_ZOOM_RATE));
+}
+function bindPinchZoom(host, zoom) {
+  let gestureScale = null;
+  let touches = 0;
+  const track = (event) => {
+    touches = event.touches?.length ?? 0;
+  };
+  const reset = () => {
+    touches = 0;
+  };
+  const resetWhenHidden = () => {
+    if (document.visibilityState === "hidden") reset();
+  };
+  const apply = (factor) => {
+    if (factor !== 1) zoom(factor);
+  };
+  const wheel = (event) => {
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (gestureScale === null) apply(pinchZoomFactor(event));
+  };
+  const gestureStart = (event) => {
+    event.preventDefault();
+    gestureScale = 1;
+  };
+  const gestureChange = (event) => {
+    event.preventDefault();
+    const scale = event.scale;
+    if (gestureScale === null || typeof scale !== "number" || !(scale > 0)) return;
+    if (!touches) apply(clampStep(scale / gestureScale));
+    gestureScale = scale;
+  };
+  const gestureEnd = (event) => {
+    event.preventDefault();
+    gestureScale = null;
+  };
+  const options = { capture: true, passive: false };
+  host.addEventListener("wheel", wheel, options);
+  host.addEventListener("gesturestart", gestureStart, options);
+  host.addEventListener("gesturechange", gestureChange, options);
+  host.addEventListener("gestureend", gestureEnd, options);
+  for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"])
+    host.addEventListener(type, track, { capture: true, passive: true });
+  host.addEventListener("pointercancel", reset, { capture: true });
+  window.addEventListener("blur", reset);
+  document.addEventListener("visibilitychange", resetWhenHidden);
+  return () => {
+    for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"])
+      host.removeEventListener(type, track, { capture: true });
+    host.removeEventListener("pointercancel", reset, { capture: true });
+    window.removeEventListener("blur", reset);
+    document.removeEventListener("visibilitychange", resetWhenHidden);
+    host.removeEventListener("wheel", wheel, options);
+    host.removeEventListener("gesturestart", gestureStart, options);
+    host.removeEventListener("gesturechange", gestureChange, options);
+    host.removeEventListener("gestureend", gestureEnd, options);
+  };
+}
+
 // src/components/graph-workspace/GraphMoleculeMeasurements.ts
 function measureAtoms(atoms) {
   if (atoms.length === 2)
@@ -1659,7 +1730,11 @@ function GraphMoleculeViewer({
       try {
         const managed = createMoleculeRenderViewer($3Dmol, host);
         const viewer = managed.viewer;
-        release = managed.release;
+        const unbindPinch = bindPinchZoom(host, (factor) => viewer.zoom(factor));
+        release = () => {
+          unbindPinch();
+          managed.release();
+        };
         viewerRef.current = viewer;
         setViewerReady(true);
       } catch (error) {

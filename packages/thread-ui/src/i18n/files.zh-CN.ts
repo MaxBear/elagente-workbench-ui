@@ -632,6 +632,7 @@ export const filesZhCN = {
   "files.copyPathShort": "复制路径",
   "files.downloadShort": "下载",
   "files.safeReason.unsupportedEncodingOrBinaryFile": "这不是文本文件，无法预览。",
+  "files.safeReason.scientificBinaryFile": "这是二进制科学数据（例如 ORCA .gbw 或 PySCF .chk 文件），无法预览。请下载后用生成它的程序打开。",
   "files.terminalMenu": "终端",
   "files.terminalCopy": "复制",
   "files.terminalPaste": "粘贴",
@@ -681,4 +682,5 @@ export const filesZhCN = {
   "files.propertiesOlderDevice": "这台设备的 Supervisor 还不提供文件时间，更新后可见。",
   "files.downloadZip": "下载为 ZIP",
   "files.showHiddenFiles": "显示隐藏文件",
+  "files.showThreadEvents": "显示线程事件（调试）",
 } as const;
