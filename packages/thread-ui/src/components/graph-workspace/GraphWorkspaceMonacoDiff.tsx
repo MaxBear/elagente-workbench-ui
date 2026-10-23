@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor/editor/editor.api.js';
-import { editorThemeFor } from './GraphWorkspaceMonacoEditor';
+import { editorThemeFor, monacoLanguage } from './GraphWorkspaceMonacoEditor';
 import { useDocumentThemeRevision } from '../themeHooks';
 import { translate } from '../../i18n';
 export default function WorkspaceDocumentDiff({
@@ -20,14 +20,9 @@ export default function WorkspaceDocumentDiff({
   const themeRevision = useDocumentThemeRevision();
   useEffect(() => {
     if (!host.current) return;
-    const left = monaco.editor.createModel(
-      original,
-      language === 'text' ? 'plaintext' : language,
-    );
-    const right = monaco.editor.createModel(
-      modified,
-      language === 'text' ? 'plaintext' : language,
-    );
+    // The same language ids as the editor (`py` → python, unknown → plaintext).
+    const left = monaco.editor.createModel(original, monacoLanguage(language));
+    const right = monaco.editor.createModel(modified, monacoLanguage(language));
     const editor = monaco.editor.createDiffEditor(host.current, {
       readOnly: true,
       automaticLayout: true,

@@ -158,7 +158,7 @@ export interface GraphWorkspaceMonacoEditorProps {
 }
 
 // App-servers report the file extension (`py`, `md`); Monaco needs its ids.
-function monacoLanguage(language: string) {
+export function monacoLanguage(language: string) {
   const id = codeLanguage(language);
   return monaco.languages.getLanguages().some((entry) => entry.id === id) ? id : 'plaintext';
 }

@@ -53,10 +53,10 @@ export function codeLanguage(language: string) {
 }
 
 // HDF5 (PySCF checkpoints, with or without `.chk`) decoded as UTF-8 text.
-const HDF5_SIGNATURE = /^\ufffdHDF\r\n\u001a\n/;
+const HDF5_SIGNATURE = '\ufffdHDF\r\n\u001a\n';
 
 export function isBinaryPreview(content: string) {
-  if (content.includes('\0') || HDF5_SIGNATURE.test(content)) return true;
+  if (content.includes('\0') || content.startsWith(HDF5_SIGNATURE)) return true;
   // Catch unknown binary formats decoded lossily by the text preview endpoint.
   const sample = content.slice(0, 8000);
   const suspicious = sample.match(/[\x01-\x08\x0e-\x1f\ufffd]/g)?.length ?? 0;

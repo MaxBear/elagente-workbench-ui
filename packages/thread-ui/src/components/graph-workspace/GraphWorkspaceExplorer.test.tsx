@@ -276,6 +276,34 @@ describe('GraphWorkspaceExplorer', () => {
     expect(window.localStorage.getItem('workbench.explorer.showThreadEvents')).toBe('true');
   });
 
+  it('selects a file when the thread-events view is turned off while an event is selected', async () => {
+    window.localStorage.setItem('workbench.explorer.showThreadEvents', 'true');
+    const { adapter, readFile } = createAdapter();
+    const withEvents = {
+      ...detail,
+      turns: [{ id: 'turn-1', items: [{ id: 'call-1', kind: 'toolCall', text: 'expert', status: 'completed' }] }],
+    } as unknown as ThreadDetailDto;
+    await act(async () => {
+      root?.render(
+        <GraphWorkspaceExplorer activeView="chat" detail={withEvents} artifacts={[]}
+          plugins={createDefaultPluginContextValue()} status={null} workspaceAdapter={adapter} />,
+      );
+    });
+    await vi.waitFor(() => expect(host!.textContent).toContain('thread-events/turn-1'));
+    const eventRow = () => host!.querySelector<HTMLElement>('[data-explorer-path$="-tool-call.json"]');
+    await vi.waitFor(() => expect(eventRow()).not.toBeNull());
+    await act(async () => eventRow()!.click());
+    await vi.waitFor(() => expect(host!.querySelector('[data-testid="preview-file"]')?.textContent).toContain('none'));
+    readFile.mockClear();
+    const more = () => host!.querySelector<HTMLButtonElement>('button[aria-label="More Explorer actions"]')!;
+    act(() => more().click());
+    const toggle = [...host!.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')]
+      .find((item) => item.textContent?.includes('Show thread events'))!;
+    await act(async () => toggle.click());
+    await vi.waitFor(() => expect(host!.querySelector('[data-testid="preview-file"]')?.textContent).toContain('README.md'));
+    expect(host!.textContent).not.toContain('thread-events');
+  });
+
   it('lists an external linked file under its real parent directory, not a virtual folder', async () => {
     const { adapter, listTree } = createAdapter();
     const statLinkedFile = vi.fn(async () => file('/outside/docs/notes.txt'));

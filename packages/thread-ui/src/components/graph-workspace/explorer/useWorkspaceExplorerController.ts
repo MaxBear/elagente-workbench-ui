@@ -814,6 +814,8 @@ export function useWorkspaceExplorerController({
     showThreadEvents,
     setShowThreadEvents: (value: boolean) => {
       setShowThreadEventsPreference(value);
+      // Hiding the events must not leave a hidden event selected: show a file instead.
+      if (!value && selectedNodeId?.startsWith('event:')) setSelectedNodeId(firstNonEventNode(tree)?.id ?? null);
       try { localStorage.setItem(SHOW_THREAD_EVENTS_KEY, String(value)); } catch { /* Applies to this page only. */ }
     },
   };
@@ -821,6 +823,17 @@ export function useWorkspaceExplorerController({
 
 const SHOW_HIDDEN_KEY = 'workbench.explorer.showHidden';
 const SHOW_THREAD_EVENTS_KEY = 'workbench.explorer.showThreadEvents';
+
+/** The first file or artifact, outside the thread-events debug view. */
+function firstNonEventNode(node: WorkspaceTreeNode): WorkspaceTreeNode | null {
+  if (node.kind === 'file' || node.kind === 'artifact' || node.kind === 'live-artifact') return node;
+  if (node.kind === 'event' || node.id === 'thread-events') return null;
+  for (const child of node.children) {
+    const found = firstNonEventNode(child);
+    if (found) return found;
+  }
+  return null;
+}
 
 class MissingTargetError extends Error {}
 
