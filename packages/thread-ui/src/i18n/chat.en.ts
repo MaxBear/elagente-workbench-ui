@@ -1,4 +1,5 @@
 export const chatEn = {
+  "chat.toolArtifacts": "Tool artifacts",
   "chat.turnNotificationOn": "Notify you when this turn ends",
   "chat.turnNotificationOff": "Subscribe to this turn",
 

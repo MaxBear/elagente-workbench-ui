@@ -51,21 +51,21 @@ describe('tool artifacts', () => {
     const figure = view.querySelector('.thread-graph-tool-artifacts [data-artifact-id="png"]')!;
     expect(figure.closest('details')).toBeNull();
     const image = figure.querySelector('img')!;
-    expect(image.getAttribute('src')).toBe('/agent-api/demo/artifacts/thr/png');
+    expect(image.getAttribute('src')).toBe(`${location.origin}/agent-api/demo/artifacts/thr/png`);
     expect(image.getAttribute('alt')).toBe('water.png');
     act(() => figure.querySelector('button')!.click());
-    expect(document.querySelector('.thread-graph-image-lightbox img')?.getAttribute('src')).toBe('/agent-api/demo/artifacts/thr/png');
+    expect(document.querySelector('.thread-graph-image-lightbox img')?.getAttribute('src')).toBe(`${location.origin}/agent-api/demo/artifacts/thr/png`);
     expect(view.textContent).not.toContain('Full artifacts');
   });
 
-  it('links other artifacts with name and type, and keeps unknown ids as text', () => {
+  it('links other artifacts with name and type, and keeps unknown ids inside the folded card', () => {
     const view = render(['xyz', 'missing']);
     const link = view.querySelector<HTMLAnchorElement>('[data-artifact-id="xyz"] a')!;
     expect(link.textContent).toBe('water.xyz');
-    expect(link.getAttribute('href')).toBe('/agent-api/demo/artifacts/thr/xyz');
+    expect(link.getAttribute('href')).toBe(`${location.origin}/agent-api/demo/artifacts/thr/xyz`);
     expect(view.querySelector('[data-artifact-id="xyz"]')!.textContent).toContain('chemical/x-xyz');
-    expect(view.querySelector('[data-artifact-id="missing"]')!.textContent).toBe('missing');
-    expect(view.querySelector('[data-artifact-id="missing"] a')).toBeNull();
+    expect(view.querySelector('[data-artifact-id="missing"]')).toBeNull();
+    expect(view.querySelector('details')!.textContent).toContain('Full artifacts: missing');
   });
 
   it('never puts inline base64 data into the DOM', () => {
@@ -75,9 +75,21 @@ describe('tool artifacts', () => {
     expect(view.querySelector('[data-artifact-id="inline"]')!.textContent).toContain('leak.png');
   });
 
-  it('falls back to the ids when the host cannot resolve artifacts', () => {
+  it('shows nothing outside the card when the host cannot resolve artifacts', () => {
     const view = render(['png'], {});
     expect(view.querySelector('img')).toBeNull();
-    expect(view.querySelector('[data-artifact-id="png"]')!.textContent).toBe('png');
+    expect(view.querySelector('.thread-graph-tool-artifacts')).toBeNull();
+    expect(view.querySelector('details')!.textContent).toContain('Full artifacts: png');
+  });
+
+  it('accepts same-origin and https addresses only', () => {
+    known.remote = { id: 'remote', name: 'r.png', mediaType: 'image/png', url: 'http://elsewhere.example/r.png' };
+    known.secure = { id: 'secure', name: 's.png', mediaType: 'image/png', url: 'https://cdn.example/s.png' };
+    known.relative = { id: 'relative', name: 'p.png', mediaType: 'image/png', url: '//elsewhere.example/p.png' };
+    const view = render(['remote', 'secure', 'relative']);
+    expect([...view.querySelectorAll('img')].map((image) => image.getAttribute('src'))).toEqual(['https://cdn.example/s.png']);
+    expect(view.querySelector('[data-artifact-id="remote"] a')).toBeNull();
+    expect(view.querySelector('[data-artifact-id="relative"] a')).toBeNull();
+    expect(view.querySelector('[data-artifact-id="png"]')).toBeNull();
   });
 });

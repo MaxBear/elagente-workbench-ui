@@ -91,10 +91,7 @@ describe("W5 tool evidence and usage (G10 G11 G12 G14 G17 G41 G43)", () => {
       expect(
         tool.querySelector('[aria-label="Tool log summary"]')?.textContent,
       ).toContain("Task complete");
-      // Reported artifacts are listed beside the card (as ids without a host resolver).
-      expect(
-        container.querySelectorAll('[aria-label="Tool artifacts"] [data-artifact-id]').length,
-      ).toBeGreaterThan(0);
+      expect(tool.textContent).toContain("Full artifacts:");
     },
   );
 
