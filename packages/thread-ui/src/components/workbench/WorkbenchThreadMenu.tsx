@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Copy, ExternalLink, MoreHorizontal, Pencil, Trash2, TriangleAlert } from 'lucide-react';
 import { translate, useI18n } from '../../i18n';
@@ -11,7 +11,10 @@ import type { ThreadMenuContext, WorkbenchThread } from '../MatterWorkbench';
     Pockymoe b35e997b): the same trigger, menu markup, items and keyboard; the
     host performs the rename and the delete (and confirms it). With `context` it
     opens where the thread was right-clicked and reports when it is done. It portals
-    into the workbench (like ThreadToolsMenu) so the workbench theme tokens apply. */
+    into the workbench (like ThreadToolsMenu) so the workbench theme tokens apply.
+    Unlike Pockymoe, a host may draw its own chrome (a navigation rail) beside the
+    workbench, so the menu stays inside the workbench's visible box, not just the
+    viewport, and is measured once rendered so zoom and its real size are honoured. */
 export function WorkbenchThreadMenu({ thread, context, copyIdLabel, onNavigate, onRename, onDelete }: {
   thread: WorkbenchThread;
   context?: ThreadMenuContext | undefined;
@@ -21,11 +24,26 @@ export function WorkbenchThreadMenu({ thread, context, copyIdLabel, onNavigate, 
   onDelete?: (() => void) | undefined;
 }) {
   useI18n();
-  const place = (left: number, top: number) => ({ left: Math.min(Math.max(8, left), innerWidth - 268), top: Math.max(8, Math.min(top, innerHeight - 340)) });
+  const trigger = useRef<HTMLButtonElement>(null);
+  const portalHost = () => (trigger.current ?? context?.returnFocus)?.closest<HTMLElement>('.thread-ui-shell') ?? document.body;
+  const place = (left: number, top: number) => {
+    const area = menuArea(portalHost());
+    return { left: clamp(left, area.left + 8, area.right - 268), top: clamp(top, area.top + 8, area.bottom - 340) };
+  };
   const [position, setPosition] = useState<{ top: number; left: number } | null>(() => context ? place(context.x, context.y) : null);
   const [copied, setCopied] = useState<{ key: string; state: 'copied' | 'failed' } | null>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
+  // Fit the rendered menu: correct for its real size and for a portal host that
+  // positions fixed descendants itself.
+  useLayoutEffect(() => {
+    const node = menu.current;
+    if (!position || !node) return;
+    const area = menuArea(node.parentElement ?? document.body);
+    const box = node.getBoundingClientRect();
+    const dx = clamp(box.left, area.left + 8, area.right - 8 - box.width) - box.left;
+    const dy = clamp(box.top, area.top + 8, area.bottom - 8 - box.height) - box.top;
+    if (Math.abs(dx) >= 1 || Math.abs(dy) >= 1) setPosition({ left: position.left + dx, top: position.top + dy });
+  }, [position]);
   useEffect(() => {
     if (!position) return;
     setCopied(null);
@@ -77,6 +95,19 @@ export function WorkbenchThreadMenu({ thread, context, copyIdLabel, onNavigate, 
       {copyItem('thread', copyIdLabel, thread.key)}
       {onRename && <button onClick={() => { setPosition(null); onRename(); }}><Pencil data-icon="rename" size={15} />{translate("workbench.renameThread")}</button>}
       {onDelete && <button className="recent-thread-delete" onClick={() => { setPosition(null); onDelete(); }}><Trash2 data-icon="delete" size={15} />{translate("workbench.deleteThread")}</button>}
-    </div>, (trigger.current ?? context?.returnFocus)?.closest('.thread-ui-shell') ?? document.body)}
+    </div>, portalHost())}
   </>;
+}
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max));
+
+/** The part of the viewport the workbench occupies; the menu must not leave it. */
+function menuArea(host: HTMLElement) {
+  const box = host === document.body ? null : host.getBoundingClientRect();
+  return {
+    left: Math.max(0, box?.left ?? 0),
+    top: Math.max(0, box?.top ?? 0),
+    right: Math.min(innerWidth, box?.right ?? innerWidth),
+    bottom: Math.min(innerHeight, box?.bottom ?? innerHeight),
+  };
 }
