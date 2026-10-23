@@ -33,11 +33,14 @@ export function WorkbenchThreadMenu({ thread, context, copyIdLabel, onNavigate, 
   const [position, setPosition] = useState<{ top: number; left: number } | null>(() => context ? place(context.x, context.y) : null);
   const [copied, setCopied] = useState<{ key: string; state: 'copied' | 'failed' } | null>(null);
   const menu = useRef<HTMLDivElement>(null);
-  // Fit the rendered menu: correct for its real size and for a portal host that
-  // positions fixed descendants itself.
+  // Fit the rendered menu once per opening: correct for its real size and for a
+  // portal host that positions fixed descendants itself.
+  const fitted = useRef(false);
   useLayoutEffect(() => {
     const node = menu.current;
-    if (!position || !node) return;
+    if (!position || !node) { fitted.current = false; return; }
+    if (fitted.current) return;
+    fitted.current = true;
     const area = menuArea(node.parentElement ?? document.body);
     const box = node.getBoundingClientRect();
     const dx = clamp(box.left, area.left + 8, area.right - 8 - box.width) - box.left;
