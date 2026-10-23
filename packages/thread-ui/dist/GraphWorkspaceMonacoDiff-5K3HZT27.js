@@ -1,12 +1,14 @@
 import {
-  editorThemeFor
-} from "./chunk-63NAVPUC.js";
+  editorThemeFor,
+  monacoLanguage
+} from "./chunk-3NZZH7EM.js";
+import "./chunk-DCPNHQ2H.js";
 import {
   useDocumentThemeRevision
-} from "./chunk-TZIQBT3H.js";
+} from "./chunk-TV56ELKX.js";
 import {
   translate
-} from "./chunk-YW4S7OP5.js";
+} from "./chunk-GQPLSSTB.js";
 
 // src/components/graph-workspace/GraphWorkspaceMonacoDiff.tsx
 import { useEffect, useRef } from "react";
@@ -23,14 +25,8 @@ function WorkspaceDocumentDiff({
   const themeRevision = useDocumentThemeRevision();
   useEffect(() => {
     if (!host.current) return;
-    const left = monaco.editor.createModel(
-      original,
-      language === "text" ? "plaintext" : language
-    );
-    const right = monaco.editor.createModel(
-      modified,
-      language === "text" ? "plaintext" : language
-    );
+    const left = monaco.editor.createModel(original, monacoLanguage(language));
+    const right = monaco.editor.createModel(modified, monacoLanguage(language));
     const editor2 = monaco.editor.createDiffEditor(host.current, {
       readOnly: true,
       automaticLayout: true,

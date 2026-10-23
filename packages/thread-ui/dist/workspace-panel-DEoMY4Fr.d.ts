@@ -47,7 +47,21 @@ interface ThreadLinkInfo {
  * reader cannot open it, `undefined` while the page does not know yet.
  */
 type DescribeThread = (threadId: string) => ThreadLinkInfo | null | undefined;
+/** An artifact a tool reported (`progress.artifactIds`), as the host resolved it. */
+interface ThreadToolArtifact {
+    id: string;
+    name: string;
+    /** IANA media type, e.g. `image/png`; images with a URL are shown inline. */
+    mediaType?: string | undefined;
+    /** The host's artifact kind (e.g. `file`, `chem.structure`). */
+    kind?: string | undefined;
+    /** A same-origin or https address of the artifact bytes; never a data URL. */
+    url?: string | undefined;
+    size?: number | undefined;
+}
 interface ThreadTimelineAdapter {
+    /** Resolves an artifact a tool reported; null when the host does not know it. */
+    resolveArtifact?: (artifactId: string) => ThreadToolArtifact | null;
     resolveWorkspacePath?: (path: string) => Promise<boolean>;
     workspaceRootPath?: string | undefined;
     getImageAssetUrl?: (input: {
@@ -330,6 +344,8 @@ interface ThreadShellAdapter {
 }
 interface ThreadDetailUiAdapter {
     openThread(threadId: string): void;
+    /** Resolves artifacts a tool reported, so tool cards can show them (images inline). */
+    resolveArtifact?: (artifactId: string) => ThreadToolArtifact | null;
     getThreadHref?: (threadId: string) => string;
     /**
      * Names linked threads by their titles. With it, a sub-thread (one with a
@@ -532,4 +548,4 @@ interface ThreadGraphWorkspaceFeatures {
 declare function ThreadGraphWorkspacePanel({ detail, status, plugins, workspaceAdapter, metaContent, settingsContent, activeView, features: featureConfig, focusPathRequest, onActiveFileChange, }: ThreadGraphWorkspacePanelProps): react.JSX.Element | null;
 declare const MemoizedThreadGraphWorkspacePanel: react.MemoExoticComponent<typeof ThreadGraphWorkspacePanel>;
 
-export { mergePluginState as A, ThreadGraphWorkspacePanel as B, type DescribeThread as D, type ExtensionPluginApi as E, MemoizedThreadGraphWorkspacePanel as M, type PromptAttachmentUpload as P, type SettingsSection as S, type ThreadShellControlState as T, type WorkspaceDocumentSaveInput as W, type ThreadTimelineAdapter as a, type ThreadShellAdapter as b, type ThreadGraphWorkspacePanelProps as c, type PluginContextValue as d, type ThreadDetailUiAdapter as e, type ThreadGraphWorkspaceFeatures as f, SettingsPanels as g, type ThreadWorkspaceAdapter as h, PluginContext as i, PluginProvider as j, type PluginProviderAdapter as k, type SendPromptInput as l, type ShellSocketConnection as m, type ShellSocketHandlers as n, type ThreadImageAssetVariant as o, type ThreadLinkInfo as p, type ThreadWorkspaceArchiveFormat as q, type ThreadWorkspaceCapabilities as r, type ThreadWorkspaceTrashEntry as s, type ThreadWorkspaceTrashList as t, type WorkspaceDocumentSnapshot as u, type WorkspaceSaveReceipt as v, type WorkspaceTab as w, createDefaultPluginContextValue as x, createExtensionPluginApi as y, extensionModuleAvailable as z };
+export { extensionModuleAvailable as A, mergePluginState as B, ThreadGraphWorkspacePanel as C, type DescribeThread as D, type ExtensionPluginApi as E, MemoizedThreadGraphWorkspacePanel as M, type PromptAttachmentUpload as P, type SettingsSection as S, type ThreadShellControlState as T, type WorkspaceDocumentSaveInput as W, type ThreadTimelineAdapter as a, type ThreadShellAdapter as b, type ThreadGraphWorkspacePanelProps as c, type PluginContextValue as d, type ThreadDetailUiAdapter as e, type ThreadGraphWorkspaceFeatures as f, SettingsPanels as g, type ThreadWorkspaceAdapter as h, PluginContext as i, PluginProvider as j, type PluginProviderAdapter as k, type SendPromptInput as l, type ShellSocketConnection as m, type ShellSocketHandlers as n, type ThreadImageAssetVariant as o, type ThreadLinkInfo as p, type ThreadToolArtifact as q, type ThreadWorkspaceArchiveFormat as r, type ThreadWorkspaceCapabilities as s, type ThreadWorkspaceTrashEntry as t, type ThreadWorkspaceTrashList as u, type WorkspaceDocumentSnapshot as v, type WorkspaceSaveReceipt as w, type WorkspaceTab as x, createDefaultPluginContextValue as y, createExtensionPluginApi as z };
