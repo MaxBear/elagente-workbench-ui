@@ -12,7 +12,9 @@ export function safeArtifactUrl(url: string | undefined) {
   if (!url || typeof window === "undefined") return null;
   try {
     const parsed = new URL(url, window.location.href);
-    return parsed.origin === window.location.origin || parsed.protocol === "https:" ? parsed.href : null;
+    // An opaque origin ("null", e.g. file: or sandboxed pages) matches itself: require http(s).
+    const web = parsed.protocol === "https:" || parsed.protocol === "http:";
+    return web && (parsed.protocol === "https:" || parsed.origin === window.location.origin) ? parsed.href : null;
   } catch {
     return null;
   }

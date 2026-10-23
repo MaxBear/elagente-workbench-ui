@@ -82,6 +82,14 @@ describe('tool artifacts', () => {
     expect(view.querySelector('details')!.textContent).toContain('Full artifacts: png');
   });
 
+  it('refuses non-web schemes even when the page origin is opaque', () => {
+    known.file = { id: 'file', name: 'f.png', mediaType: 'image/png', url: 'file:///tmp/f.png' };
+    known.script = { id: 'script', name: 'x.png', mediaType: 'image/png', url: 'javascript:alert(1)' };
+    const view = render(['file', 'script']);
+    expect(view.querySelector('img')).toBeNull();
+    expect(view.querySelector('a')).toBeNull();
+  });
+
   it('accepts same-origin and https addresses only', () => {
     known.remote = { id: 'remote', name: 'r.png', mediaType: 'image/png', url: 'http://elsewhere.example/r.png' };
     known.secure = { id: 'secure', name: 's.png', mediaType: 'image/png', url: 'https://cdn.example/s.png' };

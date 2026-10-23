@@ -113,6 +113,35 @@ describe('bindPinchZoom', () => {
     expect(zoom).toHaveBeenCalledTimes(1);
   });
 
+  it('recovers trackpad gesture zoom after a lost touchend', () => {
+    const { canvas, zoom } = stage();
+    const touch = (type: string, count: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'touches', { value: { length: count } });
+      return event;
+    };
+    const trackpadPinch = () => {
+      canvas.dispatchEvent(gesture('gesturestart'));
+      canvas.dispatchEvent(gesture('gesturechange', 1.05));
+      canvas.dispatchEvent(gesture('gestureend'));
+    };
+    // The touchend never arrives; leaving the window resets the count.
+    canvas.dispatchEvent(touch('touchstart', 1));
+    window.dispatchEvent(new Event('blur'));
+    trackpadPinch();
+    expect(zoom).toHaveBeenCalledTimes(1);
+    // A cancelled pointer resets it too.
+    canvas.dispatchEvent(touch('touchstart', 1));
+    canvas.dispatchEvent(new Event('pointercancel', { bubbles: true }));
+    trackpadPinch();
+    expect(zoom).toHaveBeenCalledTimes(2);
+    // And any later touch event recomputes it from event.touches.
+    canvas.dispatchEvent(touch('touchstart', 2));
+    canvas.dispatchEvent(touch('touchmove', 0));
+    trackpadPinch();
+    expect(zoom).toHaveBeenCalledTimes(3);
+  });
+
   it('stops handling pinch once unbound', () => {
     const { canvas, threeDmol, zoom } = stage();
     cleanup?.();

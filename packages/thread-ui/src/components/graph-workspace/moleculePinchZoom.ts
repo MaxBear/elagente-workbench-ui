@@ -42,9 +42,18 @@ export function bindPinchZoom(
   let gestureScale: number | null = null;
   // Fingers on a touch screen. iOS/iPadOS also report a touch pinch as gesture
   // events, but 3Dmol already zooms from the touches; Mac trackpads send none.
+  // Every touch event recomputes the count from `event.touches`, and losing the
+  // page or a cancelled pointer resets it, so a missed touchend cannot leave
+  // trackpad gesture zoom disabled.
   let touches = 0;
   const track = (event: TouchEvent) => {
-    touches = event.touches.length;
+    touches = event.touches?.length ?? 0;
+  };
+  const reset = () => {
+    touches = 0;
+  };
+  const resetWhenHidden = () => {
+    if (document.visibilityState === 'hidden') reset();
   };
   const apply = (factor: number) => {
     if (factor !== 1) zoom(factor);
@@ -75,11 +84,17 @@ export function bindPinchZoom(
   host.addEventListener('gesturestart', gestureStart, options);
   host.addEventListener('gesturechange', gestureChange, options);
   host.addEventListener('gestureend', gestureEnd, options);
-  for (const type of ['touchstart', 'touchend', 'touchcancel'] as const)
+  for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const)
     host.addEventListener(type, track, { capture: true, passive: true });
+  host.addEventListener('pointercancel', reset, { capture: true });
+  window.addEventListener('blur', reset);
+  document.addEventListener('visibilitychange', resetWhenHidden);
   return () => {
-    for (const type of ['touchstart', 'touchend', 'touchcancel'] as const)
+    for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const)
       host.removeEventListener(type, track, { capture: true });
+    host.removeEventListener('pointercancel', reset, { capture: true });
+    window.removeEventListener('blur', reset);
+    document.removeEventListener('visibilitychange', resetWhenHidden);
     host.removeEventListener('wheel', wheel, options);
     host.removeEventListener('gesturestart', gestureStart, options);
     host.removeEventListener('gesturechange', gestureChange, options);
