@@ -3438,3 +3438,15 @@ html[data-theme-effective="light"] .thread-workspace-link-menu button:hover,html
   line-height: 1.5;
 }
 .thread-ui-shell .thread-graph-turn-empty-reason { margin-top: 2px; color: var(--theme-fg-soft); }
+
+/* Artifacts a tool reported (progress.artifactIds), under its card. */
+.thread-ui-shell .thread-graph-tool-artifacts { margin: -0.25rem 0 0.5rem; display: grid; gap: 0.375rem; }
+.thread-ui-shell .thread-graph-tool-artifact-images { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.thread-ui-shell .thread-graph-tool-artifact-images > figure { margin: 0; display: grid; gap: 0.25rem; max-width: 12rem; }
+.thread-ui-shell .thread-graph-tool-artifact-images .thread-graph-zoomable-image-trigger { margin: 0; border: 1px solid var(--theme-border); border-radius: 0.375rem; background: var(--theme-surface); }
+.thread-ui-shell .thread-graph-tool-artifact-images .thread-graph-zoomable-image-trigger > img { max-width: 12rem; max-height: 9rem; border-radius: 0.375rem; }
+.thread-ui-shell .thread-graph-tool-artifact-images figcaption { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--theme-fg-muted); }
+.thread-ui-shell .thread-graph-tool-artifact-files { display: grid; gap: 0.25rem; margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.thread-ui-shell .thread-graph-tool-artifact-files > li { display: flex; align-items: center; gap: 0.375rem; min-width: 0; overflow-wrap: anywhere; }
+.thread-ui-shell .thread-graph-tool-artifact-files a { color: var(--theme-accent-strong, var(--theme-fg)); text-decoration: underline; }
+.thread-ui-shell .thread-graph-tool-artifact-type { color: var(--theme-fg-muted); font-size: 11px; }

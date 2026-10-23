@@ -36,6 +36,7 @@ export type {
   ThreadImageAssetVariant,
   ThreadShellAdapter,
   ThreadTimelineAdapter,
+  ThreadToolArtifact,
   ThreadWorkspaceAdapter,
   ThreadWorkspaceCapabilities,
   ThreadWorkspaceArchiveFormat,

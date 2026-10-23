@@ -9,6 +9,7 @@ import {
 } from "./structuredEvidence";
 import type { TimelineTurn } from "./timelineItems";
 import { StructuredUsageInline } from "./StructuredUsageInline";
+import { ToolArtifacts } from "./ToolArtifacts";
 
 /** The status of the turn a structured evidence row belongs to. */
 export const TurnEvidenceStatusContext = createContext<TimelineTurn["status"] | undefined>(undefined);
@@ -46,6 +47,7 @@ export function StructuredToolEvidence({
     !["completed", "failed", "interrupted"].includes(progress.status);
   const running = progress.status === "running";
   return (
+    <>
     <details
       className="thread-graph-tool-call my-2 min-w-0 rounded-lg border p-3"
       data-tool-call-id={progress.callId}
@@ -106,11 +108,6 @@ export function StructuredToolEvidence({
             {progress.logSummary}
           </pre>
         </section> : null}
-        {progress.artifactIds?.length ? (
-          <div className="break-words text-xs">
-            Full artifacts: {progress.artifactIds.join(", ")}
-          </div>
-        ) : null}
         <StructuredUsageInline
           usage={latestUsage([item], "tool", progress.callId)}
           scope="tool"
@@ -118,5 +115,9 @@ export function StructuredToolEvidence({
         />
       </div>
     </details>
+    {/* Reported artifacts stay visible while the card is folded: a rendered
+        structure is the point of a view tool. */}
+    {progress.artifactIds?.length ? <ToolArtifacts ids={progress.artifactIds} adapter={adapter} /> : null}
+    </>
   );
 }
