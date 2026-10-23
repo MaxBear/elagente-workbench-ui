@@ -15,7 +15,7 @@ import type { WorkspaceTreeNode } from '../workspaceTree';
 import type { WorkspaceExplorerIdentity } from './useWorkspaceExplorerPersistence';
 
 import type { WorkspaceDocuments } from "./useWorkspaceDocuments";
-import { DRAWIO_MAX_BYTES, isBinaryPreview, isDownloadOnlyPath, isDrawioPath } from './filePreviewPolicy';
+import { DRAWIO_MAX_BYTES, downloadOnlyReason, isBinaryPreview, isDownloadOnlyPath, isDrawioPath } from './filePreviewPolicy';
 
 const PREVIEW_CHUNK_BYTES = 24_000;
 const MAX_MOLECULAR_PREVIEW_BYTES = 10 * 1024 * 1024;
@@ -76,6 +76,7 @@ export function useWorkspaceFilePreview({
       try {
         if (isDownloadOnlyPath(currentPath)) {
           setDownloadOnly(true);
+          setDownloadReason(downloadOnlyReason(currentPath));
           return;
         }
         const extension = extensionOf(currentPath);

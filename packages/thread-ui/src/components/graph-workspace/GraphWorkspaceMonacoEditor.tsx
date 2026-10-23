@@ -14,6 +14,7 @@ import 'monaco-editor/languages/definitions/shell/register.js';
 import 'monaco-editor/languages/definitions/sql/register.js';
 import 'monaco-editor/languages/definitions/typescript/register.js';
 import 'monaco-editor/languages/definitions/yaml/register.js';
+import { codeLanguage } from './explorer/filePreviewPolicy';
 
 declare global {
   interface Window {
@@ -156,13 +157,10 @@ export interface GraphWorkspaceMonacoEditorProps {
   readOnly: boolean;
 }
 
+// App-servers report the file extension (`py`, `md`); Monaco needs its ids.
 function monacoLanguage(language: string) {
-  const aliases: Record<string, string> = {
-    jsx: 'javascript',
-    text: 'plaintext',
-    tsx: 'typescript',
-  };
-  return aliases[language] ?? (language || 'plaintext');
+  const id = codeLanguage(language);
+  return monaco.languages.getLanguages().some((entry) => entry.id === id) ? id : 'plaintext';
 }
 
 export default function GraphWorkspaceMonacoEditor({

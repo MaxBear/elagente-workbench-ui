@@ -25,7 +25,11 @@ vi.mock('./GraphWorkspacePreviewPane', () => ({
     onExpandExplorer,
     pdfUrl,
     previewFile,
+    downloadOnly,
+    downloadReason,
   }: {
+    downloadOnly?: boolean;
+    downloadReason?: string | null;
     pdfUrl?: string | null;
     focusLine?: number | null;
     mobileNavigation?: boolean;
@@ -33,7 +37,8 @@ vi.mock('./GraphWorkspacePreviewPane', () => ({
     onExpandExplorer?: () => void;
     previewFile?: ThreadWorkspaceFilePreview | null;
   }) => (
-    <div data-testid="preview-file" data-focus-line={focusLine ?? undefined} data-pdf-url={pdfUrl ?? undefined}>
+    <div data-testid="preview-file" data-focus-line={focusLine ?? undefined} data-pdf-url={pdfUrl ?? undefined}
+      data-download-only={downloadOnly ? 'true' : undefined} data-download-reason={downloadReason ?? undefined}>
       {previewFile?.path ?? 'none'}
       {onCollapse ? (
         <button type="button" aria-label="Hide Editor" onClick={onCollapse} />
@@ -288,6 +293,15 @@ describe('GraphWorkspaceExplorer', () => {
     expect(listTree).toHaveBeenCalledTimes(calls);
     expect(listTree.mock.calls.some(([input]) => String(input.path).startsWith('/outside'))).toBe(false);
     expect(statLinkedFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers an ORCA .gbw as a download with its reason and never reads it as text', async () => {
+    const { adapter, readFile } = createAdapter();
+    await renderExplorer({ ...adapter, listTree: async () => directory('', [file('job.gbw')]) }, { path: 'job.gbw', requestId: 1 });
+    const preview = () => host?.querySelector('[data-testid="preview-file"]');
+    await vi.waitFor(() => expect(preview()?.getAttribute('data-download-only')).toBe('true'));
+    expect(preview()?.getAttribute('data-download-reason')).toBe('scientificBinaryFile');
+    expect(readFile).not.toHaveBeenCalled();
   });
 
   it('previews a PDF from bytes read through the adapter, not from a navigable URL', async () => {
