@@ -94,6 +94,25 @@ describe('bindPinchZoom', () => {
     expect(zoom).toHaveBeenCalledTimes(3);
   });
 
+  it('leaves an iOS touch pinch to 3Dmol: no gesture zoom while a finger is down', () => {
+    const { canvas, zoom } = stage();
+    const touch = (type: string, count: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'touches', { value: { length: count } });
+      return event;
+    };
+    canvas.dispatchEvent(touch('touchstart', 2));
+    canvas.dispatchEvent(gesture('gesturestart'));
+    canvas.dispatchEvent(gesture('gesturechange', 1.5));
+    canvas.dispatchEvent(gesture('gestureend'));
+    canvas.dispatchEvent(touch('touchend', 0));
+    expect(zoom).not.toHaveBeenCalled();
+    // A trackpad gesture afterwards (no touches) zooms again.
+    canvas.dispatchEvent(gesture('gesturestart'));
+    canvas.dispatchEvent(gesture('gesturechange', 1.05));
+    expect(zoom).toHaveBeenCalledTimes(1);
+  });
+
   it('stops handling pinch once unbound', () => {
     const { canvas, threeDmol, zoom } = stage();
     cleanup?.();

@@ -7,7 +7,8 @@
  * `wheelDelta` approaches -600. Pinch events arrive every frame, so a short
  * pinch compounds into a jump while the mouse wheel (few, large notches) feels
  * right. Here a pinch scales the view by exactly the amount the fingers asked
- * for; plain wheel and two-finger scroll stay with 3Dmol unchanged.
+ * for; plain wheel and two-finger scroll stay with 3Dmol unchanged, and so
+ * does a touch-screen pinch (3Dmol handles touches itself).
  */
 
 /** Chromium and Firefox encode a pinch as deltaY ≈ -100·ln(scale). */
@@ -39,6 +40,12 @@ export function bindPinchZoom(
 ): () => void {
   // Cumulative scale of an active Safari gesture; it owns the pinch while set.
   let gestureScale: number | null = null;
+  // Fingers on a touch screen. iOS/iPadOS also report a touch pinch as gesture
+  // events, but 3Dmol already zooms from the touches; Mac trackpads send none.
+  let touches = 0;
+  const track = (event: TouchEvent) => {
+    touches = event.touches.length;
+  };
   const apply = (factor: number) => {
     if (factor !== 1) zoom(factor);
   };
@@ -56,7 +63,7 @@ export function bindPinchZoom(
     event.preventDefault();
     const scale = (event as Event & { scale?: unknown }).scale;
     if (gestureScale === null || typeof scale !== 'number' || !(scale > 0)) return;
-    apply(clampStep(scale / gestureScale));
+    if (!touches) apply(clampStep(scale / gestureScale));
     gestureScale = scale;
   };
   const gestureEnd = (event: Event) => {
@@ -68,7 +75,11 @@ export function bindPinchZoom(
   host.addEventListener('gesturestart', gestureStart, options);
   host.addEventListener('gesturechange', gestureChange, options);
   host.addEventListener('gestureend', gestureEnd, options);
+  for (const type of ['touchstart', 'touchend', 'touchcancel'] as const)
+    host.addEventListener(type, track, { capture: true, passive: true });
   return () => {
+    for (const type of ['touchstart', 'touchend', 'touchcancel'] as const)
+      host.removeEventListener(type, track, { capture: true });
     host.removeEventListener('wheel', wheel, options);
     host.removeEventListener('gesturestart', gestureStart, options);
     host.removeEventListener('gesturechange', gestureChange, options);
