@@ -216,8 +216,10 @@ describe('GraphWorkspaceExplorer', () => {
     await renderExplorer(adapter);
     await vi.waitFor(() => expect(listTree).toHaveBeenCalled());
     const more = () => host?.querySelector<HTMLButtonElement>('button[aria-label="More Explorer actions"]');
-    // Without the host capability there is no toggle, and here no other action either.
-    expect(more()).toBeNull();
+    // Without the host capability there is no hidden-files toggle; only the thread-events debug view.
+    act(() => more()!.click());
+    expect([...host!.querySelectorAll('[role="menuitemcheckbox"]')].map((item) => item.textContent)).toEqual(['Show thread events (debug)']);
+    act(() => more()!.click());
 
     act(() => root?.unmount());
     root = createRoot(host!);
@@ -239,6 +241,34 @@ describe('GraphWorkspaceExplorer', () => {
     expect(window.localStorage.getItem('workbench.explorer.showHidden')).toBe('true');
     act(() => more()!.click());
     expect(host!.querySelector('[role="menuitemcheckbox"]')?.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('hides internal thread events from the file tree unless the debug view is turned on', async () => {
+    const { adapter, listTree } = createAdapter();
+    const withEvents = {
+      ...detail,
+      turns: [{ id: 'turn-1', items: [{ id: 'call-1', kind: 'toolCall', text: 'expert', status: 'completed' }] }],
+    } as unknown as ThreadDetailDto;
+    await act(async () => {
+      root?.render(
+        <GraphWorkspaceExplorer activeView="chat" detail={withEvents} artifacts={[]}
+          plugins={createDefaultPluginContextValue()} status={null} workspaceAdapter={adapter} />,
+      );
+    });
+    await vi.waitFor(() => expect(listTree).toHaveBeenCalled());
+    await vi.waitFor(() => expect(host!.textContent).toContain('README.md'));
+    expect(host!.querySelector('[data-explorer-path="thread-events:"]')).toBeNull();
+    expect(host!.textContent).not.toContain('thread-events');
+
+    const more = () => host!.querySelector<HTMLButtonElement>('button[aria-label="More Explorer actions"]')!;
+    act(() => more().click());
+    const toggle = [...host!.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')]
+      .find((item) => item.textContent?.includes('Show thread events'))!;
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    await act(async () => toggle.click());
+    // Compact folders render the single turn as `thread-events/turn-1`.
+    await vi.waitFor(() => expect(host!.textContent).toContain('thread-events/turn-1'));
+    expect(window.localStorage.getItem('workbench.explorer.showThreadEvents')).toBe('true');
   });
 
   it('lists an external linked file under its real parent directory, not a virtual folder', async () => {
