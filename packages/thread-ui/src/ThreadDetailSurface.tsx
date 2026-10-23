@@ -204,6 +204,8 @@ export interface ThreadDetailSurfaceProps {
   /** null shows all supplied navigation threads, regardless of their file workspace. */
   currentWorkspaceId?: string | null;
   currentWorkspaceLabel?: string | null;
+  /** Names what the New Chat button creates (e.g. "New Grafico conversation"). */
+  newThreadLabel?: string;
   onCloseAppNavigation?: () => void;
   presentation?: "workspace" | "embedded-single-thread";
   className?: string;
@@ -282,6 +284,7 @@ export function ThreadDetailSurface({
   currentThreadId,
   currentWorkspaceId,
   currentWorkspaceLabel,
+  newThreadLabel,
   onCloseAppNavigation,
   presentation = "workspace",
   className = "thread-detail-surface relative flex h-full min-h-0 flex-1 flex-col overflow-hidden",
@@ -542,6 +545,7 @@ export function ThreadDetailSurface({
       currentThreadLabel={detail?.thread.title ?? threads.find(thread => thread.id === (currentThreadId ?? detail?.thread.id))?.title ?? undefined}
       currentWorkspaceId={currentWorkspaceId ?? detail?.thread.workspaceId}
       currentWorkspaceLabel={currentWorkspaceLabel ?? detail?.workspace.label}
+      {...(newThreadLabel ? { newThreadLabel } : {})}
       harnessLabel={composerProps?.agentLabel}
       sessionLabel={detail?.thread.providerSessionId ?? detail?.thread.id}
       usageLabel={topbarUsageLabel}
