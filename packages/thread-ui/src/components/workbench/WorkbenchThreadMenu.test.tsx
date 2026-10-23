@@ -63,6 +63,35 @@ describe('WorkbenchThreadMenu placement', () => {
     expect(menu.textContent).toContain('Delete thread');
   });
 
+  it('opens above the ⋯ button when there is no room below it', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('thread-ui-shell')) return rect({ left: 56, top: 0, width: 1224, height: 800 });
+      if (this.classList.contains('recent-thread-actions')) return rect({ left: 220, top: 700, width: 28, height: 28 });
+      if (this.classList.contains('recent-thread-menu'))
+        return rect({ left: parseFloat(this.style.left), top: parseFloat(this.style.top), width: 260, height: 220 });
+      return rect({ left: 0, top: 0, width: 0, height: 0 });
+    });
+    flushSync(() => root!.render(<WorkbenchThreadMenu thread={thread} copyIdLabel="Copy session ID" onNavigate={vi.fn()} />));
+    await act(async () => document.querySelector<HTMLButtonElement>('.recent-thread-actions')!.click());
+    // Bottom of the menu 6px above the button's top.
+    expect(menuBox().top).toBe(700 - 6 - 220);
+  });
+
+  it('uses the viewport when the workbench is narrower than the menu', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('thread-ui-shell')) return rect({ left: 100, top: 0, width: 200, height: 800 });
+      if (this.classList.contains('recent-thread-actions')) return rect({ left: 220, top: 100, width: 28, height: 28 });
+      if (this.classList.contains('recent-thread-menu'))
+        return rect({ left: parseFloat(this.style.left), top: parseFloat(this.style.top), width: 260, height: 220 });
+      return rect({ left: 0, top: 0, width: 0, height: 0 });
+    });
+    flushSync(() => root!.render(<WorkbenchThreadMenu thread={thread} copyIdLabel="Copy session ID" onNavigate={vi.fn()} />));
+    await act(async () => document.querySelector<HTMLButtonElement>('.recent-thread-actions')!.click());
+    const { left } = menuBox();
+    // Right-aligned to the button (248 - 260 < 8, so clamped to the viewport edge), fully visible.
+    expect(left).toBe(8);
+  });
+
   it('moves a right-click menu up and left so all of it is visible', async () => {
     const returnFocus = document.createElement('button');
     shell!.append(returnFocus);

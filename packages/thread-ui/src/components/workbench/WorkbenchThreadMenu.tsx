@@ -26,25 +26,34 @@ export function WorkbenchThreadMenu({ thread, context, copyIdLabel, onNavigate, 
   useI18n();
   const trigger = useRef<HTMLButtonElement>(null);
   const portalHost = () => (trigger.current ?? context?.returnFocus)?.closest<HTMLElement>('.thread-ui-shell') ?? document.body;
-  const place = (left: number, top: number) => {
-    const area = menuArea(portalHost());
-    return { left: clamp(left, area.left + 8, area.right - 268), top: clamp(top, area.top + 8, area.bottom - 340) };
+  // Where the menu was opened: the ⋯ button's box, or the right-click point.
+  const anchor = useRef<{ left: number; top: number; right: number; bottom: number } | null>(
+    context ? { left: context.x, top: context.y, right: context.x, bottom: context.y } : null);
+  // A first guess from the usual size; the layout effect places the real menu.
+  const place = (box: { left: number; top: number; right: number; bottom: number }) => {
+    const area = menuArea(portalHost(), 260);
+    return { left: clamp(context ? box.left : box.right - 260, area.left + 8, area.right - 268), top: clamp(box.bottom + (context ? 0 : 6), area.top + 8, area.bottom - 340) };
   };
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(() => context ? place(context.x, context.y) : null);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(() => anchor.current ? place(anchor.current) : null);
   const [copied, setCopied] = useState<{ key: string; state: 'copied' | 'failed' } | null>(null);
   const menu = useRef<HTMLDivElement>(null);
-  // Fit the rendered menu once per opening: correct for its real size and for a
-  // portal host that positions fixed descendants itself.
+  // Fit the rendered menu once per opening by its measured size: below the
+  // anchor, or above it when it does not fit, inside the workbench. The measured
+  // offset also corrects for a portal host that positions fixed descendants.
   const fitted = useRef(false);
   useLayoutEffect(() => {
     const node = menu.current;
     if (!position || !node) { fitted.current = false; return; }
-    if (fitted.current) return;
+    if (fitted.current || !anchor.current) return;
     fitted.current = true;
-    const area = menuArea(node.parentElement ?? document.body);
     const box = node.getBoundingClientRect();
-    const dx = clamp(box.left, area.left + 8, area.right - 8 - box.width) - box.left;
-    const dy = clamp(box.top, area.top + 8, area.bottom - 8 - box.height) - box.top;
+    const area = menuArea(node.parentElement ?? document.body, box.width);
+    const at = anchor.current, gap = context ? 0 : 6;
+    let top = at.bottom + gap;
+    if (top + box.height > area.bottom - 8 && at.top - gap - box.height >= area.top + 8) top = at.top - gap - box.height;
+    const left = clamp(context ? at.left : at.right - box.width, area.left + 8, area.right - 8 - box.width);
+    top = clamp(top, area.top + 8, area.bottom - 8 - box.height);
+    const dx = left - box.left, dy = top - box.top;
     if (Math.abs(dx) >= 1 || Math.abs(dy) >= 1) setPosition({ left: position.left + dx, top: position.top + dy });
   }, [position]);
   useEffect(() => {
@@ -90,7 +99,8 @@ export function WorkbenchThreadMenu({ thread, context, copyIdLabel, onNavigate, 
     {!context && <button ref={trigger} className="recent-thread-actions" aria-label={translate("workbench.actionsFor", { value1: thread.title })} aria-expanded={!!position} aria-haspopup="dialog" onClick={() => {
       if (position) { setPosition(null); return; }
       const box = trigger.current!.getBoundingClientRect();
-      setPosition(place(box.right - 260, box.bottom + 6));
+      anchor.current = { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
+      setPosition(place(anchor.current));
     }}><MoreHorizontal data-icon="more" size={16} /></button>}
     {position && createPortal(<div ref={menu} role="dialog" aria-label={translate("workbench.threadActions", { value1: thread.title })} className="recent-thread-menu" style={position}>
       <p className="recent-thread-menu-title">{thread.title}</p>
@@ -104,9 +114,11 @@ export function WorkbenchThreadMenu({ thread, context, copyIdLabel, onNavigate, 
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max));
 
-/** The part of the viewport the workbench occupies; the menu must not leave it. */
-function menuArea(host: HTMLElement) {
-  const box = host === document.body ? null : host.getBoundingClientRect();
+/** The part of the viewport the workbench occupies; the menu must not leave
+    it. A workbench too narrow for the menu leaves it the whole viewport. */
+function menuArea(host: HTMLElement, width: number) {
+  const workbench = host === document.body ? null : host.getBoundingClientRect();
+  const box = workbench && Math.min(innerWidth, workbench.right) - Math.max(0, workbench.left) >= width + 16 ? workbench : null;
   return {
     left: Math.max(0, box?.left ?? 0),
     top: Math.max(0, box?.top ?? 0),
