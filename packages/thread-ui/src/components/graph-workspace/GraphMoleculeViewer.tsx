@@ -43,6 +43,7 @@ import GraphMoleculeViewerUpperButtonGroup from './GraphMoleculeViewerUpperButto
 import type { GraphMoleculeCameraInfo } from './GraphMoleculeViewerControls';
 import { GraphMoleculeFigureFrame } from './GraphMoleculeFigureFrame';
 import { createMoleculeRenderViewer } from './GraphMoleculeViewerLifetime';
+import { bindPinchZoom } from './moleculePinchZoom';
 import { downloadTextFile } from './GraphMoleculeViewerControls';
 import {
   measureAtoms,
@@ -771,7 +772,12 @@ export function GraphMoleculeViewer({
         try {
           const managed = createMoleculeRenderViewer($3Dmol, host);
           const viewer = managed.viewer;
-          release = managed.release;
+          // Trackpad pinch is scaled here, not by 3Dmol's wheel-notch handler.
+          const unbindPinch = bindPinchZoom(host, (factor) => viewer.zoom(factor));
+          release = () => {
+            unbindPinch();
+            managed.release();
+          };
           // 3Dmol observes its host and resizes the canvas. Keep the personal
           // camera unchanged when surrounding controls or reconnect banners
           // resize that host; horizontal fitting belongs to the initial fit.
