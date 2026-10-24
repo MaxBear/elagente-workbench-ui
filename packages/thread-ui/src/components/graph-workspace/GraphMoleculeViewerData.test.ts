@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { RenderModel } from './GraphMoleculeViewerRenderTypes';
 import {
   applyStructureMetadata,
+  frameCell,
   frameTarget,
   readExtXyzCell,
   readGraphMoleculeViewerData,
@@ -219,5 +220,37 @@ describe('immutable structure parsing', () => {
     expect(() =>
       readGraphMoleculeViewerData({ content: [xyz], format: 'javascript' }),
     ).toThrow();
+  });
+});
+
+describe('frameCell', () => {
+  const cell = (a: number): NonNullable<ArtifactMetadata['cell']> => ({
+    vectors: [
+      [a, 0, 0],
+      [0, a, 0],
+      [0, 0, a],
+    ],
+    periodic: [true, true, true],
+    unit: 'angstrom',
+  });
+  const metadata = {
+    version: 1,
+    objectId: 'o',
+    sourceRevision: 'r',
+    checksum: 'a'.repeat(64),
+    format: 'extxyz',
+  } as const;
+
+  it('uses the per-frame entry, with null meaning no cell', () => {
+    const value = { ...metadata, frameCells: [cell(2), null] };
+    expect(frameCell(value, 0)).toEqual(cell(2));
+    expect(frameCell(value, 1)).toBeNull();
+    expect(() => frameCell(value, 2)).toThrow('no entry for frame 2');
+  });
+
+  it('keeps the single cell for every frame', () => {
+    expect(frameCell({ ...metadata, cell: cell(3) }, 5)).toEqual(cell(3));
+    expect(frameCell(metadata, 0)).toBeUndefined();
+    expect(frameCell(undefined, 0)).toBeUndefined();
   });
 });

@@ -59,6 +59,7 @@ import { Button } from '../graph-ui/Button';
 import {
   readGraphMoleculeViewerData,
   applyStructureMetadata,
+  frameCell,
   readExtXyzCell,
   frameTarget,
   structureRenderFrame,
@@ -286,6 +287,12 @@ export function GraphMoleculeViewer({
   targetRef.current = target;
   const activeObject =
     snapshot?.target?.objectId ?? snapshot?.uuid ?? moleculeId;
+  // Only the displayed frame's cell belongs to the model identity: appending
+  // frame cells must not rebuild a pinned frame.
+  const frameCells = snapshot?.metadata?.frameCells;
+  const cellKey = JSON.stringify(
+    frameCells ? (frameCells[currentIndex] ?? null) : snapshot?.metadata?.cell,
+  );
   const modelDataKey = useMemo(
     () =>
       JSON.stringify([
@@ -294,7 +301,7 @@ export function GraphMoleculeViewer({
         xyzContent,
         snapshot?.metadata?.atoms,
         snapshot?.metadata?.bonds,
-        snapshot?.metadata?.cell,
+        cellKey,
         snapshot?.metadata?.render,
       ]),
     [
@@ -303,7 +310,7 @@ export function GraphMoleculeViewer({
       xyzContent,
       snapshot?.metadata?.atoms,
       snapshot?.metadata?.bonds,
-      snapshot?.metadata?.cell,
+      cellKey,
       snapshot?.metadata?.render,
     ],
   );
@@ -872,11 +879,14 @@ export function GraphMoleculeViewer({
           );
           backgroundRef.current = background;
         }
+        const metadataCell = frameCell(snapshot?.metadata, currentIndex);
         cellRef.current =
-          snapshot?.metadata?.cell ??
-          (xyzFormat === 'extxyz' || xyzFormat === 'xyz'
-            ? readExtXyzCell(xyzContent)
-            : undefined);
+          metadataCell === null
+            ? undefined
+            : (metadataCell ??
+              (xyzFormat === 'extxyz' || xyzFormat === 'xyz'
+                ? readExtXyzCell(xyzContent)
+                : undefined));
         renderedTargetRef.current = target;
         commandState.current.atomIds = atomIdsRef.current;
 

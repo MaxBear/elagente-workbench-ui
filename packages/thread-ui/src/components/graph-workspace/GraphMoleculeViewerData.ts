@@ -82,6 +82,21 @@ export function frameTarget(
   return undefined;
 }
 
+/**
+ * The producer's unit cell for trajectory frame `index`: `frameCells[index]`
+ * (null = that frame has no cell) when present, otherwise the single `cell`.
+ */
+export function frameCell(
+  metadata: ArtifactMetadata | undefined,
+  index: number,
+): ArtifactMetadata['cell'] | null | undefined {
+  if (!metadata?.frameCells) return metadata?.cell;
+  const cell = metadata.frameCells[index];
+  if (cell === undefined)
+    throw new Error(`Frame cell metadata has no entry for frame ${index}`);
+  return cell;
+}
+
 export function readExtXyzCell(
   content: string,
 ): ArtifactMetadata['cell'] | undefined {

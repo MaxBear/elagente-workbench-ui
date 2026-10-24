@@ -901,5 +901,26 @@ const fixtures = {
     }
   }
 };
+// Cell-changing trajectory (ELA-249): one cell per frame target, null = frame without a cell.
+const frameCellChecksum = "5e877e6188206f39b24add8ecce93e0f00ee7ffb6b88e97e630d2eb3a8fc686b";
+const cubic = edge => ({vectors: [[edge, 0, 0], [0, edge, 0], [0, 0, edge]], periodic: [true, true, true], unit: "angstrom"});
+const frameCellTarget = frameIndex => ({artifactId: "artifact-frame-cells", objectId: "urn:grafico:h2-relaxation:1", sourceRevision: "native-revision-2", checksum: frameCellChecksum, streamId: "frame-cells-stream-1", frameId: `frame-${frameIndex}`, frameIndex});
+const frameCellFixture = {
+  artifact: {
+    id: "artifact-frame-cells", version: 1, path: `.artifacts/${frameCellChecksum}.extxyz`, name: "h2-relaxation.extxyz",
+    checksum: frameCellChecksum, size: 254, mediaType: "chemical/x-extxyz", kind: "chem.structure",
+    createdAt: "2026-10-24T00:00:00.000Z", turnId: "turn-fixture-1",
+    metadata: {
+      version: 1, objectId: "urn:grafico:h2-relaxation:1", sourceRevision: "native-revision-2", checksum: frameCellChecksum, format: "extxyz",
+      stream: {id: "frame-cells-stream-1", frameId: "frame-2", frameIndex: 2},
+      atoms: [{id: "H1", element: "H"}, {id: "H2", element: "H"}],
+      frameTargets: [0, 1, 2].map(frameCellTarget),
+      frameCells: [cubic(5), cubic(5.2), null],
+      render: {coordinateUnit: "angstrom", bonding: "infer"},
+    },
+    fixtureBytes: "2\nLattice=\"5 0 0 0 5 0 0 0 5\" Properties=species:S:1:pos:R:3 pbc=\"T T T\"\nH 0 0 0\nH 0 0 0.74\n2\nLattice=\"5.2 0 0 0 5.2 0 0 0 5.2\" Properties=species:S:1:pos:R:3 pbc=\"T T T\"\nH 0 0 0\nH 0 0 0.75\n2\nProperties=species:S:1:pos:R:3 pbc=\"F F F\"\nH 0 0 0\nH 0 0 0.76\n",
+  },
+};
 function freeze(v) { if (v && typeof v === "object") { Object.values(v).forEach(freeze); Object.freeze(v); } return v; }
 export const EXTENSION_FIXTURES = freeze(fixtures);
+export const FRAME_CELL_FIXTURE = freeze(frameCellFixture);

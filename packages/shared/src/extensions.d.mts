@@ -31,12 +31,15 @@ export interface ScientificTarget {
   artifactId: string; objectId: string; sourceRevision: string; checksum: string;
   streamId?: string; frameId?: string; frameIndex?: number;
 }
+export interface StructureCell {vectors: [[number, number, number], [number, number, number], [number, number, number]]; periodic: [boolean, boolean, boolean]; unit: 'angstrom' | 'bohr'}
 export interface ArtifactMetadata {
   version: 1; objectId: string; sourceRevision: string; checksum: string; format: string;
   stream?: {id: string; frameId: string; frameIndex: number};
   atoms?: {id: string; element: string}[];
   bonds?: {atomIds: [string, string]; order: number}[];
-  cell?: {vectors: [[number, number, number], [number, number, number], [number, number, number]]; periodic: [boolean, boolean, boolean]; unit: 'angstrom' | 'bohr'};
+  cell?: StructureCell;
+  /** One entry per `frameTargets` entry (null = no cell) when frame cells differ; mutually exclusive with `cell`. */
+  frameCells?: (StructureCell | null)[];
   render?: {coordinateUnit: 'angstrom' | 'bohr'; bonding: 'provided' | 'infer' | 'none'; style?: 'ball-stick' | 'stick' | 'spacefill'; background?: string};
   [field: string]: unknown;
 }

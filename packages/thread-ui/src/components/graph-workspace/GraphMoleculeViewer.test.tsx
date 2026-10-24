@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   GraphMoleculeViewer,
   type GraphMoleculeViewerHandle,
@@ -12,6 +12,7 @@ import type {
 } from './GraphMoleculeViewerRenderTypes';
 import {
   EXTENSION_FIXTURES,
+  type ArtifactMetadata,
   type ScientificTarget,
 } from '@remote-codex/shared';
 
@@ -1328,4 +1329,159 @@ it('binds a LIVE append directly to its latest verified frame before exposing re
   expect(runtime.viewer.addModel).toHaveBeenCalledTimes(1);
   expect(vi.mocked(runtime.viewer.addModel).mock.calls[0]![0]).toBe(frames[2]);
   expect(camera).toEqual(before);
+});
+
+describe('per-frame unit cells', () => {
+  const cubic = (a: number) => ({
+    vectors: [
+      [a, 0, 0],
+      [0, a, 0],
+      [0, 0, a],
+    ] as [
+      [number, number, number],
+      [number, number, number],
+      [number, number, number],
+    ],
+    periodic: [true, true, true] as [boolean, boolean, boolean],
+    unit: 'angstrom' as const,
+  });
+  const frameTargets = (count: number) =>
+    Array.from({ length: count }, (_, frameIndex) => ({
+      ...target,
+      frameId: 'f' + frameIndex,
+      frameIndex,
+    }));
+  // Identical coordinates in every frame: only the cell distinguishes them.
+  const cellSource = (
+    frameCells: (ReturnType<typeof cubic> | null)[],
+    count = frameCells.length,
+  ) => ({
+    content: Array(count).fill(first),
+    target: frameTargets(count).at(-1),
+    frameTargets: frameTargets(count),
+    uuid: 'o',
+    metadata: {
+      version: 1 as const,
+      objectId: target.objectId,
+      sourceRevision: target.sourceRevision,
+      checksum: target.checksum,
+      format: 'xyz',
+      stream: { id: 's', frameId: 'f' + (count - 1), frameIndex: count - 1 },
+      frameTargets: frameTargets(count),
+      frameCells,
+    },
+  });
+  const drawnEdge = () => {
+    // The initial render may repaint once for the inherited theme; the
+    // current box is always the last 12 edges.
+    const all = vi.mocked(runtime.viewer.addLine).mock.calls;
+    expect(all.length).toBeGreaterThan(0);
+    expect(all.length % 12).toBe(0);
+    const calls = all.slice(-12);
+    return Math.max(
+      ...calls.flatMap(([line]) => {
+        const { start, end } = line as {
+          start: { x: number; y: number; z: number };
+          end: { x: number; y: number; z: number };
+        };
+        return [start.x, start.y, start.z, end.x, end.y, end.z];
+      }),
+    );
+  };
+  const show = async (source: ReturnType<typeof cellSource>) =>
+    act(async () =>
+      root.render(<GraphMoleculeViewer source={source} onReady={onReady} />),
+    );
+
+  it('draws the displayed frame cell and redraws it on frame change', async () => {
+    await show(cellSource([cubic(2), null, cubic(4)]));
+    expect(drawnEdge()).toBe(4);
+    expect(button('Hide unit cell').disabled).toBe(false);
+    vi.mocked(runtime.viewer.addLine).mockClear();
+    vi.mocked(runtime.viewer.removeShape).mockClear();
+    await click('First frame');
+    expect(drawnEdge()).toBe(2);
+    expect(handle.target).toEqual(frameTargets(3)[0]);
+    vi.mocked(runtime.viewer.addLine).mockClear();
+    await click('Next frame');
+    // null: this frame has no cell, and no extXYZ/crystal fallback is drawn.
+    expect(runtime.viewer.addLine).not.toHaveBeenCalled();
+    expect(runtime.viewer.addUnitCell).not.toHaveBeenCalled();
+    expect(button('Show unit cell').disabled).toBe(true);
+    await click('Next frame');
+    expect(drawnEdge()).toBe(4);
+    expect(button('Hide unit cell').disabled).toBe(false);
+  });
+
+  it('keeps selection and frame targets across frames with different cells', async () => {
+    const submit = vi.fn();
+    await act(async () =>
+      root.render(
+        <GraphMoleculeViewer
+          source={cellSource([cubic(2), cubic(3), cubic(4)])}
+          onReady={onReady}
+          onSelectionSubmit={submit}
+        />,
+      ),
+    );
+    await click('First frame');
+    await act(async () => runtime.click({ index: 1 }, runtime.viewer));
+    await click('Next frame');
+    expect(handle.isAvailable()).toBe(true);
+    expect(handle.target).toEqual(frameTargets(3)[1]);
+    expect(handle.captureView()).toMatchObject({
+      target: frameTargets(3)[1],
+      selectedIds: ['1'],
+    });
+    await click('Send selection');
+    expect(submit).toHaveBeenCalledExactlyOnceWith({
+      selections: [
+        expect.objectContaining({
+          atoms: [1],
+          selectedIds: ['1'],
+          target: frameTargets(3)[1],
+        }),
+      ],
+    });
+  });
+
+  it('does not rebuild a pinned frame when later frame cells are appended', async () => {
+    await show(cellSource([cubic(2), cubic(3)]));
+    await click('First frame');
+    vi.mocked(runtime.viewer.addModel).mockClear();
+    vi.mocked(runtime.viewer.addLine).mockClear();
+    await show(cellSource([cubic(2), cubic(3), cubic(5)]));
+    expect(runtime.viewer.addModel).not.toHaveBeenCalled();
+    expect(runtime.viewer.addLine).not.toHaveBeenCalled();
+    expect(handle.target).toEqual(frameTargets(3)[0]);
+  });
+
+  it('fails visibly when frame cells do not cover the displayed frame', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await show(cellSource([cubic(2)], 2));
+    expect(node.textContent).toContain(
+      'Unable to render this molecular structure.',
+    );
+    expect(error).toHaveBeenCalled();
+  });
+
+  it('keeps a single metadata cell for every frame', async () => {
+    const source = cellSource([cubic(3), cubic(3)]);
+    const metadata: ArtifactMetadata = { ...source.metadata, cell: cubic(3) };
+    delete metadata.frameCells;
+    await act(async () =>
+      root.render(
+        <GraphMoleculeViewer
+          source={{ ...source, metadata }}
+          onReady={onReady}
+        />,
+      ),
+    );
+    expect(drawnEdge()).toBe(3);
+    vi.mocked(runtime.viewer.addLine).mockClear();
+    await click('First frame');
+    // Same coordinates and cell: the drawn box is kept.
+    expect(runtime.viewer.addLine).not.toHaveBeenCalled();
+    expect(button('Hide unit cell').disabled).toBe(false);
+  });
 });

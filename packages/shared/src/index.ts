@@ -1344,4 +1344,4 @@ export function mergeThreadHistoryItem(
 
 // Frozen ElAgente extension DTOs; no runtime UI loading from wire data.
 export * from './extensions.mjs';
-export { EXTENSION_FIXTURES } from './extension-fixtures.mjs';
+export { EXTENSION_FIXTURES, FRAME_CELL_FIXTURE } from './extension-fixtures.mjs';

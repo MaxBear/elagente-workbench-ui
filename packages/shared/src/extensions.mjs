@@ -108,6 +108,14 @@ export function validateScientificTarget(v) {
   if (frame) { str(v.streamId, 'target.streamId'); str(v.frameId, 'target.frameId'); integer(v.frameIndex, 'target.frameIndex'); }
   return v;
 }
+function cell(c, p) {
+  obj(c, p); list(c.vectors, `${p}.vectors`, 3); if (c.vectors.length !== 3) fail(`${p}.vectors`, 'expected 3 vectors');
+  c.vectors.forEach(row => { list(row, `${p}.vector`, 3); if (row.length !== 3) fail(`${p}.vector`, 'expected 3 coordinates'); row.forEach(n => num(n, `${p}.coordinate`)); });
+  const [a, b, d] = c.vectors; const det = a[0]*(b[1]*d[2]-b[2]*d[1])-a[1]*(b[0]*d[2]-b[2]*d[0])+a[2]*(b[0]*d[1]-b[1]*d[0]);
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) fail(`${p}.vectors`, 'degenerate cell');
+  list(c.periodic, `${p}.periodic`, 3); if (c.periodic.length !== 3) fail(`${p}.periodic`, 'expected 3 flags'); c.periodic.forEach(x => bool(x, `${p}.periodic`));
+  one(c.unit, ['angstrom', 'bohr'], `${p}.unit`);
+}
 export function validateArtifactMetadata(v) {
   json(v); obj(v, 'metadata'); version(v.version, 'metadata.version');
   validateScientificTarget({...v, artifactId: 'metadata', ...(v.stream ? {streamId: v.stream.id, frameId: v.stream.frameId, frameIndex: v.stream.frameIndex} : {})});
@@ -126,13 +134,13 @@ export function validateArtifactMetadata(v) {
       one(b.order, [1, 1.5, 2, 3], 'bond.order'); const key = JSON.stringify([...b.atomIds].sort()); if (seen.has(key)) fail('bonds', 'duplicate bond'); seen.add(key);
     }
   }
-  if (v.cell !== undefined) {
-    obj(v.cell, 'cell'); list(v.cell.vectors, 'cell.vectors', 3); if (v.cell.vectors.length !== 3) fail('cell.vectors', 'expected 3 vectors');
-    v.cell.vectors.forEach(row => { list(row, 'cell.vector', 3); if (row.length !== 3) fail('cell.vector', 'expected 3 coordinates'); row.forEach(n => num(n, 'cell.coordinate')); });
-    const [a, b, c] = v.cell.vectors; const det = a[0]*(b[1]*c[2]-b[2]*c[1])-a[1]*(b[0]*c[2]-b[2]*c[0])+a[2]*(b[0]*c[1]-b[1]*c[0]);
-    if (!Number.isFinite(det) || Math.abs(det) < 1e-12) fail('cell.vectors', 'degenerate cell');
-    list(v.cell.periodic, 'cell.periodic', 3); if (v.cell.periodic.length !== 3) fail('cell.periodic', 'expected 3 flags'); v.cell.periodic.forEach(x => bool(x, 'cell.periodic'));
-    one(v.cell.unit, ['angstrom', 'bohr'], 'cell.unit');
+  if (v.cell !== undefined) cell(v.cell, 'cell');
+  if (v.frameCells !== undefined) {
+    // Per-frame cells for multi-frame metadata whose cell changes; mutually exclusive with `cell`.
+    if (v.cell !== undefined) fail('frameCells', 'cell and frameCells are mutually exclusive');
+    if (!Array.isArray(v.frameTargets)) fail('frameCells', 'frameCells require multi-frame metadata (frameTargets)');
+    list(v.frameCells, 'frameCells'); if (v.frameCells.length !== v.frameTargets.length) fail('frameCells', 'expected one entry per frame target');
+    v.frameCells.forEach((c, i) => { if (c !== null) cell(c, `frameCells[${i}]`); });
   }
   if (v.render !== undefined) {
     obj(v.render, 'render'); one(v.render.coordinateUnit, ['angstrom', 'bohr'], 'render.coordinateUnit'); one(v.render.bonding, ['provided', 'infer', 'none'], 'render.bonding');
