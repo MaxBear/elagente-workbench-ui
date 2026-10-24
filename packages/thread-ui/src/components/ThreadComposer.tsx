@@ -392,6 +392,7 @@ export function ThreadComposer({
     updateDraft,
     flushControlledDraftToHost,
     captureSubmission,
+    readLatestDraft,
   } = useComposerDraft({
     isShellView,
     draftPrompt,
@@ -708,6 +709,8 @@ export function ThreadComposer({
     };
   }
 
+  const readLatestPrompt = useCallback(() => readLatestDraft().prompt, [readLatestDraft]);
+
   useComposerPromptDomSync({
     promptRef,
     isShellView,
@@ -720,6 +723,7 @@ export function ThreadComposer({
     selectionSnapshotRef,
     renderedPreviewSignatureRef,
     serializeEditorPrompt,
+    readLatestPrompt,
     restoreSelection,
   });
 
@@ -765,16 +769,19 @@ export function ThreadComposer({
         return;
       }
 
+      // The latest local draft, not the rendered one: a render can lag behind
+      // the editor's input events (ELA-229).
+      const draft = readLatestDraft();
       const submitInput = buildComposerSubmitInput({
-        prompt,
-        attachments,
+        prompt: draft.prompt,
+        attachments: draft.attachments,
         isShellView,
       });
       if (!submitInput) {
         return;
       }
 
-      const submission = captureSubmission({ prompt, attachments });
+      const submission = captureSubmission(draft);
       try {
         const submitted = await onSubmit({
           ...submitInput,
@@ -825,12 +832,17 @@ export function ThreadComposer({
     }
     const nextSelection = snapshotSelection();
     selectionSnapshotRef.current = nextSelection;
-    updateDraft((current) => ({
-      prompt: nextPrompt,
-      attachments: current.attachments.filter((attachment) =>
+    updateDraft((current) => {
+      const kept = current.attachments.filter((attachment) =>
         nextPrompt.includes(attachment.placeholder),
-      ),
-    }), 'deferred');
+      );
+      // Keep the array identity while typing so attachment-derived state is
+      // not recomputed on every input event (ELA-229).
+      return {
+        prompt: nextPrompt,
+        attachments: kept.length === current.attachments.length ? current.attachments : kept,
+      };
+    }, 'deferred');
   }
 
   function handlePromptPaste(event: ClipboardEvent<HTMLDivElement>) {

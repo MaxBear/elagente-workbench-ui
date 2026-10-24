@@ -12,6 +12,7 @@ import {
 } from './useAttachmentPreviewUrls';
 
 let latestPreviewUrls: AttachmentPreviewMap | null = null;
+let harnessRenders = 0;
 
 function makeAttachment(
   clientId: string,
@@ -36,6 +37,7 @@ function HookHarness({
   attachments: ComposerAttachmentDraft[];
   isShellView: boolean;
 }) {
+  harnessRenders += 1;
   latestPreviewUrls = useAttachmentPreviewUrls({ attachments, isShellView });
   return null;
 }
@@ -121,6 +123,34 @@ describe('useAttachmentPreviewUrls', () => {
     expect(createObjectUrl).toHaveBeenCalledTimes(1);
     expect(revokeObjectUrl).not.toHaveBeenCalled();
     harness.unmount();
+  });
+
+  it('does not update state when a new array has the same entries (ELA-229)', async () => {
+    const photo = makeAttachment('photo-a', 'photo');
+    const empty = renderHookHarness({ attachments: [], isShellView: false });
+    const initialMap = latestPreviewUrls;
+    harnessRenders = 0;
+    // Each keystroke used to hand over a fresh empty array and re-set the map.
+    for (let index = 0; index < 60; index += 1) {
+      empty.rerender({ attachments: [], isShellView: false });
+      await Promise.resolve();
+    }
+    expect(harnessRenders).toBe(60);
+    expect(latestPreviewUrls).toBe(initialMap);
+    empty.unmount();
+
+    const withPhoto = renderHookHarness({ attachments: [photo], isShellView: false });
+    await vi.waitFor(() => {
+      expect(latestPreviewUrls).toEqual({ 'photo-a': 'blob:preview-1' });
+    });
+    const photoMap = latestPreviewUrls;
+    harnessRenders = 0;
+    withPhoto.rerender({ attachments: [photo], isShellView: false });
+    await Promise.resolve();
+    expect(harnessRenders).toBe(1);
+    expect(latestPreviewUrls).toBe(photoMap);
+    expect(createObjectUrl).toHaveBeenCalledTimes(1);
+    withPhoto.unmount();
   });
 
   it('revokes URLs for removed photos and on unmount', async () => {

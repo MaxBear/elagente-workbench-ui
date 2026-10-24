@@ -92,6 +92,32 @@ describe('useComposerDraft', () => {
     harness.unmount();
   });
 
+  it('reads the latest draft before it renders (ELA-229)', () => {
+    const controlled = renderHookHarness({
+      isShellView: false,
+      draftPrompt: '',
+      draftAttachments: [],
+      onDraftChange: vi.fn(),
+    });
+    const before = latestResult!;
+    before.updateDraft(() => ({ prompt: 'typed', attachments: [] }), 'deferred');
+    before.updateDraft((current) => ({ ...current, prompt: `${current.prompt} more` }), 'deferred');
+    expect(before.prompt).toBe('');
+    expect(before.readLatestDraft().prompt).toBe('typed more');
+    controlled.unmount();
+
+    const uncontrolled = renderHookHarness({ isShellView: false });
+    const result = latestResult!;
+    flushSync(() => {
+      result.updateDraft(() => ({ prompt: 'a', attachments: [] }));
+      result.updateDraft((current) => ({ ...current, prompt: `${current.prompt}b` }));
+      expect(result.readLatestDraft().prompt).toBe('ab');
+      expect(latestResult?.prompt).toBe('');
+    });
+    expect(latestResult?.prompt).toBe('ab');
+    uncontrolled.unmount();
+  });
+
   it('sends immediate controlled draft updates to the host once', () => {
     let hostDraft: HostDraft = { prompt: 'host', attachments: [] };
     const onDraftChange = vi.fn((update) => {

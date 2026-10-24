@@ -42,6 +42,8 @@ export interface UseComposerDraftResult {
   updateDraft: (updater: DraftUpdater, syncMode?: DraftSyncMode) => void;
   flushControlledDraftToHost: (nextDraft?: ComposerDraft) => void;
   captureSubmission: (snapshot: ComposerDraft) => { complete: () => void; cancel: () => void };
+  /** The newest draft, including updates not rendered yet. */
+  readLatestDraft: () => ComposerDraft;
 }
 
 function toComposerDraft(
@@ -64,6 +66,7 @@ export function useComposerDraft({
     prompt: '',
     attachments: [],
   });
+  const latestInternalDraftRef = useRef<ComposerDraft>(internalDraft);
   const [localControlledDraft, setLocalControlledDraft] =
     useState<ComposerDraft>(() => toComposerDraft(draftPrompt, draftAttachments));
   const submittedClearRef = useRef<{ signature: string } | null>(null);
@@ -199,8 +202,15 @@ export function useComposerDraft({
       return;
     }
 
-    setInternalDraft((current) => updater(current));
+    const nextDraft = updater(latestInternalDraftRef.current);
+    latestInternalDraftRef.current = nextDraft;
+    setInternalDraft(nextDraft);
   }, [isDraftControlled, syncControlledDraftToHost]);
+
+  const readLatestDraft = useCallback(
+    () => (isDraftControlled ? latestLocalDraftRef.current : latestInternalDraftRef.current),
+    [isDraftControlled],
+  );
 
   const captureSubmission = useCallback((snapshot: ComposerDraft) => {
     const token = { signature: draftSignature(snapshot) };
@@ -221,5 +231,6 @@ export function useComposerDraft({
     updateDraft,
     flushControlledDraftToHost,
     captureSubmission,
+    readLatestDraft,
   };
 }

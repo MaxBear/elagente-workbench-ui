@@ -4,6 +4,12 @@ import type { ComposerAttachmentDraft } from './composerUtils';
 
 export type AttachmentPreviewMap = Record<string, string>;
 
+function samePreviewUrls(current: AttachmentPreviewMap, next: AttachmentPreviewMap) {
+  const keys = Object.keys(next);
+  return keys.length === Object.keys(current).length &&
+    keys.every((clientId) => current[clientId] === next[clientId]);
+}
+
 function revokeCachedPreviewUrls(previewUrlCache: Map<string, string>) {
   for (const previewUrl of previewUrlCache.values()) {
     URL.revokeObjectURL(previewUrl);
@@ -21,13 +27,22 @@ export function useAttachmentPreviewUrls({
   const previewUrlCacheRef = useRef<Map<string, string>>(new Map());
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] =
     useState<AttachmentPreviewMap>({});
+  const shownPreviewUrlsRef = useRef(attachmentPreviewUrls);
 
   useEffect(() => {
     const previewUrlCache = previewUrlCacheRef.current;
+    // Typing re-runs this effect with a new (often empty) attachments array.
+    // Even a bailing-out setState counts towards React's nested-update limit,
+    // so only set the map when its entries change (ELA-229).
+    const showPreviewUrls = (next: AttachmentPreviewMap) => {
+      if (samePreviewUrls(shownPreviewUrlsRef.current, next)) return;
+      shownPreviewUrlsRef.current = next;
+      setAttachmentPreviewUrls(next);
+    };
 
     if (isShellView) {
       revokeCachedPreviewUrls(previewUrlCache);
-      setAttachmentPreviewUrls({});
+      showPreviewUrls({});
       return;
     }
 
@@ -56,7 +71,7 @@ export function useAttachmentPreviewUrls({
       previewUrlCache.delete(clientId);
     }
 
-    setAttachmentPreviewUrls(nextPreviewUrls);
+    showPreviewUrls(nextPreviewUrls);
   }, [attachments, isShellView]);
 
   useEffect(() => {

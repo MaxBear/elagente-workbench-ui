@@ -49,3 +49,39 @@ it('updates an asynchronous image preview without replacing dictation text or mo
   flushSync(() => root.unmount());
   editor.remove();
 });
+
+it('does not rebuild the editor from a render that lags behind its input events (ELA-229)', () => {
+  const editor = document.createElement('div');
+  editor.textContent = 'line one\nline two';
+  document.body.append(editor);
+  const typed = editor.firstChild;
+  const editorRef = createRef<HTMLDivElement>();
+  editorRef.current = editor;
+  let latest = 'line one\nline two';
+  const pending = { current: null };
+  const inserted = { current: [] };
+  const preview = { current: '' };
+  function Harness({ prompt }: { prompt: string }) {
+    useComposerPromptDomSync({ promptRef: editorRef, isShellView: false,
+      prompt, promptSegments: prompt ? [{ type: 'text', key: 'text', text: prompt }] : [],
+      attachmentPreviewUrls: {}, previewSignature: '',
+      pendingSelectionRef: pending, pendingInsertedAttachmentIdsRef: inserted,
+      selectionSnapshotRef: pending, renderedPreviewSignatureRef: preview,
+      serializeEditorPrompt: () => serializeEditorPrompt(editor),
+      readLatestPrompt: () => latest,
+      restoreSelection: () => {},
+    });
+    return null;
+  }
+  const root = createRoot(document.createElement('div'));
+  // The draft already holds both lines; this render still has only the first.
+  flushSync(() => root.render(<Harness prompt="line one" />));
+  expect(editor.firstChild).toBe(typed);
+  expect(serializeEditorPrompt(editor)).toBe('line one\nline two');
+  // A change that is not the editor's own text (a send clearing it) still syncs.
+  latest = '';
+  flushSync(() => root.render(<Harness prompt="" />));
+  expect(serializeEditorPrompt(editor)).toBe('');
+  flushSync(() => root.unmount());
+  editor.remove();
+});

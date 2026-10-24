@@ -26,6 +26,8 @@ interface UseComposerPromptDomSyncInput {
   selectionSnapshotRef: MutableRefObject<PromptSelectionRange | null>;
   renderedPreviewSignatureRef: MutableRefObject<string>;
   serializeEditorPrompt: () => string;
+  /** The newest draft prompt, which may not be rendered yet. */
+  readLatestPrompt?: () => string;
   restoreSelection: (selection: PromptSelectionRange | null) => void;
 }
 
@@ -114,6 +116,7 @@ export function useComposerPromptDomSync({
   selectionSnapshotRef,
   renderedPreviewSignatureRef,
   serializeEditorPrompt,
+  readLatestPrompt,
   restoreSelection,
 }: UseComposerPromptDomSyncInput) {
   useI18n();
@@ -124,7 +127,13 @@ export function useComposerPromptDomSync({
     }
 
     const pendingSelection = pendingSelectionRef.current;
-    const shouldSyncDom = serializeEditorPrompt() !== prompt;
+    const editorPrompt = serializeEditorPrompt();
+    const latestPrompt = readLatestPrompt?.() ?? prompt;
+    // During a burst of input events the editor can be ahead of this render
+    // while its newer text is already the pending draft. Rebuilding the DOM
+    // from the stale prompt would drop that text (ELA-229).
+    const shouldSyncDom = editorPrompt !== prompt &&
+      !(latestPrompt !== prompt && editorPrompt === latestPrompt);
 
     if (shouldSyncDom) {
       editor.replaceChildren(
@@ -170,6 +179,7 @@ export function useComposerPromptDomSync({
     pendingInsertedAttachmentIdsRef,
     pendingSelectionRef,
     renderedPreviewSignatureRef,
+    readLatestPrompt,
     restoreSelection,
     selectionSnapshotRef,
     serializeEditorPrompt,
