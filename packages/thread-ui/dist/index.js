@@ -4520,6 +4520,10 @@ function useComposerAttachments({
 
 // src/components/composer/useAttachmentPreviewUrls.ts
 import { useEffect as useEffect5, useRef as useRef7, useState as useState6 } from "react";
+function samePreviewUrls(current, next) {
+  const keys = Object.keys(next);
+  return keys.length === Object.keys(current).length && keys.every((clientId) => current[clientId] === next[clientId]);
+}
 function revokeCachedPreviewUrls(previewUrlCache) {
   for (const previewUrl of previewUrlCache.values()) {
     URL.revokeObjectURL(previewUrl);
@@ -4532,11 +4536,17 @@ function useAttachmentPreviewUrls({
 }) {
   const previewUrlCacheRef = useRef7(/* @__PURE__ */ new Map());
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState6({});
+  const shownPreviewUrlsRef = useRef7(attachmentPreviewUrls);
   useEffect5(() => {
     const previewUrlCache = previewUrlCacheRef.current;
+    const showPreviewUrls = (next) => {
+      if (samePreviewUrls(shownPreviewUrlsRef.current, next)) return;
+      shownPreviewUrlsRef.current = next;
+      setAttachmentPreviewUrls(next);
+    };
     if (isShellView) {
       revokeCachedPreviewUrls(previewUrlCache);
-      setAttachmentPreviewUrls({});
+      showPreviewUrls({});
       return;
     }
     const nextPreviewUrls = {};
@@ -4560,7 +4570,7 @@ function useAttachmentPreviewUrls({
       URL.revokeObjectURL(previewUrl);
       previewUrlCache.delete(clientId);
     }
-    setAttachmentPreviewUrls(nextPreviewUrls);
+    showPreviewUrls(nextPreviewUrls);
   }, [attachments, isShellView]);
   useEffect5(() => {
     const previewUrlCache = previewUrlCacheRef.current;
@@ -4596,6 +4606,7 @@ function useComposerDraft({
     prompt: "",
     attachments: []
   });
+  const latestInternalDraftRef = useRef8(internalDraft);
   const [localControlledDraft, setLocalControlledDraft] = useState7(() => toComposerDraft(draftPrompt, draftAttachments));
   const submittedClearRef = useRef8(null);
   const draftSyncTimerRef = useRef8(null);
@@ -4692,14 +4703,20 @@ function useComposerDraft({
   );
   const updateDraft = useCallback2((updater, syncMode = "immediate") => {
     if (isDraftControlled) {
-      const nextDraft = updater(latestLocalDraftRef.current);
-      latestLocalDraftRef.current = nextDraft;
-      setLocalControlledDraft(nextDraft);
-      syncControlledDraftToHost(nextDraft, syncMode);
+      const nextDraft2 = updater(latestLocalDraftRef.current);
+      latestLocalDraftRef.current = nextDraft2;
+      setLocalControlledDraft(nextDraft2);
+      syncControlledDraftToHost(nextDraft2, syncMode);
       return;
     }
-    setInternalDraft((current) => updater(current));
+    const nextDraft = updater(latestInternalDraftRef.current);
+    latestInternalDraftRef.current = nextDraft;
+    setInternalDraft(nextDraft);
   }, [isDraftControlled, syncControlledDraftToHost]);
+  const readLatestDraft = useCallback2(
+    () => isDraftControlled ? latestLocalDraftRef.current : latestInternalDraftRef.current,
+    [isDraftControlled]
+  );
   const captureSubmission = useCallback2((snapshot) => {
     const token = { signature: draftSignature(snapshot) };
     submittedClearRef.current = token;
@@ -4717,7 +4734,8 @@ function useComposerDraft({
     isDraftControlled,
     updateDraft,
     flushControlledDraftToHost,
-    captureSubmission
+    captureSubmission,
+    readLatestDraft
   };
 }
 
@@ -5467,6 +5485,7 @@ function useComposerPromptDomSync({
   selectionSnapshotRef,
   renderedPreviewSignatureRef,
   serializeEditorPrompt: serializeEditorPrompt2,
+  readLatestPrompt,
   restoreSelection
 }) {
   useI18n();
@@ -5476,7 +5495,9 @@ function useComposerPromptDomSync({
       return;
     }
     const pendingSelection = pendingSelectionRef.current;
-    const shouldSyncDom = serializeEditorPrompt2() !== prompt;
+    const editorPrompt = serializeEditorPrompt2();
+    const latestPrompt = readLatestPrompt?.() ?? prompt;
+    const shouldSyncDom = editorPrompt !== prompt && !(latestPrompt !== prompt && editorPrompt === latestPrompt);
     if (shouldSyncDom) {
       editor.replaceChildren(
         buildPromptFragment(promptSegments, attachmentPreviewUrls)
@@ -5515,6 +5536,7 @@ function useComposerPromptDomSync({
     pendingInsertedAttachmentIdsRef,
     pendingSelectionRef,
     renderedPreviewSignatureRef,
+    readLatestPrompt,
     restoreSelection,
     selectionSnapshotRef,
     serializeEditorPrompt2
@@ -6568,7 +6590,8 @@ function ThreadComposer({
     isDraftControlled,
     updateDraft,
     flushControlledDraftToHost,
-    captureSubmission
+    captureSubmission,
+    readLatestDraft
   } = useComposerDraft({
     isShellView,
     draftPrompt,
@@ -6848,6 +6871,7 @@ ${current.prompt}` : text,
       end: nextCaret
     };
   }
+  const readLatestPrompt = useCallback9(() => readLatestDraft().prompt, [readLatestDraft]);
   useComposerPromptDomSync({
     promptRef,
     isShellView,
@@ -6860,6 +6884,7 @@ ${current.prompt}` : text,
     selectionSnapshotRef,
     renderedPreviewSignatureRef,
     serializeEditorPrompt: serializeEditorPrompt2,
+    readLatestPrompt,
     restoreSelection
   });
   function dismissPromptFocus() {
@@ -6894,15 +6919,16 @@ ${current.prompt}` : text,
         await submitGoal();
         return;
       }
+      const draft = readLatestDraft();
       const submitInput = buildComposerSubmitInput({
-        prompt,
-        attachments,
+        prompt: draft.prompt,
+        attachments: draft.attachments,
         isShellView
       });
       if (!submitInput) {
         return;
       }
-      const submission = captureSubmission({ prompt, attachments });
+      const submission = captureSubmission(draft);
       try {
         const submitted = await onSubmit({
           ...submitInput,
@@ -6950,12 +6976,15 @@ ${current.prompt}` : text,
     }
     const nextSelection = snapshotSelection();
     selectionSnapshotRef.current = nextSelection;
-    updateDraft((current) => ({
-      prompt: nextPrompt,
-      attachments: current.attachments.filter(
+    updateDraft((current) => {
+      const kept = current.attachments.filter(
         (attachment) => nextPrompt.includes(attachment.placeholder)
-      )
-    }), "deferred");
+      );
+      return {
+        prompt: nextPrompt,
+        attachments: kept.length === current.attachments.length ? current.attachments : kept
+      };
+    }, "deferred");
   }
   function handlePromptPaste(event) {
     const files = extractFilesFromTransfer(
