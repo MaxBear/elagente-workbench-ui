@@ -334,6 +334,13 @@ function frameTarget(snapshot, index, frameCount) {
   if (target.frameIndex === index && target.frameId) return target;
   return void 0;
 }
+function frameCell(metadata, index) {
+  if (!metadata?.frameCells) return metadata?.cell;
+  const cell = metadata.frameCells[index];
+  if (cell === void 0)
+    throw new Error(`Frame cell metadata has no entry for frame ${index}`);
+  return cell;
+}
 function readExtXyzCell(content) {
   const comment = content.split(/\r\n|\r|\n/)[1] ?? "";
   const lattice = /\bLattice="([^"]+)"/i.exec(comment)?.[1]?.trim().split(/\s+/).map(Number);
@@ -1315,6 +1322,10 @@ function GraphMoleculeViewer({
   const targetRef = useRef2(target);
   targetRef.current = target;
   const activeObject = snapshot?.target?.objectId ?? snapshot?.uuid ?? moleculeId;
+  const frameCells = snapshot?.metadata?.frameCells;
+  const cellKey = JSON.stringify(
+    frameCells ? frameCells[currentIndex] ?? null : snapshot?.metadata?.cell
+  );
   const modelDataKey = useMemo(
     () => JSON.stringify([
       activeObject,
@@ -1322,7 +1333,7 @@ function GraphMoleculeViewer({
       xyzContent,
       snapshot?.metadata?.atoms,
       snapshot?.metadata?.bonds,
-      snapshot?.metadata?.cell,
+      cellKey,
       snapshot?.metadata?.render
     ]),
     [
@@ -1331,7 +1342,7 @@ function GraphMoleculeViewer({
       xyzContent,
       snapshot?.metadata?.atoms,
       snapshot?.metadata?.bonds,
-      snapshot?.metadata?.cell,
+      cellKey,
       snapshot?.metadata?.render
     ]
   );
@@ -1807,7 +1818,8 @@ function GraphMoleculeViewer({
           );
           backgroundRef.current = background;
         }
-        cellRef.current = snapshot?.metadata?.cell ?? (xyzFormat === "extxyz" || xyzFormat === "xyz" ? readExtXyzCell(xyzContent) : void 0);
+        const metadataCell = frameCell(snapshot?.metadata, currentIndex);
+        cellRef.current = metadataCell === null ? void 0 : metadataCell ?? (xyzFormat === "extxyz" || xyzFormat === "xyz" ? readExtXyzCell(xyzContent) : void 0);
         renderedTargetRef.current = target;
         commandState.current.atomIds = atomIdsRef.current;
         cellShapesRef.current = [];

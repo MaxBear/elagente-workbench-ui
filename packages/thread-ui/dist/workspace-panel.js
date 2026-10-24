@@ -35,7 +35,7 @@ import {
 } from "./chunk-ZJW34XWK.js";
 import {
   GraphMoleculeViewer
-} from "./chunk-YCAIDCZR.js";
+} from "./chunk-K6OSZF4I.js";
 import "./chunk-5LLLXMOS.js";
 import {
   DRAWIO_MAX_BYTES,

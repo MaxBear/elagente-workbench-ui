@@ -286,6 +286,23 @@ function validateScientificTarget(v) {
   }
   return v;
 }
+function cell(c, p) {
+  obj(c, p);
+  list(c.vectors, `${p}.vectors`, 3);
+  if (c.vectors.length !== 3) fail(`${p}.vectors`, "expected 3 vectors");
+  c.vectors.forEach((row) => {
+    list(row, `${p}.vector`, 3);
+    if (row.length !== 3) fail(`${p}.vector`, "expected 3 coordinates");
+    row.forEach((n) => num(n, `${p}.coordinate`));
+  });
+  const [a, b, d] = c.vectors;
+  const det = a[0] * (b[1] * d[2] - b[2] * d[1]) - a[1] * (b[0] * d[2] - b[2] * d[0]) + a[2] * (b[0] * d[1] - b[1] * d[0]);
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) fail(`${p}.vectors`, "degenerate cell");
+  list(c.periodic, `${p}.periodic`, 3);
+  if (c.periodic.length !== 3) fail(`${p}.periodic`, "expected 3 flags");
+  c.periodic.forEach((x) => bool(x, `${p}.periodic`));
+  one(c.unit, ["angstrom", "bohr"], `${p}.unit`);
+}
 function validateArtifactMetadata(v) {
   json(v);
   obj(v, "metadata");
@@ -317,22 +334,15 @@ function validateArtifactMetadata(v) {
       seen.add(key);
     }
   }
-  if (v.cell !== void 0) {
-    obj(v.cell, "cell");
-    list(v.cell.vectors, "cell.vectors", 3);
-    if (v.cell.vectors.length !== 3) fail("cell.vectors", "expected 3 vectors");
-    v.cell.vectors.forEach((row) => {
-      list(row, "cell.vector", 3);
-      if (row.length !== 3) fail("cell.vector", "expected 3 coordinates");
-      row.forEach((n) => num(n, "cell.coordinate"));
+  if (v.cell !== void 0) cell(v.cell, "cell");
+  if (v.frameCells !== void 0) {
+    if (v.cell !== void 0) fail("frameCells", "cell and frameCells are mutually exclusive");
+    if (!Array.isArray(v.frameTargets)) fail("frameCells", "frameCells require multi-frame metadata (frameTargets)");
+    list(v.frameCells, "frameCells");
+    if (v.frameCells.length !== v.frameTargets.length) fail("frameCells", "expected one entry per frame target");
+    v.frameCells.forEach((c, i) => {
+      if (c !== null) cell(c, `frameCells[${i}]`);
     });
-    const [a, b, c] = v.cell.vectors;
-    const det = a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
-    if (!Number.isFinite(det) || Math.abs(det) < 1e-12) fail("cell.vectors", "degenerate cell");
-    list(v.cell.periodic, "cell.periodic", 3);
-    if (v.cell.periodic.length !== 3) fail("cell.periodic", "expected 3 flags");
-    v.cell.periodic.forEach((x) => bool(x, "cell.periodic"));
-    one(v.cell.unit, ["angstrom", "bohr"], "cell.unit");
   }
   if (v.render !== void 0) {
     obj(v.render, "render");
@@ -1351,6 +1361,36 @@ var fixtures = {
     }
   }
 };
+var frameCellChecksum = "5e877e6188206f39b24add8ecce93e0f00ee7ffb6b88e97e630d2eb3a8fc686b";
+var cubic = (edge) => ({ vectors: [[edge, 0, 0], [0, edge, 0], [0, 0, edge]], periodic: [true, true, true], unit: "angstrom" });
+var frameCellTarget = (frameIndex) => ({ artifactId: "artifact-frame-cells", objectId: "urn:grafico:h2-relaxation:1", sourceRevision: "native-revision-2", checksum: frameCellChecksum, streamId: "frame-cells-stream-1", frameId: `frame-${frameIndex}`, frameIndex });
+var frameCellFixture = {
+  artifact: {
+    id: "artifact-frame-cells",
+    version: 1,
+    path: `.artifacts/${frameCellChecksum}.extxyz`,
+    name: "h2-relaxation.extxyz",
+    checksum: frameCellChecksum,
+    size: 254,
+    mediaType: "chemical/x-extxyz",
+    kind: "chem.structure",
+    createdAt: "2026-10-24T00:00:00.000Z",
+    turnId: "turn-fixture-1",
+    metadata: {
+      version: 1,
+      objectId: "urn:grafico:h2-relaxation:1",
+      sourceRevision: "native-revision-2",
+      checksum: frameCellChecksum,
+      format: "extxyz",
+      stream: { id: "frame-cells-stream-1", frameId: "frame-2", frameIndex: 2 },
+      atoms: [{ id: "H1", element: "H" }, { id: "H2", element: "H" }],
+      frameTargets: [0, 1, 2].map(frameCellTarget),
+      frameCells: [cubic(5), cubic(5.2), null],
+      render: { coordinateUnit: "angstrom", bonding: "infer" }
+    },
+    fixtureBytes: '2\nLattice="5 0 0 0 5 0 0 0 5" Properties=species:S:1:pos:R:3 pbc="T T T"\nH 0 0 0\nH 0 0 0.74\n2\nLattice="5.2 0 0 0 5.2 0 0 0 5.2" Properties=species:S:1:pos:R:3 pbc="T T T"\nH 0 0 0\nH 0 0 0.75\n2\nProperties=species:S:1:pos:R:3 pbc="F F F"\nH 0 0 0\nH 0 0 0.76\n'
+  }
+};
 function freeze(v) {
   if (v && typeof v === "object") {
     Object.values(v).forEach(freeze);
@@ -1359,6 +1399,7 @@ function freeze(v) {
   return v;
 }
 var EXTENSION_FIXTURES = freeze(fixtures);
+var FRAME_CELL_FIXTURE = freeze(frameCellFixture);
 
 // src/index.ts
 var AUTO_THREAD_TITLE_MAX_CHARS = 15;
@@ -1395,6 +1436,7 @@ export {
   EXTENSION_TYPES,
   EXTENSION_VERSION,
   ExtensionValidationError,
+  FRAME_CELL_FIXTURE,
   agentBackendIds,
   agentBackendMetadata,
   defaultAgentBackendId,
