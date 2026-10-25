@@ -448,15 +448,18 @@ function isTerminalTurnStatus(status: TimelineTurn['status']) {
   );
 }
 
-function itemCreatedAtMillis(item: ThreadHistoryItemDto) {
-  const millis = Date.parse(item.createdAt ?? '');
-  return Number.isFinite(millis) ? millis : null;
+// An item's last change: a tool that completes or reports progress updates in
+// place, so its creation time alone would freeze "Last progress" (ELA-253).
+function itemActivityAtMillis(item: ThreadHistoryItemDto) {
+  const candidates = [Date.parse(item.createdAt ?? ''), Date.parse(item.updatedAt ?? '')]
+    .filter(Number.isFinite);
+  return candidates.length > 0 ? Math.max(...candidates) : null;
 }
 
 function latestItemTimestamp(items: ThreadHistoryItemDto[]) {
   let latest: number | null = null;
   for (const item of items) {
-    const millis = itemCreatedAtMillis(item);
+    const millis = itemActivityAtMillis(item);
     if (millis === null) {
       continue;
     }
@@ -465,7 +468,7 @@ function latestItemTimestamp(items: ThreadHistoryItemDto[]) {
   return latest;
 }
 
-function latestActivityTimestamp(
+export function latestActivityTimestamp(
   startedAt: string | null | undefined,
   items: ThreadHistoryItemDto[],
   liveActivityAt: string | null | undefined,
