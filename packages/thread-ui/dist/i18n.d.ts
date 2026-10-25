@@ -2960,6 +2960,9 @@ declare const en: {
     readonly "chat.typeMessage": "Message";
     readonly "chat.ctrlEnterToSend": " · Ctrl+Enter to send";
     readonly "chat.enterToSend": " · Enter to send";
+    readonly "chat.composerLockedRunning": "Working… you can send when this turn ends";
+    readonly "chat.composerLockedOffline": "Reconnecting… you can send once connected";
+    readonly "chat.composerLocked": "Sending is unavailable right now";
     readonly "chat.moreLines": "+{{value1}} lines";
     readonly "chat.planModeOn": "Plan mode";
     readonly "chat.exitPlanMode": "Exit plan mode";
@@ -7003,6 +7006,9 @@ declare const zhCN: {
     "chat.typeMessage": "输入消息";
     "chat.ctrlEnterToSend": "，Ctrl+Enter 发送";
     "chat.enterToSend": "，Enter 发送";
+    "chat.composerLockedRunning": "正在处理…本轮结束后可发送";
+    "chat.composerLockedOffline": "正在重新连接…连接后可发送";
+    "chat.composerLocked": "暂时无法发送";
     "chat.moreLines": "+{{value1}} 行";
     "chat.planModeOn": "计划模式";
     "chat.exitPlanMode": "退出计划模式";
@@ -11068,6 +11074,9 @@ declare const resources: {
         readonly "chat.typeMessage": "Message";
         readonly "chat.ctrlEnterToSend": " · Ctrl+Enter to send";
         readonly "chat.enterToSend": " · Enter to send";
+        readonly "chat.composerLockedRunning": "Working… you can send when this turn ends";
+        readonly "chat.composerLockedOffline": "Reconnecting… you can send once connected";
+        readonly "chat.composerLocked": "Sending is unavailable right now";
         readonly "chat.moreLines": "+{{value1}} lines";
         readonly "chat.planModeOn": "Plan mode";
         readonly "chat.exitPlanMode": "Exit plan mode";
@@ -15110,6 +15119,9 @@ declare const resources: {
         "chat.typeMessage": "输入消息";
         "chat.ctrlEnterToSend": "，Ctrl+Enter 发送";
         "chat.enterToSend": "，Enter 发送";
+        "chat.composerLockedRunning": "正在处理…本轮结束后可发送";
+        "chat.composerLockedOffline": "正在重新连接…连接后可发送";
+        "chat.composerLocked": "暂时无法发送";
         "chat.moreLines": "+{{value1}} 行";
         "chat.planModeOn": "计划模式";
         "chat.exitPlanMode": "退出计划模式";

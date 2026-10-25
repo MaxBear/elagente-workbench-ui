@@ -38,7 +38,7 @@ import {
   useMenuKeyboard,
   useModalFocus,
   useTabScrollEdges
-} from "./chunk-ZJW34XWK.js";
+} from "./chunk-DZSWI2VM.js";
 import {
   Button,
   Tooltip,
@@ -57,7 +57,7 @@ import {
   shellThemeProps,
   useDocumentThemeRevision,
   useThemeFeature
-} from "./chunk-TV56ELKX.js";
+} from "./chunk-FAEK7GVU.js";
 import {
   DEFAULT_LOCALE,
   I18nProvider,
@@ -75,7 +75,7 @@ import {
   t,
   translate,
   useI18n
-} from "./chunk-GQPLSSTB.js";
+} from "./chunk-DCALMNCJ.js";
 
 // #style-inject:#style-inject
 function styleInject(css, { insertAt } = {}) {
@@ -718,15 +718,18 @@ function buildComposerControlState({
   threadConnected,
   busy,
   isShellView,
+  disabled = false,
+  running = false,
   disabledPlaceholder,
   settingsBusy,
   supportedEffortCount,
   fastMode,
   sendShortcut = "ctrlEnter"
 }) {
-  const promptPlaceholder = goalComposeMode ? translate("chat.describeTheGoalTheBackendShouldContinue") : disabledPlaceholder ?? (isShellView ? translate("chat.sendShellInputToTheAttachedTerminal") : translate("chat.typeMessage"));
-  const promptPlaceholderHint = goalComposeMode || disabledPlaceholder || isShellView ? "" : translate(sendShortcut === "enter" ? "chat.enterToSend" : "chat.ctrlEnterToSend");
-  const sendButtonLabel = goalComposeMode ? goalBusy ? translate("chat.setting") : translate("chat.setGoal") : !threadConnected && busy ? translate("chat.connecting") : !threadConnected ? translate("chat.send") : busy && !isShellView ? translate("chat.sending") : translate("chat.send");
+  const lockedReason = !goalComposeMode && !isShellView && disabled ? disabledPlaceholder ?? translate(running ? "chat.composerLockedRunning" : !threadConnected ? "chat.composerLockedOffline" : "chat.composerLocked") : null;
+  const promptPlaceholder = goalComposeMode ? translate("chat.describeTheGoalTheBackendShouldContinue") : lockedReason ?? disabledPlaceholder ?? (isShellView ? translate("chat.sendShellInputToTheAttachedTerminal") : translate("chat.typeMessage"));
+  const promptPlaceholderHint = goalComposeMode || lockedReason || disabledPlaceholder || isShellView ? "" : translate(sendShortcut === "enter" ? "chat.enterToSend" : "chat.ctrlEnterToSend");
+  const sendButtonLabel = goalComposeMode ? goalBusy ? translate("chat.setting") : translate("chat.setGoal") : lockedReason ? lockedReason : !threadConnected && busy ? translate("chat.connecting") : !threadConnected ? translate("chat.send") : busy && !isShellView ? translate("chat.sending") : translate("chat.send");
   const sendButtonClassName = !threadConnected ? "ui-action-danger" : goalComposeMode ? "ui-action-info" : "ui-action-primary";
   const modelControlsDisabled = settingsBusy;
   const effortControlsDisabled = modelControlsDisabled || supportedEffortCount === 0;
@@ -2924,7 +2927,8 @@ function ComposerSettingsToolbar({
   const modelTriggerRef = useRef5(null);
   const modelAvatar = useThemeFeature("composer.modelAvatar");
   const intentIcons = useThemeFeature("composer.intentIcons");
-  const sendLater = queueing && activeView === "chat" && !goalComposeMode;
+  const sendLocked = activeView === "chat" && disabled && !goalComposeMode;
+  const sendLater = queueing && activeView === "chat" && !goalComposeMode && !sendLocked;
   const sendIntentLabel = goalComposeMode ? translate("chat.setGoal") : sendLater ? translate("chat.sendAfterTurn") : translate("chat.sendPrompt");
   const sendEmpty = promptEmpty && !goalBusy && !(activeView === "chat" && disabled);
   const selectedModelLabel = modelOptions.find((entry) => entry.model === model)?.displayName || model || translate("chat.selectModel");
@@ -3070,7 +3074,7 @@ ${modelContextTitle}` : ""}`,
         "data-empty": sendEmpty ? "true" : void 0,
         "aria-label": sendIntentLabel,
         "aria-disabled": sendEmpty || void 0,
-        title: sendEmpty ? translate("chat.typeToSend") : sendLater || goalComposeMode ? sendIntentLabel : sendButtonLabel,
+        title: sendLocked ? sendButtonLabel : sendEmpty ? translate("chat.typeToSend") : sendLater || goalComposeMode ? sendIntentLabel : sendButtonLabel,
         disabled: goalBusy || (activeView === "chat" ? disabled : false),
         className: `${sendButtonBaseClassName} h-9 w-9 rounded-full text-sm font-medium disabled:cursor-not-allowed sm:h-8 sm:w-8 ${sendButtonClassName}`,
         children: goalComposeMode ? /* @__PURE__ */ jsx14(Target, { "aria-hidden": "true", className: "h-[18px] w-[18px]", strokeWidth: 2.2 }) : sendLater ? /* @__PURE__ */ jsx14(SendLaterIcon, {}) : intentIcons ? /* @__PURE__ */ jsx14(Send, { "aria-hidden": "true", className: "composer-send-plane h-[17px] w-[17px]", strokeWidth: 2.2 }) : /* @__PURE__ */ jsxs11(
@@ -6446,6 +6450,7 @@ function ThreadComposer({
   threadConnected = true,
   shellAvailable = true,
   disabled = false,
+  threadRunning = false,
   disabledPlaceholder,
   shellControlState = null,
   draftPrompt,
@@ -7119,6 +7124,8 @@ ${current.prompt}` : text,
     threadConnected,
     busy,
     isShellView,
+    disabled,
+    running: threadRunning || canInterrupt,
     disabledPlaceholder,
     settingsBusy,
     supportedEffortCount: supportedEfforts.length,
@@ -18658,14 +18665,14 @@ var HistoryItemRow = memo7(function HistoryItemRow2({
 function isTerminalTurnStatus(status) {
   return status === "completed" || status === "failed" || status === "interrupted";
 }
-function itemCreatedAtMillis(item) {
-  const millis = Date.parse(item.createdAt ?? "");
-  return Number.isFinite(millis) ? millis : null;
+function itemActivityAtMillis(item) {
+  const candidates = [Date.parse(item.createdAt ?? ""), Date.parse(item.updatedAt ?? "")].filter(Number.isFinite);
+  return candidates.length > 0 ? Math.max(...candidates) : null;
 }
 function latestItemTimestamp(items) {
   let latest = null;
   for (const item of items) {
-    const millis = itemCreatedAtMillis(item);
+    const millis = itemActivityAtMillis(item);
     if (millis === null) {
       continue;
     }
@@ -25063,6 +25070,7 @@ function GraphChatThreadChatPanel({
   const resolvedComposerProps = useMemo19(
     () => composerProps ? {
       ...composerProps,
+      threadRunning: composerProps.threadRunning ?? (detail.thread.status === "running" || detail.thread.activeTurnId !== null),
       followTail: composerProps.followTail ?? tailVisible,
       onToggleFollow: composerProps.onToggleFollow ?? (() => setLatestRequest((value) => value + 1)),
       canJumpToPreviousTurn: composerProps.canJumpToPreviousTurn ?? previousAvailable,
@@ -25087,7 +25095,9 @@ function GraphChatThreadChatPanel({
       adapter.cancelPendingSteer,
       adapter.steerPendingPrompt,
       composerProps,
+      detail.thread.activeTurnId,
       detail.thread.id,
+      detail.thread.status,
       queuedPrompts,
       tailVisible,
       previousAvailable,
