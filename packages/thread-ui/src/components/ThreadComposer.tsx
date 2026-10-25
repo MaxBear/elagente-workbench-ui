@@ -131,6 +131,8 @@ export interface ThreadComposerProps {
   threadConnected?: boolean;
   shellAvailable?: boolean;
   disabled?: boolean;
+  /** A turn is running; the chat panel supplies it from the thread when omitted. */
+  threadRunning?: boolean;
   disabledPlaceholder?: string | undefined;
   shellControlState?: ThreadShellControlState | null;
   draftPrompt?: string | undefined;
@@ -240,6 +242,7 @@ export function ThreadComposer({
   threadConnected = true,
   shellAvailable = true,
   disabled = false,
+  threadRunning = false,
   disabledPlaceholder,
   shellControlState = null,
   draftPrompt,
@@ -1003,6 +1006,8 @@ export function ThreadComposer({
     threadConnected,
     busy,
     isShellView,
+    disabled,
+    running: threadRunning || canInterrupt,
     disabledPlaceholder,
     settingsBusy,
     supportedEffortCount: supportedEfforts.length,

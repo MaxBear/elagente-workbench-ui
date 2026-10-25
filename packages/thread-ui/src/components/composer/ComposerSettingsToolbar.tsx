@@ -102,8 +102,10 @@ export function ComposerSettingsToolbar({
   // paper plane for sending now. Every theme shows the same three intents.
   const modelAvatar = useThemeFeature('composer.modelAvatar');
   const intentIcons = useThemeFeature('composer.intentIcons');
+  // The host locked the chat prompt: no send or queue intent, only the reason.
+  const sendLocked = activeView === 'chat' && disabled && !goalComposeMode;
   // A turn is running: sending now adds the prompt to run after it.
-  const sendLater = queueing && activeView === 'chat' && !goalComposeMode;
+  const sendLater = queueing && activeView === 'chat' && !goalComposeMode && !sendLocked;
   const sendIntentLabel = goalComposeMode
     ? translate('chat.setGoal')
     : sendLater
@@ -274,7 +276,7 @@ export function ComposerSettingsToolbar({
         data-empty={sendEmpty ? 'true' : undefined}
         aria-label={sendIntentLabel}
         aria-disabled={sendEmpty || undefined}
-        title={sendEmpty ? translate('chat.typeToSend') : sendLater || goalComposeMode ? sendIntentLabel : sendButtonLabel}
+        title={sendLocked ? sendButtonLabel : sendEmpty ? translate('chat.typeToSend') : sendLater || goalComposeMode ? sendIntentLabel : sendButtonLabel}
         disabled={goalBusy || (activeView === 'chat' ? disabled : false)}
         className={`${sendButtonBaseClassName} h-9 w-9 rounded-full text-sm font-medium disabled:cursor-not-allowed sm:h-8 sm:w-8 ${sendButtonClassName}`}
       >

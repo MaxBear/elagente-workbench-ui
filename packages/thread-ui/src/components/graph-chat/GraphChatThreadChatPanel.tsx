@@ -129,6 +129,8 @@ export function GraphChatThreadChatPanel({
       composerProps
         ? {
             ...composerProps,
+            threadRunning: composerProps.threadRunning ??
+              (detail.thread.status === 'running' || detail.thread.activeTurnId !== null),
             followTail: composerProps.followTail ?? tailVisible,
             onToggleFollow: composerProps.onToggleFollow ?? (() => setLatestRequest(value => value + 1)),
             canJumpToPreviousTurn: composerProps.canJumpToPreviousTurn ?? previousAvailable,
@@ -161,7 +163,9 @@ export function GraphChatThreadChatPanel({
       adapter.cancelPendingSteer,
       adapter.steerPendingPrompt,
       composerProps,
+      detail.thread.activeTurnId,
       detail.thread.id,
+      detail.thread.status,
       queuedPrompts,
       tailVisible, previousAvailable, nextAvailable,
     ],

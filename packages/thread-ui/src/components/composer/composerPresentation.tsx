@@ -42,6 +42,8 @@ export function buildComposerControlState({
   threadConnected,
   busy,
   isShellView,
+  disabled = false,
+  running = false,
   disabledPlaceholder,
   settingsBusy,
   supportedEffortCount,
@@ -53,33 +55,48 @@ export function buildComposerControlState({
   threadConnected: boolean;
   busy: boolean;
   isShellView: boolean;
+  /** The host locked the prompt; the placeholder says why instead of how to send. */
+  disabled?: boolean;
+  /** A turn is running, whether or not the host lets the prompt queue behind it. */
+  running?: boolean;
   disabledPlaceholder?: string | undefined;
   settingsBusy: boolean;
   supportedEffortCount: number;
   fastMode: boolean;
   sendShortcut?: 'ctrlEnter' | 'enter';
 }) {
+  // A locked chat prompt explains itself; hosts may override the reason (ELA-253).
+  const lockedReason = !goalComposeMode && !isShellView && disabled
+    ? disabledPlaceholder ??
+      translate(running
+        ? "chat.composerLockedRunning"
+        : !threadConnected
+          ? "chat.composerLockedOffline"
+          : "chat.composerLocked")
+    : null;
   const promptPlaceholder = goalComposeMode
     ? translate("chat.describeTheGoalTheBackendShouldContinue")
-    : (disabledPlaceholder ??
+    : (lockedReason ?? disabledPlaceholder ??
       (isShellView
         ? translate("chat.sendShellInputToTheAttachedTerminal")
         : translate("chat.typeMessage")));
   // Keyboards only: how to send, from the current shortcut setting.
-  const promptPlaceholderHint = goalComposeMode || disabledPlaceholder || isShellView
+  const promptPlaceholderHint = goalComposeMode || lockedReason || disabledPlaceholder || isShellView
     ? ''
     : translate(sendShortcut === 'enter' ? "chat.enterToSend" : "chat.ctrlEnterToSend");
   const sendButtonLabel = goalComposeMode
     ? goalBusy
       ? translate("chat.setting")
       : translate("chat.setGoal")
-    : !threadConnected && busy
-      ? translate("chat.connecting")
-      : !threadConnected
-        ? translate("chat.send")
-        : busy && !isShellView
-          ? translate("chat.sending")
-          : translate("chat.send");
+    : lockedReason
+      ? lockedReason
+      : !threadConnected && busy
+        ? translate("chat.connecting")
+        : !threadConnected
+          ? translate("chat.send")
+          : busy && !isShellView
+            ? translate("chat.sending")
+            : translate("chat.send");
   const sendButtonClassName = !threadConnected
     ? 'ui-action-danger'
     : goalComposeMode

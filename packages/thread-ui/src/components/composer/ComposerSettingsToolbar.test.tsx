@@ -300,6 +300,16 @@ describe('ComposerSettingsToolbar', () => {
     ).toBe(true);
   });
 
+  it('drops the queue intent while a running turn locks the chat prompt (ELA-253)', () => {
+    const view = renderToolbar({ disabled: true, queueing: true });
+    const send = view.querySelector<HTMLButtonElement>('.send-base');
+
+    expect(send?.disabled).toBe(true);
+    expect(send?.getAttribute('data-send-intent')).toBe('send');
+    expect(send?.querySelector('.composer-send-later')).toBeNull();
+    expect(send?.getAttribute('title')).toBe('Send');
+  });
+
   it('does not disable the shell send button from chat prompt disabled state', () => {
     const view = renderToolbar({ activeView: 'shell', disabled: true });
 
