@@ -11,9 +11,16 @@ import './fixture.css';
 const adapter: ThreadDetailUiAdapter = {
   openThread() {}, sendPrompt() {}, interrupt() {}, compact() {}, updateSettings() {},
   workspace: {
-    async listTree() {
+    async listTree({path}) {
+      // ?folders: a long folder inside a workspace of folders (ELA-257 048e).
+      if (new URLSearchParams(location.search).has('folders')) {
+        if (path === 'phosphine_mobo') return {name:'phosphine_mobo', path, kind:'directory', childrenLoaded:true, children:Array.from({length:80}, (_, index) => ({name:`result-${index}.json`, path:`phosphine_mobo/result-${index}.json`, kind:'file', size:24}))};
+        return {name:'Workspace', path:'', kind:'directory', childrenLoaded:true, children:['benchmark_campaign','phosphine_mobo','runs','structures'].map(name => ({name, path:name, kind:'directory', hasChildren:true, childrenLoaded:false, children:[]}))};
+      }
       return {name:'Workspace', path:'', kind:'directory', childrenLoaded:true, children:Array.from({length:80}, (_, index) => ({name:`inspection-result-${index}.txt`, path:`inspection-result-${index}.txt`, kind:'file', size:24}))};
     },
+    // Downloads leave an operation notice over the file panes (ELA-257 048e).
+    async downloadNode() {},
     async readFile({path}) { return {path, name:path, content:'Persistent inspection fixture\n', language:'text', size:30, truncated:false, nextOffset:30}; },
   },
 };

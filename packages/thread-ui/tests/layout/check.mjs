@@ -164,6 +164,34 @@ try {
       await context.close();
     }
   }
+  // ELA-257 048e: after a download, its notice sits over the file panes. A long
+  // expanded folder must still scroll its last row clear of that notice.
+  for (const viewport of [{width:1440,height:900}, {width:390,height:844}]) {
+    const context = await browser.newContext({viewport});
+    const page = await context.newPage();
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(`${process.env.LAYOUT_URL || 'http://127.0.0.1:5183'}/?folders`);
+    await page.locator('.thread-graph-composer-input [contenteditable]').waitFor();
+    await page.getByRole('button', {name:'Toggle Explorer',exact:true}).click();
+    await page.locator('span[title="phosphine_mobo"]').click();
+    if (viewport.width === 390) await page.locator('span[title="phosphine_mobo"]').click(); // the phone opened the drawer
+    await page.keyboard.press('ArrowRight');
+    await page.locator('span[title="result-0.json"]').click({button:'right'});
+    await page.getByRole('menuitem', {name:/^Download/}).first().click();
+    await page.locator('.workspace-operation-notice').waitFor();
+    await page.locator('.thread-graph-workspace-tree-scroll').hover();
+    await page.mouse.wheel(0, 8000);
+    await page.waitForFunction(() => { const node = document.querySelector('.thread-graph-workspace-tree-scroll'); return node.scrollTop > 0 && node.scrollTop >= node.scrollHeight - node.clientHeight - 1; });
+    const covered = await page.evaluate(() => {
+      const notice = document.querySelector('.workspace-operation-notice').getBoundingClientRect();
+      const last = document.querySelector('.thread-graph-workspace-tree-scroll span[title="structures"]').getBoundingClientRect();
+      return {lastBottom: last.bottom, noticeTop: notice.top};
+    });
+    assert.ok(covered.lastBottom <= covered.noticeTop, `${viewport.width}: the last Explorer row stays under the operation notice ${JSON.stringify(covered)}`);
+    await screenshot(page, `${viewport.width}-explorer-notice-scrolled`);
+    records.push({name:`${viewport.width}-explorer-notice-scrolled`, ...covered});
+    await context.close();
+  }
   assert.deepEqual(errors,[]);
   await writeFile(path.join(output,'results.json'),JSON.stringify({passed:true,records,errors,keyboard:'Chromium viewport + synthetic visualViewport; physical mobile IME remains W11 acceptance'},null,2));
   console.log(`Passed ${records.length} layout geometry checks; screenshots in ${output}`);

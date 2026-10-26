@@ -36,6 +36,9 @@
   box-shadow: 0 8px 24px rgb(0 0 0 / 14%); overflow-wrap: anywhere;
 }
 .workspace-operation-notice[role='alert'] { color: var(--theme-danger, #dc2626); }
+/* The notice stays until the next operation; the tree's last rows must scroll
+   clear of it (ELA-257 048e): its 7rem, padding, border and offset. */
+[data-testid='workspace-panel']:has(> .workspace-operation-notice) .thread-graph-workspace-tree-scroll { padding-bottom: calc(7rem + 32px); }
 
 /* Thread row menu (WorkbenchThreadMenu): Pockymoe apps/supervisor-web/src/matter-theme.css
    (b35e997b) recent-thread rules, with the accepted palette's focus ring. */
