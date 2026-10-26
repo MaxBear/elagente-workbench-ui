@@ -45,8 +45,10 @@ const reducedMotion = () => typeof window !== 'undefined' && typeof window.match
  * then), tapping a thread opens it. On touch, pinching in goes up a level,
  * spreading opens the block under the fingers and dragging down dismisses.
  */
-export function ThreadMap({ devices, currentKey, hours = 24, heading, actions, onOpen, onRetry, onDismiss }: {
+export function ThreadMap({ devices, currentKey, hours = 24, heading, actions, onOpen, onRetry, onDismiss, allLabel: hostAllLabel }: {
   devices: ThreadMapDevice[];
+  /** The top level's name when a host's devices are not machines, e.g. "All Agents". */
+  allLabel?: string | undefined;
   currentKey?: string | undefined;
   hours?: number;
   heading?: ReactNode;
@@ -57,7 +59,7 @@ export function ThreadMap({ devices, currentKey, hours = 24, heading, actions, o
   onDismiss?: (() => void) | undefined;
 }) {
   useI18n();
-  const allLabel = translate('workbench.threadMapAll');
+  const allLabel = hostAllLabel ?? translate('workbench.threadMapAll');
   const root = useMemo(() => buildThreadMap(devices, allLabel), [devices, allLabel]);
   const nodes = useMemo(() => indexMap(root), [root]);
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -334,8 +336,10 @@ export function ThreadMap({ devices, currentKey, hours = 24, heading, actions, o
       const named = box.width >= 72;
       const Icon = item.kind === 'device' ? Monitor : Folder;
       const zoomable = !unlisted;
+      // A device that is an agent (a host's scientific Agent) shows that agent's icon.
+      const agentDevice = item.kind === 'device' ? item.device?.agent : undefined;
       const head = <>
-        {named && <Icon aria-hidden="true" />}
+        {named && (agentDevice ? <AgentChip agent={agentDevice} /> : <Icon aria-hidden="true" />)}
         <span className="thread-map-section-label">{item.label}</span>
         {unlisted
           ? named && <span className="thread-map-section-count">{state === 'error' ? <RotateCw aria-hidden="true" /> : translate(state === 'offline' ? 'workbench.threadMapOffline' : 'workbench.threadMapLoading')}</span>

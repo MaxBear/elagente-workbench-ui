@@ -49,6 +49,8 @@ export interface ThreadMapWorkspace { id: string; label: string; path?: string |
 export interface ThreadMapDevice {
   id: string;
   name: string;
+  /** Theme agent key when the device is an agent (a host's scientific Agent): its icon replaces the machine icon. */
+  agent?: string | undefined;
   state: 'ready' | 'loading' | 'offline' | 'error';
   error?: string | null | undefined;
   workspaces: ThreadMapWorkspace[];

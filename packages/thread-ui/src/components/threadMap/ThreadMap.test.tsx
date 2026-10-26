@@ -232,6 +232,22 @@ describe('ThreadMap', () => {
     }
   });
 
+  it('names a host\'s top level and shows an agent icon for a device that is an agent (ELA-256)', () => {
+    const agents: ThreadMapDevice[] = [
+      { id: 'grafico', name: 'grafico', agent: 'grafico', state: 'ready', workspaces: [{ id: 'g', label: 'grafico', threads: [thread('g1')] }] },
+      { id: 'quntur', name: 'Quntur', agent: 'quntur', state: 'ready', workspaces: [{ id: 'q', label: 'Quntur', threads: [thread('q1')] }] },
+    ];
+    act(() => root.render(<ThreadMap devices={agents} allLabel="All Agents" onOpen={vi.fn()} />));
+    expect(crumbs()[0]).toBe('All Agents*');
+    const heads = [...host.querySelectorAll('.thread-map-section-head')];
+    const grafico = heads.find(head => head.textContent?.includes('grafico') && head.querySelector('.thread-map-agent'));
+    expect(grafico?.querySelector('.thread-map-agent')?.getAttribute('data-agent')).toBe('grafico');
+    expect(grafico?.querySelector('.lucide-monitor')).toBeNull();
+    // Without the prop the shared wording stays.
+    show(devices);
+    expect(crumbs()[0]).toBe('All devices*');
+  });
+
   it('says when there is nothing to show yet', () => {
     show([{ id: 'd', name: 'D', state: 'loading', workspaces: [] }]);
     expect(host.querySelector('section[aria-label="D · Loading…"]')).not.toBeNull();
