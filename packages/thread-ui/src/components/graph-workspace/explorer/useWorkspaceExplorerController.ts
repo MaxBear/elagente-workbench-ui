@@ -92,6 +92,16 @@ export function useWorkspaceExplorerController({
   const [showThreadEvents, setShowThreadEventsPreference] = useState(() => {
     try { return localStorage.getItem(SHOW_THREAD_EVENTS_KEY) === 'true'; } catch { return false; }
   });
+  // The same preference changed elsewhere (a host setting, another tab) applies while open (ELA-256).
+  const applyShowThreadEvents = useRef((value: boolean) => setShowThreadEventsPreference(value));
+  useEffect(() => {
+    const changed = (event: StorageEvent) => {
+      if (event.key === SHOW_THREAD_EVENTS_KEY) applyShowThreadEvents.current(event.newValue === 'true');
+      else if (event.key === SHOW_HIDDEN_KEY) setShowHiddenPreference(event.newValue === 'true');
+    };
+    window.addEventListener('storage', changed);
+    return () => window.removeEventListener('storage', changed);
+  }, []);
   const listIdentity = useMemo(
     () => (showHidden ? { ...workspaceIdentity, showHidden: true } : workspaceIdentity),
     [showHidden, workspaceIdentity],
@@ -768,6 +778,11 @@ export function useWorkspaceExplorerController({
     };
   }, [refreshWorkspaceTree, workspaceAdapter, workspaceIdentity]);
 
+  applyShowThreadEvents.current = (value: boolean) => {
+    setShowThreadEventsPreference(value);
+    // Hiding the events must not leave a hidden event selected: show a file instead.
+    if (!value && selectedNodeId?.startsWith('event:')) setSelectedNodeId(firstNonEventNode(tree)?.id ?? null);
+  };
   return {
     capabilities,
     capabilityError,
@@ -813,10 +828,10 @@ export function useWorkspaceExplorerController({
     } : undefined,
     showThreadEvents,
     setShowThreadEvents: (value: boolean) => {
-      setShowThreadEventsPreference(value);
-      // Hiding the events must not leave a hidden event selected: show a file instead.
-      if (!value && selectedNodeId?.startsWith('event:')) setSelectedNodeId(firstNonEventNode(tree)?.id ?? null);
+      applyShowThreadEvents.current(value);
       try { localStorage.setItem(SHOW_THREAD_EVENTS_KEY, String(value)); } catch { /* Applies to this page only. */ }
+      // Browsers tell only other tabs; a host setting in this page hears it too (ELA-256).
+      try { window.dispatchEvent(new StorageEvent('storage', { key: SHOW_THREAD_EVENTS_KEY, newValue: String(value) })); } catch { /* No listeners. */ }
     },
   };
 }

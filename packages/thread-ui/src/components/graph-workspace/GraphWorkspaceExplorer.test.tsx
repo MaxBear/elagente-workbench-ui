@@ -276,6 +276,52 @@ describe('GraphWorkspaceExplorer', () => {
     expect(window.localStorage.getItem('workbench.explorer.showThreadEvents')).toBe('true');
   });
 
+  it('follows a thread-events change made elsewhere (host settings or another tab) while open (ELA-256)', async () => {
+    const { adapter, listTree } = createAdapter();
+    const withEvents = {
+      ...detail,
+      turns: [{ id: 'turn-1', items: [{ id: 'call-1', kind: 'toolCall', text: 'expert', status: 'completed' }] }],
+    } as unknown as ThreadDetailDto;
+    await act(async () => {
+      root?.render(
+        <GraphWorkspaceExplorer activeView="chat" detail={withEvents} artifacts={[]}
+          plugins={createDefaultPluginContextValue()} status={null} workspaceAdapter={adapter} />,
+      );
+    });
+    await vi.waitFor(() => expect(listTree).toHaveBeenCalled());
+    await vi.waitFor(() => expect(host!.textContent).toContain('README.md'));
+    expect(host!.textContent).not.toContain('thread-events');
+    // The host's Settings writes the shared key and announces it.
+    window.localStorage.setItem('workbench.explorer.showThreadEvents', 'true');
+    await act(async () => { window.dispatchEvent(new StorageEvent('storage', { key: 'workbench.explorer.showThreadEvents', newValue: 'true' })); });
+    await vi.waitFor(() => expect(host!.textContent).toContain('thread-events/turn-1'));
+    await act(async () => { window.dispatchEvent(new StorageEvent('storage', { key: 'unrelated', newValue: 'false' })); });
+    expect(host!.textContent).toContain('thread-events/turn-1');
+    await act(async () => { window.dispatchEvent(new StorageEvent('storage', { key: 'workbench.explorer.showThreadEvents', newValue: 'false' })); });
+    await vi.waitFor(() => expect(host!.textContent).not.toContain('thread-events'));
+  });
+
+  it('announces its own thread-events change so a host setting can follow (ELA-256)', async () => {
+    const { adapter, listTree } = createAdapter();
+    const seen: (string | null)[] = [];
+    const listener = (event: StorageEvent) => { if (event.key === 'workbench.explorer.showThreadEvents') seen.push(event.newValue); };
+    window.addEventListener('storage', listener);
+    try {
+      await act(async () => {
+        root?.render(
+          <GraphWorkspaceExplorer activeView="chat" detail={detail} artifacts={[]}
+            plugins={createDefaultPluginContextValue()} status={null} workspaceAdapter={adapter} />,
+        );
+      });
+      await vi.waitFor(() => expect(listTree).toHaveBeenCalled());
+      act(() => host!.querySelector<HTMLButtonElement>('button[aria-label="More Explorer actions"]')!.click());
+      const toggle = [...host!.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')]
+        .find((item) => item.textContent?.includes('Show thread events'))!;
+      await act(async () => toggle.click());
+      expect(seen).toEqual(['true']);
+    } finally { window.removeEventListener('storage', listener); }
+  });
+
   it('selects a file when the thread-events view is turned off while an event is selected', async () => {
     window.localStorage.setItem('workbench.explorer.showThreadEvents', 'true');
     const { adapter, readFile } = createAdapter();
