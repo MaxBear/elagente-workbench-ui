@@ -1068,6 +1068,33 @@ describe('ThreadTimeline', () => {
 
   });
 
+  it('shows a step offset only when the step has its own time, never a made-up 0s (ELA-257 048f)', () => {
+    const startedAt = new Date(Date.UTC(2026, 9, 22, 21, 0, 0)).toISOString();
+    const artifact = (id: string, createdAt?: string) => ({
+      id, kind: 'artifact' as const, text: `${id}.xyz`, ...(createdAt ? { createdAt } : {}),
+      artifact: { id, pluginId: 'elagente', type: 'chem.structure', title: `${id}.xyz`, payload: {}, createdAt: startedAt },
+    });
+    const element = render(
+      <ThreadTimeline
+        autoCollapseCompletedTurns={false}
+        liveOutput=""
+        turns={[{
+          ...completedTurn([
+            { id: 'user-1', kind: 'userMessage', text: 'Run the campaign.' },
+            artifact('stamped', new Date(Date.UTC(2026, 9, 22, 21, 1, 30)).toISOString()),
+            // Recorded before items were stamped (ELA-253): no time of its own.
+            artifact('legacy'),
+          ]),
+          startedAt,
+        }] as never}
+      />,
+    );
+    const timeOf = (title: string) => [...element.querySelectorAll('.thread-graph-event-artifact')]
+      .find(node => node.textContent?.includes(title))?.querySelector('.thread-graph-relative-time')?.textContent ?? null;
+    expect(timeOf('stamped.xyz')).toBe('1m 30s');
+    expect(timeOf('legacy.xyz')).toBeNull();
+  });
+
   it('shows the latest activity time and a second-precision running duration', () => {
     vi.useFakeTimers();
     const startedAt = new Date(Date.UTC(2026, 6, 3, 20, 10, 0)).toISOString();

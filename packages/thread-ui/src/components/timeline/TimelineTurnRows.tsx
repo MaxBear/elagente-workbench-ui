@@ -1168,7 +1168,9 @@ function TimelineHistoryEntries({
         // Messages read as one log; their time shows on hover.
         timeLabel={isAgentMessage || isUserMessage ? null : timeLabel}
         timeTitle={item.createdAt ? formatLongTimestamp(timestamp) : fallbackTimeTitle}
-        timeMeta={relativeTimeMeta(timestamp)}
+        // The offset from the turn start needs the step's own time: the turn
+        // start as a fallback reads as "0s" on every step (ELA-257 048f).
+        timeMeta={item.createdAt ? relativeTimeMeta(item.createdAt) : null}
         autoOpenToolDetails={autoOpenLatestToolDetails && key === latestEntryKey}
         onOpenExpandedText={onOpenExpandedText}
         onOpenCommandDetail={onOpenCommandDetail}
