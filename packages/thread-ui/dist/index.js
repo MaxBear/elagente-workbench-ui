@@ -19275,7 +19275,7 @@ function TimelineHistoryEntries({
         scrollRootRef,
         timeLabel: isAgentMessage || isUserMessage ? null : timeLabel,
         timeTitle: item.createdAt ? formatLongTimestamp(timestamp) : fallbackTimeTitle,
-        timeMeta: relativeTimeMeta(timestamp),
+        timeMeta: item.createdAt ? relativeTimeMeta(item.createdAt) : null,
         autoOpenToolDetails: autoOpenLatestToolDetails && key === latestEntryKey,
         onOpenExpandedText,
         onOpenCommandDetail,
