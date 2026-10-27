@@ -1229,7 +1229,7 @@ declare function SettingsDialog({ sections, themeMode, effectiveTheme, trigger, 
 
 type WorkspacePathResolver = (path: string) => Promise<boolean>;
 /** A resolver belongs to one adapter/device/workspace; never cache across scopes. */
-declare function createWorkspacePathResolver(adapter: Pick<ThreadWorkspaceAdapter, 'listTree' | 'statLinkedFile'>, identity: {
+declare function createWorkspacePathResolver(adapter: Pick<ThreadWorkspaceAdapter, 'listTree' | 'statLinkedFile' | 'hiddenFiles'>, identity: {
     threadId: string;
     workspaceId?: string | null;
 }, workspaceRoot: string): WorkspacePathResolver;

@@ -2608,7 +2608,11 @@ var filesEn = {
   "files.propertiesOlderDevice": "This device's Supervisor does not report file times yet; they show after it updates.",
   "files.downloadZip": "Download as ZIP",
   "files.showHiddenFiles": "Show hidden files",
-  "files.showThreadEvents": "Show thread events (debug)"
+  "files.showThreadEvents": "Show thread events (debug)",
+  "files.hiddenByDefault": "hidden by default",
+  "files.publishedVersionOf": "Published version of {{name}}",
+  "files.publishedVersionAt": "Published version of {{name}}, {{time}}",
+  "files.hiddenByDefaultTitle": "{{name}} is hidden from the file list by default. It is shown because a link opened it."
 };
 
 // src/i18n/settings.en.ts
@@ -6607,7 +6611,11 @@ var filesZhCN = {
   "files.propertiesOlderDevice": "\u8FD9\u53F0\u8BBE\u5907\u7684 Supervisor \u8FD8\u4E0D\u63D0\u4F9B\u6587\u4EF6\u65F6\u95F4\uFF0C\u66F4\u65B0\u540E\u53EF\u89C1\u3002",
   "files.downloadZip": "\u4E0B\u8F7D\u4E3A ZIP",
   "files.showHiddenFiles": "\u663E\u793A\u9690\u85CF\u6587\u4EF6",
-  "files.showThreadEvents": "\u663E\u793A\u7EBF\u7A0B\u4E8B\u4EF6\uFF08\u8C03\u8BD5\uFF09"
+  "files.showThreadEvents": "\u663E\u793A\u7EBF\u7A0B\u4E8B\u4EF6\uFF08\u8C03\u8BD5\uFF09",
+  "files.hiddenByDefault": "\u9ED8\u8BA4\u9690\u85CF",
+  "files.publishedVersionOf": "{{name}} \u7684\u53D1\u5E03\u7248\u672C",
+  "files.publishedVersionAt": "{{name}} \u7684\u53D1\u5E03\u7248\u672C\uFF0C{{time}}",
+  "files.hiddenByDefaultTitle": "{{name}} \u9ED8\u8BA4\u4E0D\u5728\u6587\u4EF6\u5217\u8868\u4E2D\u663E\u793A\uFF0C\u56E0\u4ECE\u94FE\u63A5\u6253\u5F00\u800C\u663E\u793A\u3002"
 };
 
 // src/i18n/settings.zh-CN.ts

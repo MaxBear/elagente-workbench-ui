@@ -32,10 +32,10 @@ import {
   useLongPress,
   useMenuKeyboard,
   useTabScrollEdges
-} from "./chunk-DZSWI2VM.js";
+} from "./chunk-SURQ5D3C.js";
 import {
   GraphMoleculeViewer
-} from "./chunk-THB3OOFK.js";
+} from "./chunk-E3QRG4MX.js";
 import "./chunk-5LLLXMOS.js";
 import {
   DRAWIO_MAX_BYTES,
@@ -43,7 +43,7 @@ import {
   isBinaryPreview,
   isDownloadOnlyPath,
   isDrawioPath
-} from "./chunk-CJLJDZLH.js";
+} from "./chunk-XUYI3XDH.js";
 import {
   IMAGE_EXTENSIONS,
   MOLECULAR_EXTENSIONS,
@@ -53,6 +53,7 @@ import {
   collectAncestorPaths,
   collectArtifacts,
   collectWorkspaceItems,
+  compareWorkspaceNodes,
   extensionOf,
   findFirstPreviewNode,
   findFirstWorkspaceFile,
@@ -66,13 +67,13 @@ import {
   useThemeFeature,
   workspaceRelativeFocusPath,
   workspaceTreeNodeToGraphNode
-} from "./chunk-FAEK7GVU.js";
+} from "./chunk-MJ2B5Y3F.js";
 import {
   en,
   getLocale,
   translate,
   useI18n
-} from "./chunk-DCALMNCJ.js";
+} from "./chunk-KMRLYZDW.js";
 
 // src/components/ThreadGraphWorkspacePanel.tsx
 import { memo as memo2, useEffect as useEffect12, useMemo as useMemo9, useState as useState11 } from "react";
@@ -601,6 +602,81 @@ function linkedDirectoryNodes(files) {
   }));
 }
 
+// src/components/graph-workspace/explorer/workspaceHiddenPaths.ts
+function isInternalWorkspacePath(path) {
+  return path.split("/").some((segment) => segment.startsWith(".elagente"));
+}
+function parentWorkspacePath(path) {
+  const index = path.lastIndexOf("/");
+  return index < 0 ? "" : path.slice(0, index);
+}
+function markHidden(node) {
+  return { ...node, hiddenByDefault: true, children: node.children.map(markHidden) };
+}
+async function resolveHiddenChain(listHidden, targetPath, firstHiddenPath, isCurrent) {
+  const chain = [...ancestorDirectoryPaths(targetPath), targetPath];
+  const start = chain.indexOf(firstHiddenPath);
+  if (start < 0 || isInternalWorkspacePath(targetPath)) return null;
+  const nodes = [];
+  try {
+    for (const path of chain.slice(start)) {
+      const listing = await listHidden(parentWorkspacePath(path));
+      if (!isCurrent()) return null;
+      const entry = (listing.children ?? []).map(workspaceTreeNodeToGraphNode).find((child) => child.path === path);
+      if (!entry || path !== targetPath && entry.kind !== "directory") return null;
+      nodes.push({ ...entry, children: [] });
+    }
+    const leaf = nodes.at(-1);
+    if (leaf.kind === "directory") {
+      const listing = workspaceTreeNodeToGraphNode(await listHidden(targetPath));
+      if (!isCurrent()) return null;
+      nodes[nodes.length - 1] = {
+        ...leaf,
+        children: listing.children,
+        childrenLoaded: true,
+        hasChildren: listing.children.length > 0
+      };
+    }
+  } catch {
+    return null;
+  }
+  let node = nodes.at(-1);
+  for (let index = nodes.length - 2; index >= 0; index -= 1) {
+    node = { ...nodes[index], children: [node], childrenLoaded: true, hasChildren: true };
+  }
+  return { targetPath, node: markHidden(node) };
+}
+function insertNode(tree, parentPath, node) {
+  if (tree.path === parentPath) {
+    const existing = tree.children.find((child) => child.path === node.path);
+    if (!existing) {
+      return { ...tree, children: [...tree.children, node].sort(compareWorkspaceNodes) };
+    }
+    if (existing.kind !== "directory" || node.kind !== "directory") return tree;
+    let merged = existing;
+    for (const child of node.children) merged = insertNode(merged, node.path, child);
+    return merged === existing ? tree : { ...tree, children: tree.children.map((child) => child === existing ? merged : child) };
+  }
+  const next = tree.children.find(
+    (child) => child.kind === "directory" && (parentPath === child.path || parentPath.startsWith(`${child.path}/`))
+  );
+  if (!next) return tree;
+  const updated = insertNode(next, parentPath, node);
+  return updated === next ? tree : { ...tree, children: tree.children.map((child) => child === next ? updated : child) };
+}
+function withRevealedHiddenPaths(tree, revealed) {
+  let next = tree;
+  for (const entry of revealed) {
+    next = insertNode(next, parentWorkspacePath(entry.node.path), entry.node);
+  }
+  return next;
+}
+function hasRevealedHiddenPath(revealed, path) {
+  if (path === null) return false;
+  const visit = (node) => node.path === path || node.children.some(visit);
+  return revealed.some((entry) => visit(entry.node));
+}
+
 // src/components/graph-workspace/explorer/useWorkspaceExplorerController.ts
 function selectedPathForId(selectedId, nodeMap) {
   if (!selectedId) {
@@ -702,7 +778,10 @@ function useWorkspaceExplorerController({
     () => collectWorkspaceItems(detail, artifacts, status, activeView, { includeThreadEvents: showThreadEvents }),
     [activeView, artifacts, detail, status, locale, showThreadEvents]
   );
-  const fallbackFirstSelectableNode = findFirstPreviewNode(fallbackTree);
+  const fallbackFirstSelectableNode = findFirstPreviewNode({
+    ...fallbackTree,
+    children: fallbackTree.children.filter((node) => node.id !== "artifacts")
+  });
   const initialPersistedState = useRef(persistence.read());
   const [adapterModel, setAdapterModel] = useState(null);
   const adapterTree = useMemo2(
@@ -710,10 +789,14 @@ function useWorkspaceExplorerController({
     [adapterModel]
   );
   const [linkedFiles, setLinkedFiles] = useState([]);
+  const [revealedHidden, setRevealedHidden] = useState([]);
+  const revealedHiddenRef = useRef(revealedHidden);
+  revealedHiddenRef.current = revealedHidden;
   const tree = useMemo2(() => {
-    const root = adapterTree ? { ...adapterTree, children: [...adapterTree.children, ...fallbackTree.children] } : fallbackTree;
+    const listed = adapterTree && revealedHidden.length ? withRevealedHiddenPaths(adapterTree, revealedHidden) : adapterTree;
+    const root = listed ? { ...listed, children: [...listed.children, ...fallbackTree.children] } : fallbackTree;
     return linkedFiles.length ? { ...root, children: [...root.children, ...linkedDirectoryNodes(linkedFiles)] } : root;
-  }, [adapterTree, fallbackTree, linkedFiles, locale]);
+  }, [adapterTree, fallbackTree, linkedFiles, revealedHidden, locale]);
   const nodeMap = useMemo2(() => flattenWorkspaceNodes(tree), [tree]);
   const [selectedNodeId, setSelectedNodeId] = useState(() => {
     const selectedPath = focusPathRequest ? workspaceRelativeFocusPath(
@@ -819,6 +902,33 @@ function useWorkspaceExplorerController({
             nextModel = mergeWorkspaceExplorerSubtree(nextModel, refreshedNode);
           }
         }
+        let revealed = revealedHiddenRef.current;
+        if (revealed.length && !showHidden) {
+          const kept = [];
+          for (const entry of revealed) {
+            try {
+              const listing = await workspaceAdapter.listTree({
+                ...workspaceIdentity,
+                path: parentWorkspacePath(entry.targetPath),
+                showHidden: true
+              });
+              if (workspaceGenerationRef.current !== workspaceGeneration || refreshGenerationRef.current !== refreshGeneration) {
+                return;
+              }
+              if ((listing.children ?? []).some(
+                (child) => workspaceTreeNodeToGraphNode(child).path === entry.targetPath
+              )) {
+                kept.push(entry);
+              }
+            } catch {
+            }
+          }
+          if (kept.length !== revealed.length) {
+            revealed = kept;
+            revealedHiddenRef.current = kept;
+            setRevealedHidden(kept);
+          }
+        }
         const nextTree = workspaceExplorerModelToTree(nextModel);
         adapterModelRef.current = nextModel;
         setAdapterModel(nextModel);
@@ -832,7 +942,7 @@ function useWorkspaceExplorerController({
             (node) => node.path === fallbackPath
           );
           if (virtualNode) return virtualNode.id;
-          if (fallbackPath !== null && hasWorkspaceExplorerPath(nextModel, fallbackPath)) {
+          if (fallbackPath !== null && (hasWorkspaceExplorerPath(nextModel, fallbackPath) || hasRevealedHiddenPath(revealed, fallbackPath))) {
             return `workspace:${fallbackPath}`;
           }
           return firstFile?.id ?? null;
@@ -851,7 +961,7 @@ function useWorkspaceExplorerController({
         }
       }
     },
-    [listIdentity, workspaceAdapter, workspaceIdentity]
+    [listIdentity, showHidden, workspaceAdapter, workspaceIdentity]
   );
   const loadDirectoryChildren = useCallback2(
     async (path) => {
@@ -998,7 +1108,8 @@ function useWorkspaceExplorerController({
         }
         for (const ancestor of ancestors) {
           const existing = findWorkspaceExplorerNodeByPath(nextModel, ancestor);
-          if (existing?.kind === "directory" && existing.childrenState === "resolved") {
+          if (!existing) break;
+          if (existing.kind === "directory" && existing.childrenState === "resolved") {
             continue;
           }
           const loadedNode = workspaceTreeNodeToGraphNode(
@@ -1013,6 +1124,19 @@ function useWorkspaceExplorerController({
           nextModel = mergeWorkspaceExplorerSubtree(nextModel, loadedNode);
         }
         const target = findWorkspaceExplorerNodeByPath(nextModel, targetPath);
+        let revealed = null;
+        if (!target && hiddenFilesAvailable && !showHidden && !isInternalWorkspacePath(targetPath)) {
+          const firstHiddenPath = [...ancestors, targetPath].find(
+            (candidate) => !hasWorkspaceExplorerPath(nextModel, candidate)
+          );
+          revealed = await resolveHiddenChain(
+            (directory) => workspaceAdapter.listTree({ ...workspaceIdentity, path: directory, showHidden: true }),
+            targetPath,
+            firstHiddenPath,
+            isCurrent
+          );
+          if (!isCurrent()) return;
+        }
         if (target?.kind === "directory") {
           const loadedNode = workspaceTreeNodeToGraphNode(await workspaceAdapter.listTree({ ...listIdentity, path: targetPath }));
           if (!isCurrent()) return;
@@ -1021,7 +1145,16 @@ function useWorkspaceExplorerController({
         }
         adapterModelRef.current = nextModel;
         setAdapterModel(nextModel);
-        if (!hasWorkspaceExplorerPath(nextModel, targetPath)) {
+        if (revealed) {
+          const entry = revealed;
+          setRevealedHidden((current) => [
+            ...current.filter((item) => item.targetPath !== targetPath),
+            entry
+          ]);
+          if (flattenWorkspaceNodes(entry.node).get(`workspace:${targetPath}`)?.kind === "directory") {
+            setExpandedPaths((current) => new Set(current).add(targetPath));
+          }
+        } else if (!hasWorkspaceExplorerPath(nextModel, targetPath)) {
           throw new MissingTargetError(translate("files.fileNotFound", { value1: targetPath }));
         }
         setSelectedNodeId(`workspace:${targetPath}`);
@@ -1043,7 +1176,7 @@ function useWorkspaceExplorerController({
         }
       }
     },
-    [detail.workspace.absPath, listIdentity, workspaceAdapter, workspaceIdentity]
+    [detail.workspace.absPath, hiddenFilesAvailable, listIdentity, showHidden, workspaceAdapter, workspaceIdentity]
   );
   const focusArtifact = useCallback2((artifactId) => {
     artifactFocusRef.current = artifactId;
@@ -1089,6 +1222,7 @@ function useWorkspaceExplorerController({
   }, []);
   useEffect2(() => {
     setLinkedFiles([]);
+    setRevealedHidden([]);
     artifactFocusRef.current = null;
     skipPersistenceWriteRef.current = true;
     const persisted = persistence.read();
@@ -1262,7 +1396,7 @@ var SHOW_HIDDEN_KEY = "workbench.explorer.showHidden";
 var SHOW_THREAD_EVENTS_KEY = "workbench.explorer.showThreadEvents";
 function firstNonEventNode(node) {
   if (node.kind === "file" || node.kind === "artifact" || node.kind === "live-artifact") return node;
-  if (node.kind === "event" || node.id === "thread-events") return null;
+  if (node.kind === "event" || node.id === "thread-events" || node.id === "artifacts") return null;
   for (const child of node.children) {
     const found = firstNonEventNode(child);
     if (found) return found;
@@ -2673,6 +2807,7 @@ function WorkspaceExplorerRow({
   const isArtifact = node.kind === "artifact" || node.kind === "live-artifact";
   const canCopyReference = !isArtifact && Boolean(node.workspaceNode);
   const displayName = row.compactPathSegments?.join("/") ?? node.name;
+  const hiddenByDefault = node.hiddenByDefault === true;
   const label = row.matchRanges?.length ? /* @__PURE__ */ jsx5(Fragment4, { children: row.matchRanges.reduce((parts, range, index) => {
     const previousEnd = row.matchRanges?.[index - 1]?.end ?? 0;
     if (range.start > previousEnd) {
@@ -2707,7 +2842,8 @@ function WorkspaceExplorerRow({
       tabIndex: focused ? 0 : -1,
       "data-explorer-node-id": node.id,
       "data-explorer-path": node.path,
-      className: `thread-graph-tree-row group relative flex min-w-0 items-center text-sm transition ${selected ? "is-selected" : ""} ${focused ? "is-focused" : ""}`,
+      ...hiddenByDefault ? { "data-hidden-by-default": "true" } : {},
+      className: `thread-graph-tree-row group relative flex min-w-0 items-center text-sm transition ${selected ? "is-selected" : ""} ${focused ? "is-focused" : ""}${hiddenByDefault ? " is-hidden-by-default" : ""}`,
       style: { paddingLeft },
       onFocus,
       onKeyDown: (event) => {
@@ -2775,7 +2911,11 @@ function WorkspaceExplorerRow({
                 // Long host paths keep their meaningful tail visible.
                 /* @__PURE__ */ jsx5("span", { className: "workspace-linked-directory-label min-w-0 flex-1", title: `${displayName}
 ${translate("files.linkedFilesAreReadOnlyPreviews")}`, children: /* @__PURE__ */ jsx5("bdi", { children: displayName }) })
-              ) : /* @__PURE__ */ jsx5("span", { className: "flex min-w-0 flex-1", title: displayName, children: row.matchRanges?.length ? /* @__PURE__ */ jsx5("span", { className: "min-w-0 truncate", children: label }) : /* @__PURE__ */ jsx5(MiddleName, { name: displayName }) })
+              ) : /* @__PURE__ */ jsxs5("span", { className: "workspace-node-label flex min-w-0 flex-1", title: hiddenByDefault ? `${displayName}
+${translate("files.hiddenByDefaultTitle", { name: displayName })}` : displayName, children: [
+                row.matchRanges?.length ? /* @__PURE__ */ jsx5("span", { className: "min-w-0 truncate", children: label }) : /* @__PURE__ */ jsx5(MiddleName, { name: displayName }),
+                hiddenByDefault ? /* @__PURE__ */ jsx5("span", { className: "workspace-hidden-hint", children: translate("files.hiddenByDefault") }) : null
+              ] })
             ]
           }
         ),
@@ -3174,7 +3314,9 @@ function WorkspaceExplorerPanel({
   const visibleTree = useMemo4(
     () => ({
       ...tree,
-      children: tree.children.filter((node) => node.id !== "live")
+      // Live artifacts have their own list; published artifacts (ELA-260) open
+      // from Inspect and links only, never as a second copy of the files.
+      children: tree.children.filter((node) => node.id !== "live" && node.id !== "artifacts")
     }),
     [tree]
   );
@@ -3937,7 +4079,7 @@ function WorkspaceFileTabs({
 // src/components/graph-workspace/GraphWorkspacePreviewPane.tsx
 import { Fragment as Fragment6, jsx as jsx12, jsxs as jsxs10 } from "react/jsx-runtime";
 var GraphWorkspaceMonacoEditor = lazy(
-  () => import("./GraphWorkspaceMonacoEditor-COV5EXYH.js")
+  () => import("./GraphWorkspaceMonacoEditor-5LUXE24Q.js")
 );
 var isHostFilePath = (path) => path.startsWith("/") || /^[a-z]:[\\/]/i.test(path);
 function fileSizeLabel(size) {
@@ -4036,7 +4178,7 @@ function translateReadOnly(reason) {
   const key = `files.safeReason.${reason}`;
   return Object.hasOwn(en, key) ? translate(key) : reason;
 }
-var WorkspaceDocumentDiff = lazy(() => import("./GraphWorkspaceMonacoDiff-AK3QKL5Y.js"));
+var WorkspaceDocumentDiff = lazy(() => import("./GraphWorkspaceMonacoDiff-67NZL3FX.js"));
 var SMALL_TEXT_FILE_MAX_BYTES = 50 * 1024;
 var SMALL_TEXT_FILE_MAX_LINES = 1e3;
 var MARKDOWN_EXTENSIONS = /* @__PURE__ */ new Set(["md", "markdown"]);
@@ -4089,6 +4231,12 @@ function isSmallEditableTextFile(file) {
 function previewTargetTitle(target) {
   if (!target) {
     return null;
+  }
+  const artifact = target.kind === "artifact" ? target.node.artifact : void 0;
+  if (artifact) {
+    const name = artifact.workspacePath || artifact.title || artifact.id;
+    const time = Date.parse(artifact.createdAt);
+    return Number.isFinite(time) && time > 0 ? translate("files.publishedVersionAt", { name, time: new Date(time).toLocaleString(getLocale()) }) : translate("files.publishedVersionOf", { name });
   }
   return target.node.path || target.node.name || null;
 }

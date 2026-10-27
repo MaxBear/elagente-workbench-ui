@@ -1,6 +1,6 @@
 import {
   translate
-} from "./chunk-DCALMNCJ.js";
+} from "./chunk-KMRLYZDW.js";
 
 // src/components/themeHooks.ts
 import { useSyncExternalStore } from "react";
@@ -468,6 +468,7 @@ export {
   hasWorkspacePath,
   buildMoleculePreviewSnapshot,
   languageForPath,
+  compareWorkspaceNodes,
   collectWorkspaceItems,
   flattenWorkspaceNodes,
   findFirstPreviewNode,

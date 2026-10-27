@@ -1,14 +1,14 @@
 import {
   editorThemeFor,
   monacoLanguage
-} from "./chunk-ANAOLLTV.js";
-import "./chunk-CJLJDZLH.js";
+} from "./chunk-3N3UNHXK.js";
+import "./chunk-XUYI3XDH.js";
 import {
   useDocumentThemeRevision
-} from "./chunk-FAEK7GVU.js";
+} from "./chunk-MJ2B5Y3F.js";
 import {
   translate
-} from "./chunk-DCALMNCJ.js";
+} from "./chunk-KMRLYZDW.js";
 
 // src/components/graph-workspace/GraphWorkspaceMonacoDiff.tsx
 import { useEffect, useRef } from "react";

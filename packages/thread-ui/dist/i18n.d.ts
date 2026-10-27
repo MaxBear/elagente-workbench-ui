@@ -2239,6 +2239,10 @@ declare const en: {
     readonly "files.downloadZip": "Download as ZIP";
     readonly "files.showHiddenFiles": "Show hidden files";
     readonly "files.showThreadEvents": "Show thread events (debug)";
+    readonly "files.hiddenByDefault": "hidden by default";
+    readonly "files.publishedVersionOf": "Published version of {{name}}";
+    readonly "files.publishedVersionAt": "Published version of {{name}}, {{time}}";
+    readonly "files.hiddenByDefaultTitle": "{{name}} is hidden from the file list by default. It is shown because a link opened it.";
     readonly "devices.reasonUnmanaged": "This is a source or unmanaged executable. Run the GitHub setup command to install a managed native runtime.";
     readonly "devices.reasonHostManaged": "Host-managed updates require a native installation and a stable native launch command. Run the GitHub setup command first.";
     readonly "devices.reasonRetiredNpmWindows": "This Windows Device Manager device runs the retired npm package. Run the Windows setup command from the Devices page to move it to the native GitHub runtime.";
@@ -6285,6 +6289,10 @@ declare const zhCN: {
     "files.downloadZip": "下载为 ZIP";
     "files.showHiddenFiles": "显示隐藏文件";
     "files.showThreadEvents": "显示线程事件（调试）";
+    "files.hiddenByDefault": "默认隐藏";
+    "files.publishedVersionOf": "{{name}} 的发布版本";
+    "files.publishedVersionAt": "{{name}} 的发布版本，{{time}}";
+    "files.hiddenByDefaultTitle": "{{name}} 默认不在文件列表中显示，因从链接打开而显示。";
     "devices.reasonUnmanaged": "这是源码运行或非托管的可执行文件。运行 GitHub 安装命令，安装托管的原生运行时。";
     "devices.reasonHostManaged": "由主机管理的更新需要原生安装和稳定的原生启动命令。请先运行 GitHub 安装命令。";
     "devices.reasonRetiredNpmWindows": "这台 Windows 设备管理器设备运行的是已停用的 npm 包。请在“设备”页运行 Windows 安装命令，迁移到原生 GitHub 运行时。";
@@ -10353,6 +10361,10 @@ declare const resources: {
         readonly "files.downloadZip": "Download as ZIP";
         readonly "files.showHiddenFiles": "Show hidden files";
         readonly "files.showThreadEvents": "Show thread events (debug)";
+        readonly "files.hiddenByDefault": "hidden by default";
+        readonly "files.publishedVersionOf": "Published version of {{name}}";
+        readonly "files.publishedVersionAt": "Published version of {{name}}, {{time}}";
+        readonly "files.hiddenByDefaultTitle": "{{name}} is hidden from the file list by default. It is shown because a link opened it.";
         readonly "devices.reasonUnmanaged": "This is a source or unmanaged executable. Run the GitHub setup command to install a managed native runtime.";
         readonly "devices.reasonHostManaged": "Host-managed updates require a native installation and a stable native launch command. Run the GitHub setup command first.";
         readonly "devices.reasonRetiredNpmWindows": "This Windows Device Manager device runs the retired npm package. Run the Windows setup command from the Devices page to move it to the native GitHub runtime.";
@@ -14398,6 +14410,10 @@ declare const resources: {
         "files.downloadZip": "下载为 ZIP";
         "files.showHiddenFiles": "显示隐藏文件";
         "files.showThreadEvents": "显示线程事件（调试）";
+        "files.hiddenByDefault": "默认隐藏";
+        "files.publishedVersionOf": "{{name}} 的发布版本";
+        "files.publishedVersionAt": "{{name}} 的发布版本，{{time}}";
+        "files.hiddenByDefaultTitle": "{{name}} 默认不在文件列表中显示，因从链接打开而显示。";
         "devices.reasonUnmanaged": "这是源码运行或非托管的可执行文件。运行 GitHub 安装命令，安装托管的原生运行时。";
         "devices.reasonHostManaged": "由主机管理的更新需要原生安装和稳定的原生启动命令。请先运行 GitHub 安装命令。";
         "devices.reasonRetiredNpmWindows": "这台 Windows 设备管理器设备运行的是已停用的 npm 包。请在“设备”页运行 Windows 安装命令，迁移到原生 GitHub 运行时。";
