@@ -29,6 +29,20 @@
   color: var(--theme-fg);
 }
 
+/* Nothing to see: its animation restarts each time the browser rebuilds the
+   timeline's box (its pane moved or shown again), which also drops the scroll
+   offset without a scroll event. The timeline hears `animationstart` and puts
+   the reader back (ELA-259). */
+.thread-scroll-box-probe {
+  height: 0;
+  animation: thread-scroll-box-rebuilt 1ms;
+}
+
+@keyframes thread-scroll-box-rebuilt {
+  from { opacity: 1; }
+  to { opacity: 1; }
+}
+
 .thread-ui-shell .thread-graph-scroll-content {
   min-height: 100%;
   /* The spacer is measured on the page; inside the zoomed content it is divided back. */

@@ -23,6 +23,14 @@ import {
 const ANCHOR_HOLD_MS = 900;
 const ANCHOR_EXTEND_MS = 500;
 const TOUCH_SCROLL_SLOP_PX = 6;
+// A scroll this soon after the reader's wheel, touch, key or pointer is theirs,
+// even when its scroll event has not arrived yet.
+const READER_INPUT_MS = 500;
+
+/** Display: none or out of the document: no box, so its geometry says nothing. */
+function hasNoBox(container: HTMLElement) {
+  return container.clientHeight === 0 && container.scrollHeight === 0;
+}
 
 function useChangeRevision(inputs: readonly unknown[]) {
   const previousInputsRef = useRef<readonly unknown[] | null>(null);
@@ -85,6 +93,7 @@ export function useTimelineScroll({
   const lastTouchYRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const anchorRef = useRef<{ element: Element; top: number; until: number; frame: number } | null>(null);
+  const readerInputAtRef = useRef(Number.NEGATIVE_INFINITY);
   const touchPullDistanceRef = useRef(0);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_TURNS);
   const [loadMoreClicks, setLoadMoreClicks] = useState(0);
@@ -215,8 +224,62 @@ export function useTimelineScroll({
     anchorRef.current.frame = window.requestAnimationFrame(holdAnchor);
   }, [holdAnchor, stopAnchor]);
 
+  const scrollToBottom = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.scrollTop = container.scrollHeight;
+    lastScrollTopRef.current = container.scrollTop;
+    lastObservedScrollHeightRef.current = container.scrollHeight;
+    isTailVisibleRef.current = true;
+    setIsTailVisible((current) => (current ? current : true));
+    userScrolledAwayFromTailRef.current = false;
+    shouldStickToBottomRef.current = true;
+  }, []);
+
+  /** The reader's wheel, touch, key or pointer: what scrolls next is theirs. */
+  const noteReaderInput = useCallback(() => {
+    readerInputAtRef.current = performance.now();
+  }, []);
+
+  /** A browser drops a scroller's offset when it rebuilds its box, and says
+      nothing: no scroll event. A host does that by moving the timeline's pane
+      (React reorders keyed siblings, ELA-259) or by showing it again after
+      `display: none`. The reader goes back where they were, or to the newest
+      reply if they were following it. True when the position was put back. */
+  const restoreLostScrollPosition = useCallback(() => {
+    const container = scrollContainerRef.current;
+    const remembered = lastScrollTopRef.current;
+    if (
+      !container ||
+      anchorRef.current ||
+      remembered <= 0 ||
+      container.scrollTop !== 0 ||
+      hasNoBox(container) ||
+      performance.now() - readerInputAtRef.current < READER_INPUT_MS
+    ) {
+      return false;
+    }
+
+    if (shouldStickToBottomRef.current && !userScrolledAwayFromTailRef.current) {
+      scrollToBottom();
+    } else {
+      container.scrollTop = remembered;
+      lastScrollTopRef.current = container.scrollTop;
+    }
+    return true;
+  }, [scrollToBottom]);
+
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
+    // Hidden, there is no position to learn; a rebuilt box is not the reader.
+    if (container && hasNoBox(container)) return;
+    if (restoreLostScrollPosition()) {
+      recomputeTailVisibility();
+      return;
+    }
     if (container && anchorRef.current) {
       // Scrolling done to hold a clicked control is not the reader moving.
       lastScrollTopRef.current = container.scrollTop;
@@ -247,27 +310,14 @@ export function useTimelineScroll({
       }
     }
     recomputeTailVisibility();
-  }, [recomputeTailVisibility]);
-
-  const scrollToBottom = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) {
-      return;
-    }
-
-    container.scrollTop = container.scrollHeight;
-    lastScrollTopRef.current = container.scrollTop;
-    lastObservedScrollHeightRef.current = container.scrollHeight;
-    isTailVisibleRef.current = true;
-    setIsTailVisible((current) => (current ? current : true));
-    userScrolledAwayFromTailRef.current = false;
-    shouldStickToBottomRef.current = true;
-  }, []);
+  }, [recomputeTailVisibility, restoreLostScrollPosition]);
 
   /** Call before content changes size because of the reader; pass the control
       they used to keep it where it is on screen. */
   const preserveScrollPositionForResize = useCallback((anchor?: Element | null) => {
     scrollIntentRevisionRef.current += 1;
+    // What follows (a toggle, a jump to a turn or a search hit) is the reader's.
+    noteReaderInput();
     const container = scrollContainerRef.current;
     if (!container) {
       return;
@@ -277,7 +327,7 @@ export function useTimelineScroll({
     shouldStickToBottomRef.current = false;
     userScrolledAwayFromTailRef.current = true;
     if (anchor) anchorScroll(anchor);
-  }, [anchorScroll]);
+  }, [anchorScroll, noteReaderInput]);
 
   const handleLoadEarlierClick = useCallback(() => {
     if (serverManagedHistory && loadedHiddenCount === 0) {
@@ -295,6 +345,7 @@ export function useTimelineScroll({
   ]);
 
   const handleWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
+    noteReaderInput();
     releaseAnchor();
     const container = scrollContainerRef.current;
     if (
@@ -312,16 +363,18 @@ export function useTimelineScroll({
     }
 
     triggerServerLoadEarlier();
-  }, [canLoadEarlierFromServer, releaseAnchor, triggerServerLoadEarlier]);
+  }, [canLoadEarlierFromServer, noteReaderInput, releaseAnchor, triggerServerLoadEarlier]);
 
   const handleTouchStart = useCallback((event: TouchEvent<HTMLDivElement>) => {
+    noteReaderInput();
     // A tap on a toggle is not a scroll; only a moving finger releases the hold.
     touchStartYRef.current = event.touches.item(0)?.clientY ?? null;
     lastTouchYRef.current = touchStartYRef.current;
     touchPullDistanceRef.current = 0;
-  }, []);
+  }, [noteReaderInput]);
 
   const handleTouchMove = useCallback((event: TouchEvent<HTMLDivElement>) => {
+    noteReaderInput();
     const container = scrollContainerRef.current;
     const nextY = event.touches.item(0)?.clientY ?? null;
     const previousY = lastTouchYRef.current;
@@ -359,7 +412,7 @@ export function useTimelineScroll({
     if (touchPullDistanceRef.current >= 28) {
       triggerServerLoadEarlier();
     }
-  }, [canLoadEarlierFromServer, releaseAnchor, triggerServerLoadEarlier]);
+  }, [canLoadEarlierFromServer, noteReaderInput, releaseAnchor, triggerServerLoadEarlier]);
 
   const handleTouchEnd = useCallback(() => {
     lastTouchYRef.current = null;
@@ -433,7 +486,7 @@ export function useTimelineScroll({
 
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (container && !anchorRef.current) {
+    if (container && !anchorRef.current && !hasNoBox(container)) {
       lastObservedScrollHeightRef.current = container.scrollHeight;
       lastScrollTopRef.current = container.scrollTop;
       if (isNearBottom(container, 1)) {
@@ -448,6 +501,12 @@ export function useTimelineScroll({
     }
     recomputeTailVisibility();
   }, [contentRevision, recomputeTailVisibility, visibleCount]);
+
+  // Every commit, before paint: a host that moved or re-showed the timeline in
+  // this commit has silently reset its offset (ELA-259).
+  useLayoutEffect(() => {
+    restoreLostScrollPosition();
+  });
 
   // A layout effect: content that arrives while following the tail is scrolled
   // to before it paints, not a frame later from its top.
@@ -491,6 +550,10 @@ export function useTimelineScroll({
 
     lastObservedScrollHeightRef.current = container.scrollHeight;
     const observer = new ResizeObserver(() => {
+      // Hidden: its zero size is not the content's. Shown again, the offset the
+      // browser dropped comes back before the content is followed.
+      if (hasNoBox(container)) return;
+      if (restoreLostScrollPosition()) return;
       const nextScrollHeight = container.scrollHeight;
       const previousScrollHeight = lastObservedScrollHeightRef.current;
       lastObservedScrollHeightRef.current = nextScrollHeight;
@@ -553,7 +616,7 @@ export function useTimelineScroll({
       observer.disconnect();
       viewportObserver.disconnect();
     };
-  }, [correctAnchor, scrollToBottom]);
+  }, [correctAnchor, restoreLostScrollPosition, scrollToBottom]);
 
   useEffect(() => {
     if (!shouldStickToBottomRef.current || userScrolledAwayFromTailRef.current) {
@@ -595,6 +658,8 @@ export function useTimelineScroll({
     preserveScrollPositionForResize,
     holdAnchorNow,
     releaseAnchor,
+    noteReaderInput,
+    restoreLostScrollPosition,
     serverManagedHistory,
     effectiveTotalTurnCount,
     startIndex,

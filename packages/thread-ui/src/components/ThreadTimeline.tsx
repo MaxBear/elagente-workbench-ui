@@ -304,6 +304,8 @@ function ThreadTimelineComponent({
     preserveScrollPositionForResize,
     holdAnchorNow,
     releaseAnchor,
+    noteReaderInput,
+    restoreLostScrollPosition,
     serverManagedHistory,
     effectiveTotalTurnCount,
     startIndex,
@@ -859,8 +861,13 @@ function ThreadTimelineComponent({
           onScroll={handleTimelineScroll}
           onWheel={(event) => { resetNavigation(); handleWheel(event); }}
           onTouchStart={(event) => { resetNavigation(); handleTouchStart(event); }}
-          onPointerDown={(event) => { resetNavigation(); if (event.target === event.currentTarget) releaseAnchor(); }}
-          onKeyDown={(event) => { if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) { resetNavigation(); releaseAnchor(); } }}
+          onPointerDown={(event) => { noteReaderInput(); resetNavigation(); if (event.target === event.currentTarget) releaseAnchor(); }}
+          // Dragging the scrollbar keeps the scroll the reader's.
+          onPointerMove={(event) => { if (event.buttons) noteReaderInput(); }}
+          onKeyDown={(event) => { if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) { noteReaderInput(); resetNavigation(); releaseAnchor(); } }}
+          // The probe's animation restarts whenever the browser rebuilds this box
+          // (a host moved or re-showed the pane): the offset it dropped comes back.
+          onAnimationStart={(event) => { if (event.animationName === 'thread-scroll-box-rebuilt') restoreLostScrollPosition(); }}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
@@ -874,6 +881,7 @@ function ThreadTimelineComponent({
             ], 'room', threadId)} />
           </div>
           <div ref={topSentinelRef} aria-hidden="true" className="h-px" />
+          <div aria-hidden="true" className="thread-scroll-box-probe" />
           {turns.length > 0 && (
             <div className="thread-graph-history-control px-3 pb-1 pt-2 sm:px-5 sm:pb-1.5 sm:pt-3">
               <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm">
