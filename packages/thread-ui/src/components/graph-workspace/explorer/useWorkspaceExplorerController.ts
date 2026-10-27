@@ -167,7 +167,11 @@ export function useWorkspaceExplorerController({
     () => collectWorkspaceItems(detail, artifacts, status, activeView, { includeThreadEvents: showThreadEvents }),
     [activeView, artifacts, detail, status, locale, showThreadEvents],
   );
-  const fallbackFirstSelectableNode = findFirstPreviewNode(fallbackTree);
+  // Published artifacts are not tree rows (ELA-260): never the default selection.
+  const fallbackFirstSelectableNode = findFirstPreviewNode({
+    ...fallbackTree,
+    children: fallbackTree.children.filter((node) => node.id !== 'artifacts'),
+  });
   const initialPersistedState = useRef(persistence.read());
   const [adapterModel, setAdapterModel] =
     useState<WorkspaceExplorerModel | null>(null);
@@ -901,10 +905,11 @@ export function useWorkspaceExplorerController({
 const SHOW_HIDDEN_KEY = 'workbench.explorer.showHidden';
 const SHOW_THREAD_EVENTS_KEY = 'workbench.explorer.showThreadEvents';
 
-/** The first file or artifact, outside the thread-events debug view. */
+/** The first file or live artifact a tree row shows, outside the thread-events debug view. */
 function firstNonEventNode(node: WorkspaceTreeNode): WorkspaceTreeNode | null {
   if (node.kind === 'file' || node.kind === 'artifact' || node.kind === 'live-artifact') return node;
-  if (node.kind === 'event' || node.id === 'thread-events') return null;
+  // Published artifacts are not tree rows (ELA-260).
+  if (node.kind === 'event' || node.id === 'thread-events' || node.id === 'artifacts') return null;
   for (const child of node.children) {
     const found = firstNonEventNode(child);
     if (found) return found;

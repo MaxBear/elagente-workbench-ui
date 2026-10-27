@@ -17,6 +17,10 @@ vi.mock('./GraphResizablePanels', () => ({
   ),
   ResizableHandle: () => null,
 }));
+// A workspace structure file previews in the 3D viewer, which needs WebGL.
+vi.mock('./GraphMoleculeViewer', () => ({
+  GraphMoleculeViewer: () => <div data-testid="workspace-molecule-viewer" />,
+}));
 const detail = {
   thread: {
     id: 'thread',
@@ -342,5 +346,56 @@ describe('native files alongside immutable artifact inspection', () => {
         'chat',
       ).children.find((node) => node.id === 'artifacts')!.children,
     ).toHaveLength(2);
+  });
+  describe('published artifacts stay out of the file tree (ELA-260)', () => {
+    const header = () => host.querySelector('.thread-graph-viewer-header')?.textContent ?? '';
+    const inspected = () => host.querySelector('[data-testid="reviewed-inspector"]')?.getAttribute('data-artifact');
+    // The workspace file itself is a readable structure.
+    const xyzAdapter = () => {
+      const native = nativeAdapter();
+      native.readFile.mockImplementation(async ({ path }) => ({ path, name: path, content: '1\n\nH 0 0 0\n', language: 'xyz', size: 12, truncated: false, nextOffset: 12 }));
+      return native;
+    };
+    it('renders no artifacts root or artifact rows, beside a real artifacts folder', async () => {
+      const { adapter } = xyzAdapter();
+      await render(adapter, [artifact('a'), artifact('b', 'other', 'other')]);
+      await vi.waitFor(() => expect(host.querySelector('[data-explorer-path="same.xyz"]')).not.toBeNull());
+      expect(host.querySelector('[data-explorer-path="artifacts:"]')).toBeNull();
+      expect(host.querySelector('[data-explorer-path^="artifacts:/"]')).toBeNull();
+      expect(host.textContent).not.toContain('.artifact');
+      // A native workspace folder named artifacts is a real file and stays.
+      expect(host.querySelector('[data-explorer-path="artifacts"]')).not.toBeNull();
+      // With no link, the Explorer opens a workspace file, not an invisible artifact.
+      expect(host.querySelector('[data-explorer-path="same.xyz"]')?.getAttribute('aria-selected')).toBe('true');
+    });
+    it('Inspect opens the published version with its scientific target, no hidden selection and a working keyboard', async () => {
+      const { adapter, readFile } = nativeAdapter(),
+        value = artifact('a');
+      await render(adapter, [value], { artifactId: 'a', path: 'same.xyz', requestId: 1 });
+      await vi.waitFor(() => expect(inspected()).toBe('a'));
+      const context = renderArtifact.mock.calls.at(-1)?.[0];
+      expect(context?.artifact).toBe(value);
+      expect((context?.artifact.payload as { target: { artifactId: string } }).target.artifactId).toBe('a');
+      expect(header()).toContain('Published version of same.xyz');
+      expect(header()).toContain(new Date('2026-10-04T00:00:00Z').toLocaleString('en'));
+      expect(readFile).not.toHaveBeenCalled();
+      // No row is highlighted for the invisible artifact, and one row still takes focus.
+      expect(host.querySelector('[role="treeitem"][aria-selected="true"]')).toBeNull();
+      const focusable = host.querySelectorAll<HTMLElement>('[role="treeitem"][tabindex="0"]');
+      expect(focusable).toHaveLength(1);
+      const before = focusable[0]!.getAttribute('data-explorer-path');
+      await act(async () => focusable[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+      expect(host.querySelector('[role="treeitem"][tabindex="0"]')?.getAttribute('data-explorer-path')).not.toBe(before);
+    });
+    it('opens an artifact by id, and Open in files goes to its workspace path', async () => {
+      const { adapter, readFile } = xyzAdapter();
+      await render(adapter, [artifact('a'), artifact('b', 'other', 'other')], { artifactId: 'b', path: '', requestId: 1 });
+      await vi.waitFor(() => expect(inspected()).toBe('b'));
+      expect(header()).toContain('Published version of same.xyz');
+      await render(adapter, [artifact('a'), artifact('b', 'other', 'other')], { path: 'same.xyz', requestId: 2 });
+      await vi.waitFor(() => expect(readFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'same.xyz' })));
+      expect(host.querySelector('[data-explorer-path="same.xyz"]')?.getAttribute('aria-selected')).toBe('true');
+      expect(inspected()).toBeUndefined();
+    });
   });
 });

@@ -244,6 +244,15 @@ function previewTargetTitle(target: GraphWorkspacePreviewTarget) {
   if (!target) {
     return null;
   }
+  const artifact = target.kind === 'artifact' ? target.node.artifact : undefined;
+  if (artifact) {
+    // ELA-260: the immutable copy published from a workspace file, not the file itself.
+    const name = artifact.workspacePath || artifact.title || artifact.id;
+    const time = Date.parse(artifact.createdAt);
+    return Number.isFinite(time) && time > 0
+      ? translate('files.publishedVersionAt', { name, time: new Date(time).toLocaleString(getLocale()) })
+      : translate('files.publishedVersionOf', { name });
+  }
   return target.node.path || target.node.name || null;
 }
 

@@ -684,5 +684,7 @@ export const filesEn = {
   "files.showHiddenFiles": "Show hidden files",
   "files.showThreadEvents": "Show thread events (debug)",
   "files.hiddenByDefault": "hidden by default",
+  "files.publishedVersionOf": "Published version of {{name}}",
+  "files.publishedVersionAt": "Published version of {{name}}, {{time}}",
   "files.hiddenByDefaultTitle": "{{name}} is hidden from the file list by default. It is shown because a link opened it.",
 } as const;

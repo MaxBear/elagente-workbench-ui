@@ -167,7 +167,9 @@ export function WorkspaceExplorerPanel({
   const visibleTree = useMemo(
     () => ({
       ...tree,
-      children: tree.children.filter((node) => node.id !== 'live'),
+      // Live artifacts have their own list; published artifacts (ELA-260) open
+      // from Inspect and links only, never as a second copy of the files.
+      children: tree.children.filter((node) => node.id !== 'live' && node.id !== 'artifacts'),
     }),
     [tree],
   );
