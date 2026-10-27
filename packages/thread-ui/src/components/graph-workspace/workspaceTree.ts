@@ -42,6 +42,8 @@ export interface WorkspaceTreeNode {
   childrenLoaded?: boolean;
   truncated?: boolean;
   workspaceNode?: ThreadWorkspaceTreeNode;
+  /** Hidden from listings by default (`.workbenchignore`); shown only because a link opened it. */
+  hiddenByDefault?: boolean;
 }
 
 export const MOLECULAR_EXTENSIONS = new Set([

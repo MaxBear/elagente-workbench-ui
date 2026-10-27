@@ -127,6 +127,7 @@ export function WorkspaceExplorerRow({
   // The upstream menu copies paths; an immutable artifact has no workspace path to copy.
   const canCopyReference = !isArtifact && Boolean(node.workspaceNode);
   const displayName = row.compactPathSegments?.join('/') ?? node.name;
+  const hiddenByDefault = node.hiddenByDefault === true;
   const label = row.matchRanges?.length ? (
     <>
       {row.matchRanges.reduce<ReactNode[]>((parts, range, index) => {
@@ -168,9 +169,10 @@ export function WorkspaceExplorerRow({
       tabIndex={focused ? 0 : -1}
       data-explorer-node-id={node.id}
       data-explorer-path={node.path}
+      {...(hiddenByDefault ? { 'data-hidden-by-default': 'true' } : {})}
       className={`thread-graph-tree-row group relative flex min-w-0 items-center text-sm transition ${
         selected ? 'is-selected' : ''
-      } ${focused ? 'is-focused' : ''}`}
+      } ${focused ? 'is-focused' : ''}${hiddenByDefault ? ' is-hidden-by-default' : ''}`}
       style={{ paddingLeft }}
       onFocus={onFocus}
       onKeyDown={(event) => {
@@ -240,8 +242,9 @@ export function WorkspaceExplorerRow({
             <bdi>{displayName}</bdi>
           </span>
         ) : (
-          <span className="flex min-w-0 flex-1" title={displayName}>
+          <span className="workspace-node-label flex min-w-0 flex-1" title={hiddenByDefault ? `${displayName}\n${translate('files.hiddenByDefaultTitle', { name: displayName })}` : displayName}>
             {row.matchRanges?.length ? <span className="min-w-0 truncate">{label}</span> : <MiddleName name={displayName} />}
+            {hiddenByDefault ? <span className="workspace-hidden-hint">{translate('files.hiddenByDefault')}</span> : null}
           </span>
         )}
       </button>

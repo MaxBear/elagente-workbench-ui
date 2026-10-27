@@ -27,7 +27,11 @@ vi.mock('./GraphWorkspacePreviewPane', () => ({
     previewFile,
     downloadOnly,
     downloadReason,
+    error,
+    missingPath,
   }: {
+    error?: string | null;
+    missingPath?: string | null;
     downloadOnly?: boolean;
     downloadReason?: string | null;
     pdfUrl?: string | null;
@@ -38,7 +42,8 @@ vi.mock('./GraphWorkspacePreviewPane', () => ({
     previewFile?: ThreadWorkspaceFilePreview | null;
   }) => (
     <div data-testid="preview-file" data-focus-line={focusLine ?? undefined} data-pdf-url={pdfUrl ?? undefined}
-      data-download-only={downloadOnly ? 'true' : undefined} data-download-reason={downloadReason ?? undefined}>
+      data-download-only={downloadOnly ? 'true' : undefined} data-download-reason={downloadReason ?? undefined}
+      data-missing-path={missingPath ?? undefined} data-error={error ?? undefined}>
       {previewFile?.path ?? 'none'}
       {onCollapse ? (
         <button type="button" aria-label="Hide Editor" onClick={onCollapse} />
@@ -246,6 +251,103 @@ describe('GraphWorkspaceExplorer', () => {
     expect(window.localStorage.getItem('workbench.explorer.showHidden')).toBe('true');
     act(() => more()!.click());
     expect(host!.querySelector('[role="menuitemcheckbox"]')?.getAttribute('aria-checked')).toBe('true');
+  });
+
+  describe('links into folders hidden by default (ELA-260)', () => {
+    // `.workbenchignore` hides runs/ and tool-images/ from file/list; file/read still works.
+    function createHiddenAdapter() {
+      const visible: Record<string, ThreadWorkspaceTreeNode> = {
+        '': directory('', [directory('src', [], false), file('README.md')]),
+        src: directory('src', [file('src/index.ts')]),
+      };
+      const hidden: Record<string, ThreadWorkspaceTreeNode> = {
+        '': directory('', [directory('runs', [], false), directory('src', [], false), directory('tool-images', [], false), file('README.md')]),
+        src: directory('src', [file('src/index.ts')]),
+        runs: directory('runs', [directory('runs/abc', [], false), directory('runs/def', [], false)]),
+        'runs/abc': directory('runs/abc', [file('runs/abc/x.out'), file('runs/abc/y.log')]),
+        'tool-images': directory('tool-images', [file('tool-images/a.png')]),
+      };
+      const listTree = vi.fn<ThreadWorkspaceAdapter['listTree']>(async ({ path, showHidden }) => {
+        const tree = (showHidden ? hidden : visible)[path ?? ''];
+        if (!tree) throw new Error(`No such file or directory: ${path}`);
+        return tree;
+      });
+      const readFile = vi.fn<ThreadWorkspaceAdapter['readFile']>(async ({ path }) => filePreview(path));
+      return { adapter: { listTree, readFile, hiddenFiles: true } satisfies ThreadWorkspaceAdapter, listTree, readFile };
+    }
+    const row = (path: string) => host?.querySelector<HTMLElement>(`[data-explorer-path="${path}"]`) ?? null;
+    const preview = () => host?.querySelector('[data-testid="preview-file"]');
+
+    it('opens the target and reveals only its chain, marked hidden by default, without the global toggle', async () => {
+      const { adapter, listTree, readFile } = createHiddenAdapter();
+      await renderExplorer(adapter, { path: '/workspace/demo/runs/abc/x.out', requestId: 1 });
+      await vi.waitFor(() => expect(preview()?.textContent).toBe('runs/abc/x.out'));
+      expect(readFile).toHaveBeenCalledWith(expect.objectContaining({ path: 'runs/abc/x.out' }));
+      const target = row('runs/abc/x.out')!;
+      expect(target.getAttribute('aria-selected')).toBe('true');
+      expect(target.getAttribute('data-hidden-by-default')).toBe('true');
+      expect(target.textContent).toContain('hidden by default');
+      expect(row('runs/abc')?.getAttribute('data-hidden-by-default')).toBe('true');
+      // Other hidden entries stay hidden.
+      for (const path of ['tool-images', 'runs/def', 'runs/abc/y.log']) expect(row(path)).toBeNull();
+      expect(row('src')?.getAttribute('data-hidden-by-default')).toBeNull();
+      expect(window.localStorage.getItem('workbench.explorer.showHidden')).toBeNull();
+      expect(preview()?.getAttribute('data-error')).toBeNull();
+      // Only the chain is listed with showHidden; nothing hidden is listed without it.
+      expect(listTree.mock.calls.filter(([input]) => input.showHidden).map(([input]) => input.path)).toEqual(['', 'runs', 'runs/abc']);
+      expect(listTree.mock.calls.some(([input]) => !input.showHidden && String(input.path).startsWith('runs'))).toBe(false);
+
+      // A refresh keeps the revealed file open.
+      readFile.mockClear();
+      const refreshes = listTree.mock.calls.length;
+      await act(async () => host!.querySelector<HTMLButtonElement>('button[aria-label="Refresh workspace"]')!.click());
+      await vi.waitFor(() => expect(listTree.mock.calls.length).toBeGreaterThan(refreshes));
+      expect(row('runs/abc/x.out')?.getAttribute('aria-selected')).toBe('true');
+      expect(preview()?.textContent).toBe('runs/abc/x.out');
+    });
+
+    it('opens a linked hidden folder with its contents, still without its hidden siblings', async () => {
+      const { adapter } = createHiddenAdapter();
+      await renderExplorer(adapter, { path: 'runs/abc', requestId: 1 });
+      await vi.waitFor(() => expect(row('runs/abc/y.log')).not.toBeNull());
+      expect(row('runs/abc')?.getAttribute('aria-expanded')).toBe('true');
+      expect(row('runs/abc/x.out')?.getAttribute('data-hidden-by-default')).toBe('true');
+      expect(row('runs/def')).toBeNull();
+      expect(row('tool-images')).toBeNull();
+    });
+
+    it('shows the missing view for an absent file under a hidden folder and for .elagente paths', async () => {
+      const { adapter, listTree } = createHiddenAdapter();
+      await renderExplorer(adapter, { path: 'runs/abc/nope.out', requestId: 1 });
+      await vi.waitFor(() => expect(preview()?.getAttribute('data-missing-path')).toBe('runs/abc/nope.out'));
+      expect(preview()?.getAttribute('data-error')).toBeNull();
+      expect(row('runs/abc/x.out')).toBeNull();
+      expect(row('runs')).toBeNull();
+
+      listTree.mockClear();
+      await renderExplorer(adapter, { path: '.elagente/state.json', requestId: 2 });
+      await vi.waitFor(() => expect(preview()?.getAttribute('data-missing-path')).toBe('.elagente/state.json'));
+      expect(preview()?.getAttribute('data-error')).toBeNull();
+      expect(listTree.mock.calls.some(([input]) => String(input.path).startsWith('.elagente'))).toBe(false);
+      const calls = listTree.mock.calls.length;
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
+      expect(listTree.mock.calls.length).toBe(calls);
+    });
+
+    it('leaves the global Show hidden files toggle as it was, and shows every hidden entry once it is on', async () => {
+      const { adapter, listTree } = createHiddenAdapter();
+      await renderExplorer(adapter, { path: 'runs/abc/x.out', requestId: 1 });
+      await vi.waitFor(() => expect(row('runs/abc/x.out')).not.toBeNull());
+      const more = () => host!.querySelector<HTMLButtonElement>('button[aria-label="More Explorer actions"]')!;
+      act(() => more().click());
+      const toggle = () => [...host!.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].find((item) => item.textContent?.includes('Show hidden files'))!;
+      expect(toggle().getAttribute('aria-checked')).toBe('false');
+      await act(async () => toggle().click());
+      await vi.waitFor(() => expect(row('tool-images')).not.toBeNull());
+      expect(host!.querySelectorAll('[data-explorer-path="runs/abc/x.out"]')).toHaveLength(1);
+      expect(window.localStorage.getItem('workbench.explorer.showHidden')).toBe('true');
+      expect(listTree.mock.calls.some(([input]) => input.path === '' && input.showHidden === true)).toBe(true);
+    });
   });
 
   it('hides internal thread events from the file tree unless the debug view is turned on', async () => {

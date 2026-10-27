@@ -22,4 +22,16 @@ describe('workspace path resolution', () => {
     expect(await other('docs/a.md')).toBe(false);
     expect(await resolve('/elsewhere/file.md')).toBe(false);
   });
+  it('verifies paths a .workbenchignore hides from listings when the host can list hidden entries (ELA-260)', async () => {
+    const listTree = vi.fn(async ({ showHidden }: { path?: string | null; showHidden?: boolean }) => ({ name: 'abc', path: 'runs/abc', kind: 'directory' as const,
+      children: showHidden ? [{ name: 'x.out', path: 'runs/abc/x.out', kind: 'file' as const }] : [] }));
+    const resolve = createWorkspacePathResolver({ listTree, hiddenFiles: true }, { threadId: 'a', workspaceId: 'one' }, '/code');
+    expect(await resolve('runs/abc/x.out')).toBe(true);
+    expect(await resolve('runs/abc/missing.out')).toBe(false);
+    expect(listTree).toHaveBeenCalledWith({ threadId: 'a', workspaceId: 'one', path: 'runs/abc', showHidden: true });
+    // A host that cannot list hidden entries is asked exactly as before.
+    const plain = vi.fn(listTree);
+    expect(await createWorkspacePathResolver({ listTree: plain }, { threadId: 'a' }, '/code')('runs/abc/x.out')).toBe(false);
+    expect(plain).toHaveBeenCalledWith({ threadId: 'a', path: 'runs/abc' });
+  });
 });

@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
 import { GraphChatMessageContent } from './GraphChatMessageContent';
+import { createWorkspacePathResolver } from '../workspacePathLinks';
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -267,4 +268,22 @@ it('makes verified inline and plain paths clickable while leaving missing paths,
   expect(open).toHaveBeenCalledWith({ path: 'docs/assets' });
   act(() => links[1]!.click());
   expect(open).toHaveBeenCalledWith({ path: 'docs/readme.md' });
+});
+
+it('links an auto-detected path under a folder hidden by default (ELA-260)', async () => {
+  const open = vi.fn();
+  // runs/ is in .workbenchignore: only a listing with hidden entries contains it.
+  const listTree = vi.fn(async ({ path, showHidden }: { path?: string | null; showHidden?: boolean }) => ({
+    name: 'abc', path: path ?? '', kind: 'directory' as const,
+    children: showHidden && path === 'runs/abc' ? [{ name: 'x.out', path: 'runs/abc/x.out', kind: 'file' as const }] : [],
+  }));
+  const resolve = createWorkspacePathResolver({ listTree, hiddenFiles: true }, { threadId: 't' }, '/code');
+  let element!: HTMLDivElement;
+  await act(async () => {
+    element = render(<GraphChatMessageContent workspaceRootPath="/code" resolveWorkspacePath={resolve} onOpenWorkspaceFile={open}
+      content={'The output is runs/abc/x.out; runs/abc/none.out was not written.'} />);
+  });
+  await vi.waitFor(() => expect(Array.from(element.querySelectorAll('a')).map(link => link.textContent)).toEqual(['runs/abc/x.out']));
+  act(() => element.querySelector('a')!.click());
+  expect(open).toHaveBeenCalledWith({ path: 'runs/abc/x.out' });
 });

@@ -5,7 +5,7 @@ export type WorkspacePathResolver = (path: string) => Promise<boolean>;
 
 /** A resolver belongs to one adapter/device/workspace; never cache across scopes. */
 export function createWorkspacePathResolver(
-  adapter: Pick<ThreadWorkspaceAdapter, 'listTree' | 'statLinkedFile'>,
+  adapter: Pick<ThreadWorkspaceAdapter, 'listTree' | 'statLinkedFile' | 'hiddenFiles'>,
   identity: { threadId: string; workspaceId?: string | null },
   workspaceRoot: string,
 ): WorkspacePathResolver {
@@ -34,7 +34,9 @@ export function createWorkspacePathResolver(
           const node = await adapter.statLinkedFile({ threadId: identity.threadId, path });
           return new Set([node.path]);
         }
-        const tree = await adapter.listTree({ ...identity, path: parent });
+        // A reply may name a file under a folder hidden by default (`.workbenchignore`);
+        // the Explorer can still open it, so verify against the listing with hidden entries.
+        const tree = await adapter.listTree({ ...identity, path: parent, ...(adapter.hiddenFiles ? { showHidden: true } : {}) });
         return new Set((tree.children ?? []).map(node => relativeWorkspacePath(node.path, workspaceRoot) ?? node.path));
       }).catch(() => new Set<string>());
       entry = { expires: Date.now() + 15_000, result };

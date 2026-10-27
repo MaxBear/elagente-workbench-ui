@@ -683,4 +683,6 @@ export const filesZhCN = {
   "files.downloadZip": "下载为 ZIP",
   "files.showHiddenFiles": "显示隐藏文件",
   "files.showThreadEvents": "显示线程事件（调试）",
+  "files.hiddenByDefault": "默认隐藏",
+  "files.hiddenByDefaultTitle": "{{name}} 默认不在文件列表中显示，因从链接打开而显示。",
 } as const;

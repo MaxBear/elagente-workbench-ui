@@ -35,6 +35,14 @@ import type {
 import { useWorkspaceExplorerPersistence } from './useWorkspaceExplorerPersistence';
 import { validateWorkspaceOperationCapabilities } from './workspaceOperationCapabilities';
 import { linkedDirectoryNodes, linkedParentDirectory } from './workspaceLinkedFiles';
+import {
+  hasRevealedHiddenPath,
+  isInternalWorkspacePath,
+  parentWorkspacePath,
+  resolveHiddenChain,
+  withRevealedHiddenPaths,
+  type RevealedHiddenPath,
+} from './workspaceHiddenPaths';
 
 export interface UseWorkspaceExplorerControllerInput {
   activeView: 'chat' | 'shell';
@@ -168,15 +176,22 @@ export function useWorkspaceExplorerController({
     [adapterModel],
   );
   const [linkedFiles, setLinkedFiles] = useState<WorkspaceTreeNode[]>([]);
+  // ELA-260: chains into folders hidden by default, revealed by a link.
+  const [revealedHidden, setRevealedHidden] = useState<RevealedHiddenPath[]>([]);
+  const revealedHiddenRef = useRef(revealedHidden);
+  revealedHiddenRef.current = revealedHidden;
   const tree = useMemo(() => {
     // ElAgente: immutable artifacts stay inspectable beside the native workspace files.
-    const root = adapterTree
-      ? { ...adapterTree, children: [...adapterTree.children, ...fallbackTree.children] }
+    const listed = adapterTree && revealedHidden.length
+      ? withRevealedHiddenPaths(adapterTree, revealedHidden)
+      : adapterTree;
+    const root = listed
+      ? { ...listed, children: [...listed.children, ...fallbackTree.children] }
       : fallbackTree;
     return linkedFiles.length
       ? { ...root, children: [...root.children, ...linkedDirectoryNodes(linkedFiles)] }
       : root;
-  }, [adapterTree, fallbackTree, linkedFiles, locale]);
+  }, [adapterTree, fallbackTree, linkedFiles, revealedHidden, locale]);
   const nodeMap = useMemo(() => flattenWorkspaceNodes(tree), [tree]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(() => {
     const selectedPath = focusPathRequest
@@ -314,6 +329,40 @@ export function useWorkspaceExplorerController({
             nextModel = mergeWorkspaceExplorerSubtree(nextModel, refreshedNode);
           }
         }
+        // A revealed hidden file that was deleted or renamed leaves the tree.
+        let revealed = revealedHiddenRef.current;
+        if (revealed.length && !showHidden) {
+          const kept: RevealedHiddenPath[] = [];
+          for (const entry of revealed) {
+            try {
+              const listing = await workspaceAdapter.listTree({
+                ...workspaceIdentity,
+                path: parentWorkspacePath(entry.targetPath),
+                showHidden: true,
+              });
+              if (
+                workspaceGenerationRef.current !== workspaceGeneration ||
+                refreshGenerationRef.current !== refreshGeneration
+              ) {
+                return;
+              }
+              if (
+                (listing.children ?? []).some(
+                  (child) => workspaceTreeNodeToGraphNode(child).path === entry.targetPath,
+                )
+              ) {
+                kept.push(entry);
+              }
+            } catch {
+              /* Unreachable now: drop it, as a missing file. */
+            }
+          }
+          if (kept.length !== revealed.length) {
+            revealed = kept;
+            revealedHiddenRef.current = kept;
+            setRevealedHidden(kept);
+          }
+        }
         const nextTree = workspaceExplorerModelToTree(nextModel);
         adapterModelRef.current = nextModel;
         setAdapterModel(nextModel);
@@ -331,7 +380,8 @@ export function useWorkspaceExplorerController({
           if (virtualNode) return virtualNode.id;
           if (
             fallbackPath !== null &&
-            hasWorkspaceExplorerPath(nextModel, fallbackPath)
+            (hasWorkspaceExplorerPath(nextModel, fallbackPath) ||
+              hasRevealedHiddenPath(revealed, fallbackPath))
           ) {
             return `workspace:${fallbackPath}`;
           }
@@ -357,7 +407,7 @@ export function useWorkspaceExplorerController({
         }
       }
     },
-    [listIdentity, workspaceAdapter, workspaceIdentity],
+    [listIdentity, showHidden, workspaceAdapter, workspaceIdentity],
   );
 
   const loadDirectoryChildren = useCallback(
@@ -526,8 +576,10 @@ export function useWorkspaceExplorerController({
         }
         for (const ancestor of ancestors) {
           const existing = findWorkspaceExplorerNodeByPath(nextModel, ancestor);
+          // Not in its parent's listing: hidden by default, or absent.
+          if (!existing) break;
           if (
-            existing?.kind === 'directory' &&
+            existing.kind === 'directory' &&
             existing.childrenState === 'resolved'
           ) {
             continue;
@@ -544,6 +596,21 @@ export function useWorkspaceExplorerController({
           nextModel = mergeWorkspaceExplorerSubtree(nextModel, loadedNode);
         }
         const target = findWorkspaceExplorerNodeByPath(nextModel, targetPath);
+        let revealed: RevealedHiddenPath | null = null;
+        // ELA-260: a link may name a path `.workbenchignore` hides from listings.
+        // Reveal just its chain, listed with hidden entries for this focus only.
+        if (!target && hiddenFilesAvailable && !showHidden && !isInternalWorkspacePath(targetPath)) {
+          const firstHiddenPath = [...ancestors, targetPath].find(
+            (candidate) => !hasWorkspaceExplorerPath(nextModel, candidate),
+          )!;
+          revealed = await resolveHiddenChain(
+            (directory) => workspaceAdapter.listTree({ ...workspaceIdentity, path: directory, showHidden: true }),
+            targetPath,
+            firstHiddenPath,
+            isCurrent,
+          );
+          if (!isCurrent()) return;
+        }
         if (target?.kind === 'directory') {
           const loadedNode = workspaceTreeNodeToGraphNode(await workspaceAdapter.listTree({ ...listIdentity, path: targetPath }));
           if (!isCurrent()) return;
@@ -552,7 +619,16 @@ export function useWorkspaceExplorerController({
         }
         adapterModelRef.current = nextModel;
         setAdapterModel(nextModel);
-        if (!hasWorkspaceExplorerPath(nextModel, targetPath)) {
+        if (revealed) {
+          const entry = revealed;
+          setRevealedHidden((current) => [
+            ...current.filter((item) => item.targetPath !== targetPath),
+            entry,
+          ]);
+          if (flattenWorkspaceNodes(entry.node).get(`workspace:${targetPath}`)?.kind === 'directory') {
+            setExpandedPaths((current) => new Set(current).add(targetPath));
+          }
+        } else if (!hasWorkspaceExplorerPath(nextModel, targetPath)) {
           throw new MissingTargetError(translate("files.fileNotFound", { value1: targetPath }));
         }
         setSelectedNodeId(`workspace:${targetPath}`);
@@ -576,7 +652,7 @@ export function useWorkspaceExplorerController({
         }
       }
     },
-    [detail.workspace.absPath, listIdentity, workspaceAdapter, workspaceIdentity],
+    [detail.workspace.absPath, hiddenFilesAvailable, listIdentity, showHidden, workspaceAdapter, workspaceIdentity],
   );
 
   const focusArtifact = useCallback((artifactId: string) => {
@@ -630,6 +706,7 @@ export function useWorkspaceExplorerController({
 
   useEffect(() => {
     setLinkedFiles([]);
+    setRevealedHidden([]);
     artifactFocusRef.current = null;
     skipPersistenceWriteRef.current = true;
     const persisted = persistence.read();

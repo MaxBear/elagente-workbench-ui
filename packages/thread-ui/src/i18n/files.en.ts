@@ -683,4 +683,6 @@ export const filesEn = {
   "files.downloadZip": "Download as ZIP",
   "files.showHiddenFiles": "Show hidden files",
   "files.showThreadEvents": "Show thread events (debug)",
+  "files.hiddenByDefault": "hidden by default",
+  "files.hiddenByDefaultTitle": "{{name}} is hidden from the file list by default. It is shown because a link opened it.",
 } as const;
