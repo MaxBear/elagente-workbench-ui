@@ -37,13 +37,14 @@ export interface LiveTrajectoryPlayerProps {
   /**
    * Opens the durable trajectory file (`summary.trajectory`, workspace-relative)
    * through the host's file viewer when the reader asks; the player never opens
-   * it by itself. Without it the player offers no file.
+   * it by itself. The file is offered only with this handler and
+   * `trajectoryAvailable`.
    */
   onOpenTrajectory?: (path: string) => void;
   /**
    * The host has seen the trajectory file in the workspace. A stream can be
-   * done well before its run syncs the file, so until then the file is not
-   * offered and the player keeps playing the frames it holds.
+   * done well before its run syncs the file, so until then the player says the
+   * file will be available when the run syncs and keeps playing its frames.
    */
   trajectoryAvailable?: boolean;
   onClose?: () => void;
@@ -146,16 +147,15 @@ export function LiveTrajectoryPlayer({
       </p>
       {ended && !path ? <p className="live-structures-note">{t('chat.liveTrajectoryEnded')}</p> : null}
       {error ? <p className="plugin-report-error" role="alert">{error}</p> : null}
-      {path && onOpenTrajectory ? (
+      {path && trajectoryAvailable && onOpenTrajectory ? (
         <p className="live-trajectory-file">
-          {trajectoryAvailable
-            ? <span>{t('chat.liveTrajectoryFileReady')} <code>{path}</code></span>
-            : <span role="status">{t('chat.liveTrajectoryFilePending')}</span>}
-          <button type="button" className="live-trajectory-file-button" disabled={!trajectoryAvailable}
-            onClick={() => { if (trajectoryAvailable) onOpenTrajectory(path); }}>
+          <span>{t('chat.liveTrajectoryFileReady')} <code>{path}</code></span>
+          <button type="button" className="live-trajectory-file-button" onClick={() => onOpenTrajectory(path)}>
             <FileText size={14} aria-hidden="true" /> {t('chat.liveTrajectoryOpenFile')}
           </button>
         </p>
+      ) : path && !trajectoryAvailable ? (
+        <p className="live-trajectory-file" role="status">{t('chat.liveTrajectoryFilePending')}</p>
       ) : null}
       <div className="live-trajectory-body">
         {shown.length === 0 ? (

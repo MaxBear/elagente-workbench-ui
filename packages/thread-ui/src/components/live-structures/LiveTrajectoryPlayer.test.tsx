@@ -119,17 +119,18 @@ describe('LiveTrajectoryPlayer', () => {
   it('offers the trajectory file only once the host reports it in the workspace', () => {
     const onOpenTrajectory = vi.fn();
     const path = 'runs/r1/molecules/mol-0001/trajectory.xyz';
-    const element = render(player({ row: row('done', { trajectory: path }), onOpenTrajectory }));
-    const button = () => [...element.querySelectorAll('button')].find(value => value.textContent?.includes('Open trajectory file'))!;
+    const button = () => [...element.querySelectorAll('button')].find(value => value.textContent?.includes('Open trajectory file'));
+    // Hosts may pass the handler only once the file exists; the hint shows either way.
+    const element = render(player({ row: row('done', { trajectory: path }) }));
     expect(element.querySelector('.live-trajectory-file')?.textContent).toContain('available when the run syncs');
-    expect(button().disabled).toBe(true);
-    button().click();
-    expect(onOpenTrajectory).not.toHaveBeenCalled();
+    expect(button()).toBeUndefined();
+    rerender(player({ row: row('done', { trajectory: path }), onOpenTrajectory }));
+    expect(element.querySelector('.live-trajectory-file')?.textContent).toContain('available when the run syncs');
+    expect(button()).toBeUndefined();
     rerender(player({ row: row('done', { trajectory: path }), onOpenTrajectory, trajectoryAvailable: true }));
     expect(element.querySelector('.live-trajectory-file')?.textContent).toContain(path);
     expect(element.querySelector('.live-trajectory-file')?.textContent).not.toContain('available when the run syncs');
-    expect(button().disabled).toBe(false);
-    button().click();
+    button()!.click();
     expect(onOpenTrajectory).toHaveBeenCalledExactlyOnceWith(path);
   });
 
