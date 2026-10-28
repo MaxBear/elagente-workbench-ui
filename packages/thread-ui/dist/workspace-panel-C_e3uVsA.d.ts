@@ -535,6 +535,28 @@ interface ThreadGraphWorkspacePanelProps {
     } | null;
     /** The workspace-relative path of the file being read, or null. */
     onActiveFileChange?: (relativePath: string | null) => void;
+    /** Host content shown as extra side-panel tabs, such as a trajectory player. */
+    hostPanels?: readonly WorkspaceHostPanel[];
+    /** Shows the host panel `id`; each new `requestId` shows it again. */
+    hostPanelRequest?: WorkspaceHostPanelRequest | null;
+}
+/**
+ * A host-supplied side-panel tab. It stays mounted while another tab is
+ * shown, so its personal state (for example a viewer's camera) is kept.
+ */
+interface WorkspaceHostPanel {
+    /** Stable identity, such as a stream key. */
+    id: string;
+    label: string;
+    /** The tab's tooltip; defaults to the label. */
+    title?: string;
+    content: ReactNode;
+    /** Adds a close button to the tab. */
+    onClose?: () => void;
+}
+interface WorkspaceHostPanelRequest {
+    id: string;
+    requestId: number;
 }
 type WorkspaceTab = 'workspace' | 'tools' | 'guide' | 'graph' | 'extensions';
 interface ThreadGraphWorkspaceFeatures {
@@ -545,7 +567,7 @@ interface ThreadGraphWorkspaceFeatures {
     extensions?: boolean;
     defaultTab?: WorkspaceTab;
 }
-declare function ThreadGraphWorkspacePanel({ detail, status, plugins, workspaceAdapter, metaContent, settingsContent, activeView, features: featureConfig, focusPathRequest, onActiveFileChange, }: ThreadGraphWorkspacePanelProps): react.JSX.Element | null;
+declare function ThreadGraphWorkspacePanel({ detail, status, plugins, workspaceAdapter, metaContent, settingsContent, activeView, features: featureConfig, focusPathRequest, onActiveFileChange, hostPanels, hostPanelRequest, }: ThreadGraphWorkspacePanelProps): react.JSX.Element | null;
 declare const MemoizedThreadGraphWorkspacePanel: react.MemoExoticComponent<typeof ThreadGraphWorkspacePanel>;
 
-export { extensionModuleAvailable as A, mergePluginState as B, ThreadGraphWorkspacePanel as C, type DescribeThread as D, type ExtensionPluginApi as E, MemoizedThreadGraphWorkspacePanel as M, type PromptAttachmentUpload as P, type SettingsSection as S, type ThreadShellControlState as T, type WorkspaceDocumentSaveInput as W, type ThreadTimelineAdapter as a, type ThreadShellAdapter as b, type ThreadGraphWorkspacePanelProps as c, type PluginContextValue as d, type ThreadDetailUiAdapter as e, type ThreadGraphWorkspaceFeatures as f, SettingsPanels as g, type ThreadWorkspaceAdapter as h, PluginContext as i, PluginProvider as j, type PluginProviderAdapter as k, type SendPromptInput as l, type ShellSocketConnection as m, type ShellSocketHandlers as n, type ThreadImageAssetVariant as o, type ThreadLinkInfo as p, type ThreadToolArtifact as q, type ThreadWorkspaceArchiveFormat as r, type ThreadWorkspaceCapabilities as s, type ThreadWorkspaceTrashEntry as t, type ThreadWorkspaceTrashList as u, type WorkspaceDocumentSnapshot as v, type WorkspaceSaveReceipt as w, type WorkspaceTab as x, createDefaultPluginContextValue as y, createExtensionPluginApi as z };
+export { createDefaultPluginContextValue as A, createExtensionPluginApi as B, extensionModuleAvailable as C, type DescribeThread as D, type ExtensionPluginApi as E, mergePluginState as F, ThreadGraphWorkspacePanel as G, MemoizedThreadGraphWorkspacePanel as M, type PromptAttachmentUpload as P, type SettingsSection as S, type ThreadShellControlState as T, type WorkspaceHostPanel as W, type ThreadTimelineAdapter as a, type ThreadShellAdapter as b, type ThreadGraphWorkspacePanelProps as c, type PluginContextValue as d, type ThreadDetailUiAdapter as e, type ThreadGraphWorkspaceFeatures as f, type WorkspaceHostPanelRequest as g, SettingsPanels as h, type ThreadWorkspaceAdapter as i, PluginContext as j, PluginProvider as k, type PluginProviderAdapter as l, type SendPromptInput as m, type ShellSocketConnection as n, type ShellSocketHandlers as o, type ThreadImageAssetVariant as p, type ThreadLinkInfo as q, type ThreadToolArtifact as r, type ThreadWorkspaceArchiveFormat as s, type ThreadWorkspaceCapabilities as t, type ThreadWorkspaceTrashEntry as u, type ThreadWorkspaceTrashList as v, type WorkspaceDocumentSaveInput as w, type WorkspaceDocumentSnapshot as x, type WorkspaceSaveReceipt as y, type WorkspaceTab as z };

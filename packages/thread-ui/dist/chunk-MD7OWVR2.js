@@ -1395,7 +1395,19 @@ var chatEn = {
   "chat.liveStructuresColumnStage": "Stage",
   "chat.liveStructuresColumnStep": "Step",
   "chat.liveStructuresColumnEnergy": "Energy",
-  "chat.liveStructuresColumnStatus": "Status"
+  "chat.liveStructuresColumnStatus": "Status",
+  "chat.liveStructuresColumnTrajectory": "Trajectory",
+  "chat.liveStructuresOpenTrajectory": "Open trajectory",
+  "chat.liveStructuresOpenTrajectoryOf": "Open the trajectory of {{id}} in the side panel",
+  "chat.liveTrajectoryLabel": "Trajectory of {{id}}",
+  "chat.liveTrajectoryFrames": { one: "{{value}} frame", other: "{{value}} frames" },
+  "chat.liveTrajectorySeqRange": "seq {{from}}\u2013{{to}}",
+  "chat.liveTrajectoryTruncated": "Earlier frames were not kept",
+  "chat.liveTrajectoryLoading": "Loading frames\u2026",
+  "chat.liveTrajectoryEnded": "This turn has ended. These are the frames received while it ran.",
+  "chat.liveTrajectoryFileReady": "The complete trajectory is saved as",
+  "chat.liveTrajectoryOpenFile": "Open trajectory file",
+  "chat.liveTrajectoryClose": "Close trajectory {{id}}"
 };
 
 // src/i18n/common.en.ts
@@ -2144,6 +2156,7 @@ var filesEn = {
   "files.device": "Device",
   "files.supervisorMaintenanceAndReusableDeviceTemplates": "Supervisor maintenance and reusable device templates.",
   "files.workspace": "Workspace",
+  "files.closeHostPanel": "Close {{name}}",
   "files.defaultLocationsForProjectsOnThisDevice": "Default locations for projects on this device.",
   "files.plugins": "Plugins",
   "files.renderersAndExtensionsForYourWorkspace": "Renderers and extensions for your workspace.",
@@ -5438,7 +5451,19 @@ var chatZhCN = {
   "chat.liveStructuresColumnStage": "\u9636\u6BB5",
   "chat.liveStructuresColumnStep": "\u6B65",
   "chat.liveStructuresColumnEnergy": "\u80FD\u91CF",
-  "chat.liveStructuresColumnStatus": "\u72B6\u6001"
+  "chat.liveStructuresColumnStatus": "\u72B6\u6001",
+  "chat.liveStructuresColumnTrajectory": "\u8F68\u8FF9",
+  "chat.liveStructuresOpenTrajectory": "\u6253\u5F00\u8F68\u8FF9",
+  "chat.liveStructuresOpenTrajectoryOf": "\u5728\u4FA7\u8FB9\u680F\u4E2D\u6253\u5F00 {{id}} \u7684\u8F68\u8FF9",
+  "chat.liveTrajectoryLabel": "{{id}} \u7684\u8F68\u8FF9",
+  "chat.liveTrajectoryFrames": { one: "{{value}} \u5E27", other: "{{value}} \u5E27" },
+  "chat.liveTrajectorySeqRange": "\u5E8F\u53F7 {{from}}\u2013{{to}}",
+  "chat.liveTrajectoryTruncated": "\u66F4\u65E9\u7684\u5E27\u672A\u4FDD\u7559",
+  "chat.liveTrajectoryLoading": "\u6B63\u5728\u52A0\u8F7D\u5E27\u2026",
+  "chat.liveTrajectoryEnded": "\u672C\u8F6E\u5DF2\u7ED3\u675F\u3002\u4EE5\u4E0B\u662F\u8FD0\u884C\u671F\u95F4\u6536\u5230\u7684\u5E27\u3002",
+  "chat.liveTrajectoryFileReady": "\u5B8C\u6574\u8F68\u8FF9\u5DF2\u4FDD\u5B58\u4E3A",
+  "chat.liveTrajectoryOpenFile": "\u6253\u5F00\u8F68\u8FF9\u6587\u4EF6",
+  "chat.liveTrajectoryClose": "\u5173\u95ED\u8F68\u8FF9 {{id}}"
 };
 
 // src/i18n/common.zh-CN.ts
@@ -6187,6 +6212,7 @@ var filesZhCN = {
   "files.device": "\u8BBE\u5907",
   "files.supervisorMaintenanceAndReusableDeviceTemplates": "Supervisor \u7EF4\u62A4\u548C\u53EF\u590D\u7528\u7684\u8BBE\u5907\u6A21\u677F\u3002",
   "files.workspace": "\u5DE5\u4F5C\u533A",
+  "files.closeHostPanel": "\u5173\u95ED {{name}}",
   "files.defaultLocationsForProjectsOnThisDevice": "\u6B64\u8BBE\u5907\u4E0A\u9879\u76EE\u7684\u9ED8\u8BA4\u4F4D\u7F6E\u3002",
   "files.plugins": "\u63D2\u4EF6",
   "files.renderersAndExtensionsForYourWorkspace": "\u5DE5\u4F5C\u533A\u7684\u6E32\u67D3\u5668\u548C\u6269\u5C55\u3002",

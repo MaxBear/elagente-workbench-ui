@@ -32,10 +32,10 @@ import {
   useLongPress,
   useMenuKeyboard,
   useTabScrollEdges
-} from "./chunk-QGD3GK2T.js";
+} from "./chunk-Q7CBNQCT.js";
 import {
   GraphMoleculeViewer
-} from "./chunk-6TDBZANP.js";
+} from "./chunk-T5YYDHGV.js";
 import "./chunk-R24MQJGW.js";
 import {
   DRAWIO_MAX_BYTES,
@@ -43,7 +43,7 @@ import {
   isBinaryPreview,
   isDownloadOnlyPath,
   isDrawioPath
-} from "./chunk-Y2MV5UES.js";
+} from "./chunk-4MSC7OMW.js";
 import {
   IMAGE_EXTENSIONS,
   MOLECULAR_EXTENSIONS,
@@ -67,13 +67,13 @@ import {
   useThemeFeature,
   workspaceRelativeFocusPath,
   workspaceTreeNodeToGraphNode
-} from "./chunk-2IVBJKI3.js";
+} from "./chunk-OCCN4GOQ.js";
 import {
   en,
   getLocale,
   translate,
   useI18n
-} from "./chunk-M2F5UQVE.js";
+} from "./chunk-MD7OWVR2.js";
 
 // src/components/ThreadGraphWorkspacePanel.tsx
 import { memo as memo2, useEffect as useEffect12, useMemo as useMemo9, useState as useState11 } from "react";
@@ -82,7 +82,8 @@ import {
   Paperclip,
   Terminal,
   Trash2 as Trash23,
-  Wrench
+  Wrench,
+  X as X5
 } from "lucide-react";
 
 // src/components/graph-workspace/explorer/useWorkspaceDocuments.ts
@@ -4079,7 +4080,7 @@ function WorkspaceFileTabs({
 // src/components/graph-workspace/GraphWorkspacePreviewPane.tsx
 import { Fragment as Fragment6, jsx as jsx12, jsxs as jsxs10 } from "react/jsx-runtime";
 var GraphWorkspaceMonacoEditor = lazy(
-  () => import("./GraphWorkspaceMonacoEditor-JTBY4WS2.js")
+  () => import("./GraphWorkspaceMonacoEditor-OE6AKN5N.js")
 );
 var isHostFilePath = (path) => path.startsWith("/") || /^[a-z]:[\\/]/i.test(path);
 function fileSizeLabel(size) {
@@ -4178,7 +4179,7 @@ function translateReadOnly(reason) {
   const key = `files.safeReason.${reason}`;
   return Object.hasOwn(en, key) ? translate(key) : reason;
 }
-var WorkspaceDocumentDiff = lazy(() => import("./GraphWorkspaceMonacoDiff-6X7DAOZR.js"));
+var WorkspaceDocumentDiff = lazy(() => import("./GraphWorkspaceMonacoDiff-N2PU6B7L.js"));
 var SMALL_TEXT_FILE_MAX_BYTES = 50 * 1024;
 var SMALL_TEXT_FILE_MAX_LINES = 1e3;
 var MARKDOWN_EXTENSIONS = /* @__PURE__ */ new Set(["md", "markdown"]);
@@ -6223,7 +6224,9 @@ function ThreadGraphWorkspacePanel({
   activeView = "chat",
   features: featureConfig,
   focusPathRequest = null,
-  onActiveFileChange
+  onActiveFileChange,
+  hostPanels = [],
+  hostPanelRequest = null
 }) {
   const { locale: i18nLocale } = useI18n();
   const features = useMemo9(
@@ -6232,6 +6235,7 @@ function ThreadGraphWorkspacePanel({
   );
   const initialTab = firstEnabledWorkspaceTab(features, featureConfig?.defaultTab);
   const [activeTab, setActiveTab] = useState11(initialTab);
+  const [activeHostPanel, setActiveHostPanel] = useState11(null);
   const artifacts = useMemo9(() => collectArtifacts(detail), [detail]);
   const toolEvents = useMemo9(() => collectToolEvents(detail), [detail, i18nLocale]);
   const threadPanels = plugins.getThreadPanels();
@@ -6264,21 +6268,32 @@ function ThreadGraphWorkspacePanel({
   useEffect12(() => {
     if (focusPathRequest && features.workspace) {
       setActiveTab("workspace");
+      setActiveHostPanel(null);
     }
   }, [features.workspace, focusPathRequest?.requestId]);
-  if (!activeTab) {
+  const requestedPanel = hostPanelRequest?.id ?? null;
+  const panelRequestId = hostPanelRequest?.requestId ?? null;
+  useEffect12(() => {
+    if (requestedPanel !== null) setActiveHostPanel(requestedPanel);
+  }, [requestedPanel, panelRequestId]);
+  const shownHostPanel = hostPanels.some((panel) => panel.id === activeHostPanel) ? activeHostPanel : null;
+  const selectTab = (tab) => {
+    setActiveTab(tab);
+    setActiveHostPanel(null);
+  };
+  if (!activeTab && hostPanels.length === 0) {
     return null;
   }
   return /* @__PURE__ */ jsxs16("div", { className: "thread-graph-right-panel flex h-full min-h-0 flex-col overflow-hidden", children: [
-    primaryTabs.length + secondaryTabs.length > 1 && /* @__PURE__ */ jsxs16("div", { className: "thread-graph-right-tabs flex h-9 shrink-0 items-center gap-0 overflow-hidden border-b px-1", children: [
+    primaryTabs.length + secondaryTabs.length + hostPanels.length > 1 && /* @__PURE__ */ jsxs16("div", { className: "thread-graph-right-tabs flex h-9 shrink-0 items-center gap-0 overflow-hidden border-b px-1", children: [
       primaryTabs.map((tab) => {
         const Icon = tab.icon;
         return /* @__PURE__ */ jsxs16(
           "button",
           {
             type: "button",
-            onClick: () => setActiveTab(tab.id),
-            className: `thread-graph-right-tab inline-flex h-9 shrink-0 items-center gap-1.5 px-2.5 text-xs font-medium transition ${activeTab === tab.id ? "is-active" : ""}`,
+            onClick: () => selectTab(tab.id),
+            className: `thread-graph-right-tab inline-flex h-9 shrink-0 items-center gap-1.5 px-2.5 text-xs font-medium transition ${!shownHostPanel && activeTab === tab.id ? "is-active" : ""}`,
             children: [
               Icon ? /* @__PURE__ */ jsx19(Icon, { className: "h-3.5 w-3.5" }) : null,
               tab.label
@@ -6287,6 +6302,28 @@ function ThreadGraphWorkspacePanel({
           tab.id
         );
       }),
+      hostPanels.map((panel) => /* @__PURE__ */ jsxs16("span", { className: `thread-graph-right-host-tab inline-flex h-9 min-w-0 shrink items-center ${shownHostPanel === panel.id ? "is-active" : ""}`, children: [
+        /* @__PURE__ */ jsx19(
+          "button",
+          {
+            type: "button",
+            onClick: () => setActiveHostPanel(panel.id),
+            title: panel.title ?? panel.label,
+            className: `thread-graph-right-tab inline-flex h-9 min-w-0 shrink items-center px-2.5 text-xs font-medium transition ${shownHostPanel === panel.id ? "is-active" : ""}`,
+            children: /* @__PURE__ */ jsx19("span", { className: "truncate", children: panel.label })
+          }
+        ),
+        panel.onClose ? /* @__PURE__ */ jsx19(
+          "button",
+          {
+            type: "button",
+            className: "thread-graph-right-host-tab-close inline-flex h-6 w-6 shrink-0 items-center justify-center",
+            "aria-label": translate("files.closeHostPanel", { name: panel.label }),
+            onClick: panel.onClose,
+            children: /* @__PURE__ */ jsx19(X5, { className: "h-3 w-3", "aria-hidden": "true" })
+          }
+        ) : null
+      ] }, panel.id)),
       secondaryTabs.length ? /* @__PURE__ */ jsx19(
         "div",
         {
@@ -6298,8 +6335,8 @@ function ThreadGraphWorkspacePanel({
               "button",
               {
                 type: "button",
-                onClick: () => setActiveTab(tab.id),
-                className: `thread-graph-right-tab inline-flex h-8 w-8 shrink-0 items-center justify-center text-xs font-medium transition ${activeTab === tab.id ? "is-active" : ""}`,
+                onClick: () => selectTab(tab.id),
+                className: `thread-graph-right-tab inline-flex h-8 w-8 shrink-0 items-center justify-center text-xs font-medium transition ${!shownHostPanel && activeTab === tab.id ? "is-active" : ""}`,
                 title: tab.label,
                 "aria-label": tab.label,
                 children: /* @__PURE__ */ jsx19(Icon, { className: "h-3.5 w-3.5" })
@@ -6310,7 +6347,8 @@ function ThreadGraphWorkspacePanel({
         }
       ) : null
     ] }),
-    /* @__PURE__ */ jsxs16("div", { className: "min-h-0 flex-1 overflow-hidden", children: [
+    hostPanels.map((panel) => /* @__PURE__ */ jsx19("div", { className: "thread-graph-host-panel min-h-0 flex-1 overflow-auto", hidden: shownHostPanel !== panel.id, children: panel.content }, panel.id)),
+    /* @__PURE__ */ jsxs16("div", { className: "min-h-0 flex-1 overflow-hidden", hidden: Boolean(shownHostPanel), children: [
       activeTab === "workspace" ? /* @__PURE__ */ jsx19(
         GraphWorkspaceExplorer,
         {

@@ -1,35 +1,10 @@
 import * as react from 'react';
 import { ReactNode } from 'react';
-import { ArtifactMetadata, ScientificTarget, ViewerRequest, ViewerAcknowledgement, ExtensionDiscovery } from '@remote-codex/shared';
+import { ScientificTarget, ViewerRequest, ViewerAcknowledgement, ExtensionDiscovery } from '@remote-codex/shared';
 import { E as ExtensionHostAdapter } from './plugin-types-C1Ip6feU.js';
-import { GLViewer } from '3dmol';
-
-type ThreeDmolApi = {
-    createViewer(element: HTMLElement, options?: Record<string, unknown>): GLViewer;
-};
-declare global {
-    interface Window {
-        '3Dmol'?: ThreeDmolApi;
-    }
-}
-
-type GraphMoleculeViewerSnapshot = {
-    content: string[];
-    format?: string | null;
-    uuid?: string | null;
-    name?: string | null;
-    metadata?: ArtifactMetadata;
-    target?: ScientificTarget;
-    /** Immutable targets supplied by the producer, in trajectory order. */
-    frameTargets?: ScientificTarget[];
-};
-type GraphMoleculeViewerSource = GraphMoleculeViewerSnapshot | string | null | undefined;
-type GraphMoleculeViewerData = {
-    format: string;
-    frames: string[];
-    exportContent: string;
-};
-declare function readGraphMoleculeViewerData(source: GraphMoleculeViewerSource): GraphMoleculeViewerData;
+import { G as GraphMoleculeViewerSource } from './GraphMoleculeViewerData-D1qUReJc.js';
+export { r as readGraphMoleculeViewerData } from './GraphMoleculeViewerData-D1qUReJc.js';
+import '3dmol';
 
 type GraphMoleculeScreenshot = {
     version: 1;
@@ -86,8 +61,13 @@ type GraphMoleculeViewerProps = {
     }) => ReactNode;
     onDownloadSource?: () => void;
     loading?: boolean;
+    /**
+     * Shows LIVE beside the frame controls rather than under Scientific
+     * actions, for a trajectory that is still growing.
+     */
+    followControl?: boolean;
 };
-declare function GraphMoleculeViewer({ className, moleculeId, onScreenshot, onSelectionChange, onSelectionSubmit, onReady, onActive, source, title, presentation, onOpenFile, extensionHost, toolbar, rendererSlot, onDownloadSource, loading, }: GraphMoleculeViewerProps): react.JSX.Element;
+declare function GraphMoleculeViewer({ className, moleculeId, onScreenshot, onSelectionChange, onSelectionSubmit, onReady, onActive, source, title, presentation, onOpenFile, extensionHost, toolbar, rendererSlot, onDownloadSource, loading, followControl, }: GraphMoleculeViewerProps): react.JSX.Element;
 
 type ViewerStyle = 'ball-stick' | 'stick' | 'spacefill' | 'cartoon' | 'surface';
 type ViewerAnnotation = {
@@ -126,4 +106,4 @@ declare function createViewerCommandExecutor(getState: () => {
     cellAvailable?: boolean;
 }, apply: (commands: ViewerCommand[]) => void | Promise<void>): (request: ViewerRequest) => Promise<ViewerAcknowledgement>;
 
-export { type GraphMoleculeAtomSelection, type GraphMoleculeScreenshot, type GraphMoleculeSelectionSubmission, GraphMoleculeViewer, type GraphMoleculeViewerHandle, type GraphMoleculeViewerProps, type ViewerAnnotation, type ViewerCommand, type ViewerStyle, createViewerCommandExecutor, readGraphMoleculeViewerData, sameScientificTarget, validateViewerCommands };
+export { type GraphMoleculeAtomSelection, type GraphMoleculeScreenshot, type GraphMoleculeSelectionSubmission, GraphMoleculeViewer, type GraphMoleculeViewerHandle, type GraphMoleculeViewerProps, type ViewerAnnotation, type ViewerCommand, type ViewerStyle, createViewerCommandExecutor, sameScientificTarget, validateViewerCommands };

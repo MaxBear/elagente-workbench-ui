@@ -7,7 +7,7 @@ import {
 } from "./chunk-R24MQJGW.js";
 import {
   translate
-} from "./chunk-M2F5UQVE.js";
+} from "./chunk-MD7OWVR2.js";
 
 // src/components/graph-workspace/GraphMoleculeViewer.tsx
 import {
@@ -1074,7 +1074,10 @@ function readGraphMoleculeViewerData(source) {
   if (!["xyz", "extxyz", "cif", "pdb", "sdf", "mol"].includes(format))
     throw new Error(`Unsupported structure format: ${format}`);
   const content = typeof source === "string" ? [source] : source.content;
-  const frames = format === "xyz" || format === "extxyz" ? content.flatMap(splitXyzTrajectory) : format === "sdf" ? content.flatMap(
+  const xyz = format === "xyz" || format === "extxyz";
+  if (xyz && typeof source !== "string" && source.framesSplit)
+    return { frames: content, format, exportContent: content.join("") };
+  const frames = xyz ? content.flatMap(splitXyzTrajectory) : format === "sdf" ? content.flatMap(
     (text) => text.match(/[\s\S]*?\$\$\$\$(?:\r\n|\n|\r|$)|[\s\S]+$/g)?.filter((text2) => text2.trim()) ?? []
   ) : content.filter((text) => text.trim());
   return { frames, format, exportContent: content.join("") };
@@ -1219,7 +1222,8 @@ function GraphMoleculeViewer({
   toolbar,
   rendererSlot,
   onDownloadSource,
-  loading = false
+  loading = false,
+  followControl = false
 }) {
   const viewerHostRef = useRef2(null);
   const viewerRef = useRef2(null);
@@ -2260,6 +2264,21 @@ function GraphMoleculeViewer({
       setHoveredAtom(null);
     }
   }
+  const liveButton = /* @__PURE__ */ jsxs5(
+    Button,
+    {
+      type: "button",
+      onClick: () => {
+        setLive(true);
+        setIsPlaying(false);
+      },
+      "aria-pressed": live,
+      children: [
+        "LIVE",
+        live ? " following" : ""
+      ]
+    }
+  );
   return /* @__PURE__ */ jsx7(
     GraphMoleculeFigureFrame,
     {
@@ -2746,6 +2765,7 @@ function GraphMoleculeViewer({
                           " ",
                           xyzArray.length
                         ] }),
+                        followControl ? liveButton : null,
                         /* @__PURE__ */ jsx7("div", { className: "thread-graph-molecule-frame-buttons", children: [
                           {
                             label: "First frame",
@@ -2845,21 +2865,7 @@ function GraphMoleculeViewer({
                       }
                     ),
                     rendererSlot?.({ target, selectedIds }),
-                    /* @__PURE__ */ jsxs5(
-                      Button,
-                      {
-                        type: "button",
-                        onClick: () => {
-                          setLive(true);
-                          setIsPlaying(false);
-                        },
-                        "aria-pressed": live,
-                        children: [
-                          "LIVE",
-                          live ? " following" : ""
-                        ]
-                      }
-                    ),
+                    followControl ? null : liveButton,
                     onScreenshot && /* @__PURE__ */ jsx7(
                       Button,
                       {

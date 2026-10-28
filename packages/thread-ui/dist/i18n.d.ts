@@ -1728,6 +1728,7 @@ declare const en: {
     readonly "files.device": "Device";
     readonly "files.supervisorMaintenanceAndReusableDeviceTemplates": "Supervisor maintenance and reusable device templates.";
     readonly "files.workspace": "Workspace";
+    readonly "files.closeHostPanel": "Close {{name}}";
     readonly "files.defaultLocationsForProjectsOnThisDevice": "Default locations for projects on this device.";
     readonly "files.plugins": "Plugins";
     readonly "files.renderersAndExtensionsForYourWorkspace": "Renderers and extensions for your workspace.";
@@ -3546,6 +3547,21 @@ declare const en: {
     readonly "chat.liveStructuresColumnStep": "Step";
     readonly "chat.liveStructuresColumnEnergy": "Energy";
     readonly "chat.liveStructuresColumnStatus": "Status";
+    readonly "chat.liveStructuresColumnTrajectory": "Trajectory";
+    readonly "chat.liveStructuresOpenTrajectory": "Open trajectory";
+    readonly "chat.liveStructuresOpenTrajectoryOf": "Open the trajectory of {{id}} in the side panel";
+    readonly "chat.liveTrajectoryLabel": "Trajectory of {{id}}";
+    readonly "chat.liveTrajectoryFrames": {
+        readonly one: "{{value}} frame";
+        readonly other: "{{value}} frames";
+    };
+    readonly "chat.liveTrajectorySeqRange": "seq {{from}}–{{to}}";
+    readonly "chat.liveTrajectoryTruncated": "Earlier frames were not kept";
+    readonly "chat.liveTrajectoryLoading": "Loading frames…";
+    readonly "chat.liveTrajectoryEnded": "This turn has ended. These are the frames received while it ran.";
+    readonly "chat.liveTrajectoryFileReady": "The complete trajectory is saved as";
+    readonly "chat.liveTrajectoryOpenFile": "Open trajectory file";
+    readonly "chat.liveTrajectoryClose": "Close trajectory {{id}}";
     readonly "auth.ui.signInTitle": "Sign in";
     readonly "auth.ui.registerTitle": "Create your account";
     readonly "auth.ui.or": "or";
@@ -5820,6 +5836,7 @@ declare const zhCN: {
     "files.device": "设备";
     "files.supervisorMaintenanceAndReusableDeviceTemplates": "Supervisor 维护和可复用的设备模板。";
     "files.workspace": "工作区";
+    "files.closeHostPanel": "关闭 {{name}}";
     "files.defaultLocationsForProjectsOnThisDevice": "此设备上项目的默认位置。";
     "files.plugins": "插件";
     "files.renderersAndExtensionsForYourWorkspace": "工作区的渲染器和扩展。";
@@ -7638,6 +7655,21 @@ declare const zhCN: {
     "chat.liveStructuresColumnStep": "步";
     "chat.liveStructuresColumnEnergy": "能量";
     "chat.liveStructuresColumnStatus": "状态";
+    "chat.liveStructuresColumnTrajectory": "轨迹";
+    "chat.liveStructuresOpenTrajectory": "打开轨迹";
+    "chat.liveStructuresOpenTrajectoryOf": "在侧边栏中打开 {{id}} 的轨迹";
+    "chat.liveTrajectoryLabel": "{{id}} 的轨迹";
+    "chat.liveTrajectoryFrames": {
+        readonly one: "{{value}} 帧";
+        readonly other: "{{value}} 帧";
+    };
+    "chat.liveTrajectorySeqRange": "序号 {{from}}–{{to}}";
+    "chat.liveTrajectoryTruncated": "更早的帧未保留";
+    "chat.liveTrajectoryLoading": "正在加载帧…";
+    "chat.liveTrajectoryEnded": "本轮已结束。以下是运行期间收到的帧。";
+    "chat.liveTrajectoryFileReady": "完整轨迹已保存为";
+    "chat.liveTrajectoryOpenFile": "打开轨迹文件";
+    "chat.liveTrajectoryClose": "关闭轨迹 {{id}}";
     "auth.ui.signInTitle": "登录";
     "auth.ui.registerTitle": "创建账号";
     "auth.ui.or": "或";
@@ -9934,6 +9966,7 @@ declare const resources: {
         readonly "files.device": "Device";
         readonly "files.supervisorMaintenanceAndReusableDeviceTemplates": "Supervisor maintenance and reusable device templates.";
         readonly "files.workspace": "Workspace";
+        readonly "files.closeHostPanel": "Close {{name}}";
         readonly "files.defaultLocationsForProjectsOnThisDevice": "Default locations for projects on this device.";
         readonly "files.plugins": "Plugins";
         readonly "files.renderersAndExtensionsForYourWorkspace": "Renderers and extensions for your workspace.";
@@ -11752,6 +11785,21 @@ declare const resources: {
         readonly "chat.liveStructuresColumnStep": "Step";
         readonly "chat.liveStructuresColumnEnergy": "Energy";
         readonly "chat.liveStructuresColumnStatus": "Status";
+        readonly "chat.liveStructuresColumnTrajectory": "Trajectory";
+        readonly "chat.liveStructuresOpenTrajectory": "Open trajectory";
+        readonly "chat.liveStructuresOpenTrajectoryOf": "Open the trajectory of {{id}} in the side panel";
+        readonly "chat.liveTrajectoryLabel": "Trajectory of {{id}}";
+        readonly "chat.liveTrajectoryFrames": {
+            readonly one: "{{value}} frame";
+            readonly other: "{{value}} frames";
+        };
+        readonly "chat.liveTrajectorySeqRange": "seq {{from}}–{{to}}";
+        readonly "chat.liveTrajectoryTruncated": "Earlier frames were not kept";
+        readonly "chat.liveTrajectoryLoading": "Loading frames…";
+        readonly "chat.liveTrajectoryEnded": "This turn has ended. These are the frames received while it ran.";
+        readonly "chat.liveTrajectoryFileReady": "The complete trajectory is saved as";
+        readonly "chat.liveTrajectoryOpenFile": "Open trajectory file";
+        readonly "chat.liveTrajectoryClose": "Close trajectory {{id}}";
         readonly "auth.ui.signInTitle": "Sign in";
         readonly "auth.ui.registerTitle": "Create your account";
         readonly "auth.ui.or": "or";
@@ -14025,6 +14073,7 @@ declare const resources: {
         "files.device": "设备";
         "files.supervisorMaintenanceAndReusableDeviceTemplates": "Supervisor 维护和可复用的设备模板。";
         "files.workspace": "工作区";
+        "files.closeHostPanel": "关闭 {{name}}";
         "files.defaultLocationsForProjectsOnThisDevice": "此设备上项目的默认位置。";
         "files.plugins": "插件";
         "files.renderersAndExtensionsForYourWorkspace": "工作区的渲染器和扩展。";
@@ -15843,6 +15892,21 @@ declare const resources: {
         "chat.liveStructuresColumnStep": "步";
         "chat.liveStructuresColumnEnergy": "能量";
         "chat.liveStructuresColumnStatus": "状态";
+        "chat.liveStructuresColumnTrajectory": "轨迹";
+        "chat.liveStructuresOpenTrajectory": "打开轨迹";
+        "chat.liveStructuresOpenTrajectoryOf": "在侧边栏中打开 {{id}} 的轨迹";
+        "chat.liveTrajectoryLabel": "{{id}} 的轨迹";
+        "chat.liveTrajectoryFrames": {
+            readonly one: "{{value}} 帧";
+            readonly other: "{{value}} 帧";
+        };
+        "chat.liveTrajectorySeqRange": "序号 {{from}}–{{to}}";
+        "chat.liveTrajectoryTruncated": "更早的帧未保留";
+        "chat.liveTrajectoryLoading": "正在加载帧…";
+        "chat.liveTrajectoryEnded": "本轮已结束。以下是运行期间收到的帧。";
+        "chat.liveTrajectoryFileReady": "完整轨迹已保存为";
+        "chat.liveTrajectoryOpenFile": "打开轨迹文件";
+        "chat.liveTrajectoryClose": "关闭轨迹 {{id}}";
         "auth.ui.signInTitle": "登录";
         "auth.ui.registerTitle": "创建账号";
         "auth.ui.or": "或";

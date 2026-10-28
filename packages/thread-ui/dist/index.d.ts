@@ -1,12 +1,14 @@
 import * as react from 'react';
 import { RefObject, TouchEvent, MouseEvent, ReactNode, Dispatch, SetStateAction, Component, ErrorInfo, Ref, ComponentType, ForwardRefExoticComponent, RefAttributes, ComponentProps } from 'react';
-import { T as ThreadShellControlState$1, P as PromptAttachmentUpload, S as SettingsSection, a as ThreadTimelineAdapter, b as ThreadShellAdapter, c as ThreadGraphWorkspacePanelProps, d as PluginContextValue, e as ThreadDetailUiAdapter, f as ThreadGraphWorkspaceFeatures, g as SettingsPanels, h as ThreadWorkspaceAdapter } from './workspace-panel-DEoMY4Fr.js';
-export { D as DescribeThread, E as ExtensionPluginApi, i as PluginContext, j as PluginProvider, k as PluginProviderAdapter, l as SendPromptInput, m as ShellSocketConnection, n as ShellSocketHandlers, o as ThreadImageAssetVariant, p as ThreadLinkInfo, q as ThreadToolArtifact, r as ThreadWorkspaceArchiveFormat, s as ThreadWorkspaceCapabilities, t as ThreadWorkspaceTrashEntry, u as ThreadWorkspaceTrashList, W as WorkspaceDocumentSaveInput, v as WorkspaceDocumentSnapshot, w as WorkspaceSaveReceipt, x as WorkspaceTab, y as createDefaultPluginContextValue, z as createExtensionPluginApi, A as extensionModuleAvailable, B as mergePluginState } from './workspace-panel-DEoMY4Fr.js';
+import { a as GraphMoleculeViewerSnapshot } from './GraphMoleculeViewerData-D1qUReJc.js';
+import { T as ThreadShellControlState$1, P as PromptAttachmentUpload, S as SettingsSection, a as ThreadTimelineAdapter, b as ThreadShellAdapter, c as ThreadGraphWorkspacePanelProps, d as PluginContextValue, e as ThreadDetailUiAdapter, f as ThreadGraphWorkspaceFeatures, W as WorkspaceHostPanel, g as WorkspaceHostPanelRequest, h as SettingsPanels, i as ThreadWorkspaceAdapter } from './workspace-panel-C_e3uVsA.js';
+export { D as DescribeThread, E as ExtensionPluginApi, j as PluginContext, k as PluginProvider, l as PluginProviderAdapter, m as SendPromptInput, n as ShellSocketConnection, o as ShellSocketHandlers, p as ThreadImageAssetVariant, q as ThreadLinkInfo, r as ThreadToolArtifact, s as ThreadWorkspaceArchiveFormat, t as ThreadWorkspaceCapabilities, u as ThreadWorkspaceTrashEntry, v as ThreadWorkspaceTrashList, w as WorkspaceDocumentSaveInput, x as WorkspaceDocumentSnapshot, y as WorkspaceSaveReceipt, z as WorkspaceTab, A as createDefaultPluginContextValue, B as createExtensionPluginApi, C as extensionModuleAvailable, F as mergePluginState } from './workspace-panel-C_e3uVsA.js';
 import { ReasoningEffortDto, ModelOptionDto, CollaborationModeDto, SandboxModeDto, ThreadContextUsageDto, AgentProviderCapabilitiesDto, AgentBackendToolboxItemSchemaDto, AgentBackendHookCommandTemplateDto, AgentBackendManagementSchemaDto, PromptAttachmentKindDto, ThreadSkillsDto, ThreadMcpServersDto, ThreadHooksDto, ThreadForkTurnOptionDto, ThreadGoalDto, CreateThreadHookInput, UpdateThreadHookInput, ThreadGoalStatusDto, ProviderHostFileDto, AgentSubscriptionUsageDto, UpdateThreadSettingsInput, StructuredUsage, ThreadTurnDto, ThreadTurnTokenBreakdownDto, ThreadTurnPriceEstimateDto, AgentBackendIdDto, ThreadDto, AgentRuntimeStatusDto, ThreadActionRequestDto, ThreadHistoryItemDto, RespondThreadActionRequestInput, ThreadAnsweredRequestNoteDto, ThreadActivityNoteDto, ThreadPendingSteerDto, ThreadHistoryItemDetailDto, ShellStatusDto, ThreadExportTurnOptionsDto, ThreadExportFormatDto, ExportThreadTranscriptInput, ThreadDetailDto, PluginDto, ImportPluginInput } from '@remote-codex/shared';
 import { P as PluginActionOutputContext, T as ThreadPluginAdapter } from './plugin-types-C1Ip6feU.js';
 export { A as ArtifactRenderContext, E as ExtensionHostAdapter, a as ExtensionRenderContext, F as FrontendPluginModule, I as InlineCodeRenderContext, M as MessagePresentation, b as MessagePresentationContext, c as PluginSettingsContext, d as PluginSettingsContribution, e as PluginSettingsSnapshot, f as ThreadPanelContribution, g as ThreadPluginDto, h as ThreadPluginSettingsInput, i as ThreadPluginSettingsSnapshot, U as UpstreamConnectionHost, j as UpstreamConnectionPickerProps, k as UpstreamConnectionPickerValue, l as UpstreamConnectionProtocol, V as ViewerToolbarContext, m as ViewerToolbarContribution } from './plugin-types-C1Ip6feU.js';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 export { DEFAULT_LOCALE, I18nProvider, LOCALE_OPTIONS, LOCALE_STORAGE_KEY, LanguageSwitcher, Locale, SUPPORTED_LOCALES, TranslationKey, TranslationValues, detectLocale, formatDate, formatNumber, getLocale, initializeI18n, normalizeLocale, setLocale, t, translate, useI18n } from './i18n.js';
+import '3dmol';
 
 type CopyState = 'idle' | 'copied' | 'failed';
 /** Copies `value`; returns the state to show. Shared by every copy control. */
@@ -114,6 +116,12 @@ interface LiveStructureFrame extends LiveStructureKey {
     format: string;
     xyz: string;
 }
+/** One frame of a watched stream's trajectory, in `seq` order. */
+interface LiveTrajectoryFrame {
+    seq: number;
+    format: string;
+    xyz: string;
+}
 interface LiveStructureTotals {
     streams: number;
     running: number;
@@ -152,6 +160,11 @@ declare function liveStructureCell(row: LiveStructureRow, key: string): string;
  */
 declare function toggleLiveStructure(selected: readonly LiveStructureKey[], key: LiveStructureKey, max?: number): LiveStructureKey[];
 declare function liveStructurePageCount(total: number, pageSize?: number): number;
+/**
+ * The durable trajectory file a stream's summary names (`summary.trajectory`),
+ * when it is a plain workspace-relative path; null otherwise.
+ */
+declare function liveStructureTrajectoryPath(row: Pick<LiveStructureRow, 'summary'> | null | undefined): string | null;
 
 interface LiveStructuresPanelProps {
     totals: LiveStructureTotals;
@@ -186,6 +199,11 @@ interface LiveStructuresPanelProps {
     columns?: readonly LiveStructureColumn[];
     /** Replaces the default inline molecule viewer for one frame. */
     renderViewer?: (frame: LiveStructureFrame) => ReactNode;
+    /**
+     * Opens a stream's trajectory player in the host's side panel. When given,
+     * watched viewers and table rows offer "Open trajectory".
+     */
+    onOpenTrajectory?: (stream: LiveStructureKey) => void;
     className?: string;
 }
 /**
@@ -195,7 +213,7 @@ interface LiveStructuresPanelProps {
  * panel is data-only: the host supplies rows, frames and paging, and turns
  * selection changes into whatever watch request its transport needs.
  */
-declare function LiveStructuresPanel({ totals, producers, rows, page: controlledPage, onPageChange, rowCount, pageSize, statusFilter, onStatusFilterChange, selected, onSelectionChange, maxSelected, frames, selectedRows, ended, loading, error, title, defaultOpen, columns: columnsOverride, renderViewer, className, }: LiveStructuresPanelProps): react.JSX.Element;
+declare function LiveStructuresPanel({ totals, producers, rows, page: controlledPage, onPageChange, rowCount, pageSize, statusFilter, onStatusFilterChange, selected, onSelectionChange, maxSelected, frames, selectedRows, ended, loading, error, title, defaultOpen, columns: columnsOverride, renderViewer, onOpenTrajectory, className, }: LiveStructuresPanelProps): react.JSX.Element;
 
 /**
  * The shared molecule viewer for one inline frame. The object identity is the
@@ -205,6 +223,43 @@ declare function LiveStructuresPanel({ totals, producers, rows, page: controlled
 declare function LiveStructureFrameViewer({ frame }: {
     frame: LiveStructureFrame;
 }): react.JSX.Element;
+
+/** How often a growing trajectory reaches the viewer, at most. */
+declare const LIVE_TRAJECTORY_UPDATE_MS = 1000;
+interface LiveTrajectoryPlayerProps {
+    stream: LiveStructureKey;
+    /** The stream's latest summary row: status, step, energy and `trajectory`. */
+    row?: LiveStructureRow | null;
+    /** Received frames in `seq` order; the host appends to them as the stream grows. */
+    frames: readonly LiveTrajectoryFrame[];
+    /** Frames before the first one were not kept (evicted or never retained). */
+    truncated?: boolean;
+    /** Earlier frames are being loaded. */
+    loading?: boolean;
+    error?: string | null;
+    /** The producing turn has ended. */
+    ended?: boolean;
+    updateIntervalMs?: number;
+    /**
+     * Opens the durable trajectory file (`summary.trajectory`, workspace-relative)
+     * through the host's file viewer. Without it the player stays on live frames.
+     */
+    onOpenTrajectory?: (path: string) => void;
+    /** Opens the file once when the stream is done; default true. */
+    autoOpenTrajectory?: boolean;
+    onClose?: () => void;
+    /** Replaces the default molecule viewer (tests, custom hosts). */
+    renderViewer?: (source: GraphMoleculeViewerSnapshot) => ReactNode;
+    className?: string;
+}
+/**
+ * A side-panel player for one watched stream's trajectory. It plays the
+ * frames received so far through the shared molecule viewer (play/pause,
+ * frame slider, LIVE follow) and grows as frames arrive, at most once per
+ * second, keeping the camera. Once the stream is done and its summary names a
+ * durable `trajectory` file, the player hands over to that file.
+ */
+declare function LiveTrajectoryPlayer({ stream, row, frames, truncated, loading, error, ended, updateIntervalMs, onOpenTrajectory, autoOpenTrajectory, onClose, renderViewer, className, }: LiveTrajectoryPlayerProps): react.JSX.Element;
 
 interface SlashPanelState<T> {
     status: 'idle' | 'loading' | 'ready' | 'failed';
@@ -1071,6 +1126,10 @@ interface ThreadDetailSurfaceProps {
         line?: number;
         requestId: number;
     } | null;
+    /** Host tabs in the workspace side panel, such as a live trajectory player. */
+    workspacePanels?: readonly WorkspaceHostPanel[];
+    /** Opens the side panel on the host panel `id`; each new `requestId` opens it again. */
+    workspacePanelRequest?: WorkspaceHostPanelRequest | null;
     onNewThreadTitle?: (title: string) => Promise<void> | void;
     beforeTimelineContent?: ReactNode;
     errorContent?: ReactNode;
@@ -1115,7 +1174,7 @@ interface ThreadDetailSurfaceProps {
     loadingContent?: ReactNode;
     emptyContent?: ReactNode;
 }
-declare function ThreadDetailSurface({ threads, detail: rawDetail, loading, error, status, plugins: providedPlugins, adapter, metaContent, settingsContent, globalSettingsContent, settingsSections, settingsDialogOpen, onSettingsDialogOpenChange, mobileHeaderAction, appMenuButton, appNavigationMenu, renderNavigationHeader, workspaceReturnHref, restrictedNavigation, scopedSettings, onWorkspaceReturn, threadActionsButton, surfaceActions, workbench, deviceMonitor, floatingPanel, workspaceContent, workspaceTitle, workspaceActions, workspaceFeatures, workspaceFocusPathRequest, onNewThreadTitle, beforeTimelineContent, errorContent, workspaceMissingContent, dialogs, currentThreadId, currentWorkspaceId, currentWorkspaceLabel, newThreadLabel, onCloseAppNavigation, presentation, className, activeView, liveOutput, timelineProps, composerProps, shellComposerProps, useFloatingMobileComposer, floatingMobileComposerBottomOffset, composerHostRef, shellPanelRef, shellEffectiveTheme, shellThemeMode, onShellThemeModeChange, onShellStateChange, shellUnavailableContent, shellDisconnectedContent, timelineComponent: TimelineComponent, shellPanelComponent: ShellPanelComponent, shellContent, loadingContent, emptyContent, }: ThreadDetailSurfaceProps): react.JSX.Element;
+declare function ThreadDetailSurface({ threads, detail: rawDetail, loading, error, status, plugins: providedPlugins, adapter, metaContent, settingsContent, globalSettingsContent, settingsSections, settingsDialogOpen, onSettingsDialogOpenChange, mobileHeaderAction, appMenuButton, appNavigationMenu, renderNavigationHeader, workspaceReturnHref, restrictedNavigation, scopedSettings, onWorkspaceReturn, threadActionsButton, surfaceActions, workbench, deviceMonitor, floatingPanel, workspaceContent, workspaceTitle, workspaceActions, workspaceFeatures, workspaceFocusPathRequest, workspacePanels, workspacePanelRequest, onNewThreadTitle, beforeTimelineContent, errorContent, workspaceMissingContent, dialogs, currentThreadId, currentWorkspaceId, currentWorkspaceLabel, newThreadLabel, onCloseAppNavigation, presentation, className, activeView, liveOutput, timelineProps, composerProps, shellComposerProps, useFloatingMobileComposer, floatingMobileComposerBottomOffset, composerHostRef, shellPanelRef, shellEffectiveTheme, shellThemeMode, onShellThemeModeChange, onShellStateChange, shellUnavailableContent, shellDisconnectedContent, timelineComponent: TimelineComponent, shellPanelComponent: ShellPanelComponent, shellContent, loadingContent, emptyContent, }: ThreadDetailSurfaceProps): react.JSX.Element;
 
 declare function usePlugins(): PluginContextValue;
 
@@ -1414,4 +1473,4 @@ declare function TurnNotificationButton({ subscribed, busy, error, onToggle, onR
     onRetry: () => void;
 }): react.JSX.Element;
 
-export { type AgentBackendId, AppShellMenuButton, AppShellNavContext, type AppShellNavContextValue, type AppShellNavigationItem, AppShellNavigationMenu, type AppShellNavigationMenuProps, AppShellSettingsDialog, type AppShellSettingsDialogProps, type ComposerModelPolicyProps, type ComposerSendShortcut, ConfirmDialog, ConversationSearchExcerpt, type ConversationSearchScope, ConversationSearchScopePicker, CopyButton, type CreateThreadShareInput, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, ExportTranscriptDialog, GraphChatThreadChatPanel, LIVE_STRUCTURES_MAX_SELECTED, LIVE_STRUCTURES_PAGE_SIZE, type LiveStructureColumn, type LiveStructureFrame, LiveStructureFrameViewer, type LiveStructureKey, type LiveStructureProducer, type LiveStructureRow, type LiveStructureStatus, type LiveStructureStatusFilter, type LiveStructureSummary, type LiveStructureSummaryValue, type LiveStructureTotals, LiveStructuresPanel, type LiveStructuresPanelProps, LongTextDialog, MatterWorkbench, type MatterWorkbenchOptions, MemoizedThreadGraphWorkspacePanel, type ModelPolicyDisplay, type ModelPolicyGroupDto, type ModelPolicyPresetDto, type ModelPolicySelectionDto, type ModelPolicyUpdateSelection, type ModelPolicyViewDto, PathChip, type PhoneHand, PhoneHandChoice, PluginActionOutput, PluginActionOutputContext, PluginContextValue, PluginSettingsButton, PromptAttachmentUpload, PublicTranscript, type PublicTranscriptSnapshot, type ReferenceMode, RenderErrorBoundary, RenderErrorFallback, SettingsDialog, SettingsPanels, SettingsSection, StatusMark, THEME_AGENT_KEY_PATTERN, THEME_FEATURES, type ThemeFeature, type ThemeMode, ThreadActionsDialog, type ThreadActionsDialogProps, ThreadCards, ThreadComposer, type ThreadComposerProps, ThreadDetailSurface, type ThreadDetailSurfaceProps, ThreadDetailUiAdapter, ThreadGraphWorkspaceFeatures, ThreadGraphWorkspacePanel, ThreadGraphWorkspacePanelProps, ThreadLoadingIndicator, ThreadMap, type ThreadMapDevice, ThreadMapDialog, type ThreadMapPrice, type ThreadMapThread, type ThreadMapWorkspace, type ThreadMenuContext, ThreadPluginAdapter, ThreadPluginScope, ThreadPluginsControl, type ThreadShareSummary, ThreadShellAdapter, ThreadShellControlState$1 as ThreadShellControlState, ThreadShellPanel, type ThreadShellPanelHandle, ThreadTimeline, ThreadTimelineAdapter, type ThreadTimelineProps, ThreadWorkspaceAdapter, ThreadWorkspaceLayout, TokenUsageCost, type TokenUsageCostProps, type TurnClock, TurnClockContext, TurnNotificationButton, type WorkbenchNotification, type WorkbenchPanelsOptions, type WorkbenchPresentation, type WorkbenchThread, type WorkbenchToolPanel, type WorkbenchToolPanelControls, confirmAsync, confirmWorkspaceDocumentLeave, copyText, createWorkspacePathResolver, deriveLiveStructureColumns, documentThemeFeatures, formatFileSize, formatLiveStructureValue, formatLongTimestamp, formatShortTimestamp, hasLikelyMarkdownSyntax, historyItemAccentClassName, historyItemLabel, isStaleBuildError, isThemeFeature, liveStructureCell, liveStructureKey, liveStructurePageCount, navigationStatusLabel, sameLiveStructure, themeAgentKey, themeAgentName, threadStatusClassName, threadStatusLabel, threadThemeAgentKey, toggleLiveStructure, transcriptSnapshot, turnStatusLabel, useAppShellNav, useCopy, useDevicePlugins, useLongPress, useMenuKeyboard, useModalFocus, usePlugins, useThemeFeature, useWorkbenchPresentation };
+export { type AgentBackendId, AppShellMenuButton, AppShellNavContext, type AppShellNavContextValue, type AppShellNavigationItem, AppShellNavigationMenu, type AppShellNavigationMenuProps, AppShellSettingsDialog, type AppShellSettingsDialogProps, type ComposerModelPolicyProps, type ComposerSendShortcut, ConfirmDialog, ConversationSearchExcerpt, type ConversationSearchScope, ConversationSearchScopePicker, CopyButton, type CreateThreadShareInput, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, ExportTranscriptDialog, GraphChatThreadChatPanel, LIVE_STRUCTURES_MAX_SELECTED, LIVE_STRUCTURES_PAGE_SIZE, LIVE_TRAJECTORY_UPDATE_MS, type LiveStructureColumn, type LiveStructureFrame, LiveStructureFrameViewer, type LiveStructureKey, type LiveStructureProducer, type LiveStructureRow, type LiveStructureStatus, type LiveStructureStatusFilter, type LiveStructureSummary, type LiveStructureSummaryValue, type LiveStructureTotals, LiveStructuresPanel, type LiveStructuresPanelProps, type LiveTrajectoryFrame, LiveTrajectoryPlayer, type LiveTrajectoryPlayerProps, LongTextDialog, MatterWorkbench, type MatterWorkbenchOptions, MemoizedThreadGraphWorkspacePanel, type ModelPolicyDisplay, type ModelPolicyGroupDto, type ModelPolicyPresetDto, type ModelPolicySelectionDto, type ModelPolicyUpdateSelection, type ModelPolicyViewDto, PathChip, type PhoneHand, PhoneHandChoice, PluginActionOutput, PluginActionOutputContext, PluginContextValue, PluginSettingsButton, PromptAttachmentUpload, PublicTranscript, type PublicTranscriptSnapshot, type ReferenceMode, RenderErrorBoundary, RenderErrorFallback, SettingsDialog, SettingsPanels, SettingsSection, StatusMark, THEME_AGENT_KEY_PATTERN, THEME_FEATURES, type ThemeFeature, type ThemeMode, ThreadActionsDialog, type ThreadActionsDialogProps, ThreadCards, ThreadComposer, type ThreadComposerProps, ThreadDetailSurface, type ThreadDetailSurfaceProps, ThreadDetailUiAdapter, ThreadGraphWorkspaceFeatures, ThreadGraphWorkspacePanel, ThreadGraphWorkspacePanelProps, ThreadLoadingIndicator, ThreadMap, type ThreadMapDevice, ThreadMapDialog, type ThreadMapPrice, type ThreadMapThread, type ThreadMapWorkspace, type ThreadMenuContext, ThreadPluginAdapter, ThreadPluginScope, ThreadPluginsControl, type ThreadShareSummary, ThreadShellAdapter, ThreadShellControlState$1 as ThreadShellControlState, ThreadShellPanel, type ThreadShellPanelHandle, ThreadTimeline, ThreadTimelineAdapter, type ThreadTimelineProps, ThreadWorkspaceAdapter, ThreadWorkspaceLayout, TokenUsageCost, type TokenUsageCostProps, type TurnClock, TurnClockContext, TurnNotificationButton, type WorkbenchNotification, type WorkbenchPanelsOptions, type WorkbenchPresentation, type WorkbenchThread, type WorkbenchToolPanel, type WorkbenchToolPanelControls, WorkspaceHostPanel, WorkspaceHostPanelRequest, confirmAsync, confirmWorkspaceDocumentLeave, copyText, createWorkspacePathResolver, deriveLiveStructureColumns, documentThemeFeatures, formatFileSize, formatLiveStructureValue, formatLongTimestamp, formatShortTimestamp, hasLikelyMarkdownSyntax, historyItemAccentClassName, historyItemLabel, isStaleBuildError, isThemeFeature, liveStructureCell, liveStructureKey, liveStructurePageCount, liveStructureTrajectoryPath, navigationStatusLabel, sameLiveStructure, themeAgentKey, themeAgentName, threadStatusClassName, threadStatusLabel, threadThemeAgentKey, toggleLiveStructure, transcriptSnapshot, turnStatusLabel, useAppShellNav, useCopy, useDevicePlugins, useLongPress, useMenuKeyboard, useModalFocus, usePlugins, useThemeFeature, useWorkbenchPresentation };
