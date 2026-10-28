@@ -672,6 +672,7 @@ export const chatZhCN = {
   "chat.liveTrajectoryLoading": "正在加载帧…",
   "chat.liveTrajectoryEnded": "本轮已结束。以下是运行期间收到的帧。",
   "chat.liveTrajectoryFileReady": "完整轨迹已保存为",
+  "chat.liveTrajectoryFilePending": "运行同步后即可打开轨迹文件。",
   "chat.liveTrajectoryOpenFile": "打开轨迹文件",
   "chat.liveTrajectoryClose": "关闭轨迹 {{id}}",
 } as const;

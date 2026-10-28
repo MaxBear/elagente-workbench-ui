@@ -57,7 +57,8 @@ button.live-structures-total[aria-pressed='true'] { border-color: var(--theme-ac
 .live-trajectory-meta { margin: 0; font-variant-numeric: tabular-nums; }
 .live-trajectory-file { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; padding: 6px 8px; border: 1px solid var(--theme-border); border-radius: 7px; background: var(--theme-accent-soft, transparent); }
 .live-trajectory-file-button { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; padding: 2px 8px; border: 1px solid var(--theme-border); border-radius: 6px; background: var(--theme-surface, transparent); color: var(--theme-fg); font: inherit; cursor: pointer; }
-.live-trajectory-file-button:hover { background: var(--theme-hover); }
+.live-trajectory-file-button:hover:not(:disabled) { background: var(--theme-hover); }
+.live-trajectory-file-button:disabled { opacity: .5; cursor: default; }
 .live-trajectory-file-button:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: 2px; }
 .live-trajectory-body { display: flex; flex: 1; flex-direction: column; min-height: 320px; overflow: hidden; }
 .live-trajectory-body > .thread-graph-molecule-viewer, .live-trajectory-body > .molecule-figure-frame { flex: 1; min-height: 0; }

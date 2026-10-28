@@ -672,6 +672,7 @@ export const chatEn = {
   "chat.liveTrajectoryLoading": "Loading frames…",
   "chat.liveTrajectoryEnded": "This turn has ended. These are the frames received while it ran.",
   "chat.liveTrajectoryFileReady": "The complete trajectory is saved as",
+  "chat.liveTrajectoryFilePending": "The trajectory file will be available when the run syncs.",
   "chat.liveTrajectoryOpenFile": "Open trajectory file",
   "chat.liveTrajectoryClose": "Close trajectory {{id}}",
 } as const;

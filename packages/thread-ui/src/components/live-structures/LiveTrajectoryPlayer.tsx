@@ -36,11 +36,16 @@ export interface LiveTrajectoryPlayerProps {
   updateIntervalMs?: number;
   /**
    * Opens the durable trajectory file (`summary.trajectory`, workspace-relative)
-   * through the host's file viewer. Without it the player stays on live frames.
+   * through the host's file viewer when the reader asks; the player never opens
+   * it by itself. Without it the player offers no file.
    */
   onOpenTrajectory?: (path: string) => void;
-  /** Opens the file once when the stream is done; default true. */
-  autoOpenTrajectory?: boolean;
+  /**
+   * The host has seen the trajectory file in the workspace. A stream can be
+   * done well before its run syncs the file, so until then the file is not
+   * offered and the player keeps playing the frames it holds.
+   */
+  trajectoryAvailable?: boolean;
   onClose?: () => void;
   /** Replaces the default molecule viewer (tests, custom hosts). */
   renderViewer?: (source: GraphMoleculeViewerSnapshot) => ReactNode;
@@ -88,7 +93,8 @@ function useThrottledFrames(value: readonly LiveTrajectoryFrame[], interval: num
  * frames received so far through the shared molecule viewer (play/pause,
  * frame slider, LIVE follow) and grows as frames arrive, at most once per
  * second, keeping the camera. Once the stream is done and its summary names a
- * durable `trajectory` file, the player hands over to that file.
+ * durable `trajectory` file, the player keeps playing and offers that file as
+ * soon as the host reports it in the workspace.
  */
 export function LiveTrajectoryPlayer({
   stream,
@@ -100,7 +106,7 @@ export function LiveTrajectoryPlayer({
   ended = false,
   updateIntervalMs = LIVE_TRAJECTORY_UPDATE_MS,
   onOpenTrajectory,
-  autoOpenTrajectory = true,
+  trajectoryAvailable = false,
   onClose,
   renderViewer,
   className = '',
@@ -113,12 +119,6 @@ export function LiveTrajectoryPlayer({
     [shown, key, stream.id],
   );
   const path = row?.status === 'done' ? liveStructureTrajectoryPath(row) : null;
-  const opened = useRef<string | null>(null);
-  useEffect(() => {
-    if (!path || !autoOpenTrajectory || !onOpenTrajectory || opened.current === path) return;
-    opened.current = path;
-    onOpenTrajectory(path);
-  }, [path, autoOpenTrajectory, onOpenTrajectory]);
 
   const step = row ? liveStructureCell(row, 'step') : '';
   const energy = row ? liveStructureCell(row, 'energy') : '';
@@ -148,8 +148,11 @@ export function LiveTrajectoryPlayer({
       {error ? <p className="plugin-report-error" role="alert">{error}</p> : null}
       {path && onOpenTrajectory ? (
         <p className="live-trajectory-file">
-          <span>{t('chat.liveTrajectoryFileReady')} <code>{path}</code></span>
-          <button type="button" className="live-trajectory-file-button" onClick={() => onOpenTrajectory(path)}>
+          {trajectoryAvailable
+            ? <span>{t('chat.liveTrajectoryFileReady')} <code>{path}</code></span>
+            : <span role="status">{t('chat.liveTrajectoryFilePending')}</span>}
+          <button type="button" className="live-trajectory-file-button" disabled={!trajectoryAvailable}
+            onClick={() => { if (trajectoryAvailable) onOpenTrajectory(path); }}>
             <FileText size={14} aria-hidden="true" /> {t('chat.liveTrajectoryOpenFile')}
           </button>
         </p>

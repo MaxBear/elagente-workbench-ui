@@ -105,28 +105,37 @@ describe('LiveTrajectoryPlayer', () => {
     expect(element.querySelector('[role="alert"]')?.textContent).toBe('Backfill failed');
   });
 
-  it('switches to the durable trajectory file once the stream is done', () => {
+  it('keeps playing the held frames when the stream is done and never opens the file by itself', () => {
     const onOpenTrajectory = vi.fn();
     const path = 'runs/r1/molecules/mol-0001/trajectory.xyz';
     const element = render(player({ row: row('running', { trajectory: path }), onOpenTrajectory }));
     expect(element.querySelector('.live-trajectory-file')).toBeNull();
     rerender(player({ row: row('done', { trajectory: path }), onOpenTrajectory }));
-    expect(onOpenTrajectory).toHaveBeenCalledTimes(1);
-    expect(onOpenTrajectory).toHaveBeenCalledWith(path);
-    rerender(player({ row: row('done', { trajectory: path, step: 43 }), onOpenTrajectory }));
-    expect(onOpenTrajectory).toHaveBeenCalledTimes(1);
-    const button = [...element.querySelectorAll('button')].find(value => value.textContent?.includes('Open trajectory file'))!;
-    button.click();
-    expect(onOpenTrajectory).toHaveBeenCalledTimes(2);
-    expect(element.querySelector('.live-trajectory-file')?.textContent).toContain(path);
+    rerender(player({ row: row('done', { trajectory: path }), onOpenTrajectory, trajectoryAvailable: true }));
+    expect(onOpenTrajectory).not.toHaveBeenCalled();
+    expect(shownFrames(element)).toBe(3);
   });
 
-  it('leaves the file closed when automatic opening is off or the stream failed', () => {
+  it('offers the trajectory file only once the host reports it in the workspace', () => {
     const onOpenTrajectory = vi.fn();
-    const path = 'runs/r1/trajectory.xyz';
-    render(player({ row: row('done', { trajectory: path }), onOpenTrajectory, autoOpenTrajectory: false }));
-    rerender(player({ row: row('failed', { trajectory: path }), onOpenTrajectory }));
+    const path = 'runs/r1/molecules/mol-0001/trajectory.xyz';
+    const element = render(player({ row: row('done', { trajectory: path }), onOpenTrajectory }));
+    const button = () => [...element.querySelectorAll('button')].find(value => value.textContent?.includes('Open trajectory file'))!;
+    expect(element.querySelector('.live-trajectory-file')?.textContent).toContain('available when the run syncs');
+    expect(button().disabled).toBe(true);
+    button().click();
     expect(onOpenTrajectory).not.toHaveBeenCalled();
+    rerender(player({ row: row('done', { trajectory: path }), onOpenTrajectory, trajectoryAvailable: true }));
+    expect(element.querySelector('.live-trajectory-file')?.textContent).toContain(path);
+    expect(element.querySelector('.live-trajectory-file')?.textContent).not.toContain('available when the run syncs');
+    expect(button().disabled).toBe(false);
+    button().click();
+    expect(onOpenTrajectory).toHaveBeenCalledExactlyOnceWith(path);
+  });
+
+  it('offers no file for a failed stream', () => {
+    const element = render(player({ row: row('failed', { trajectory: 'runs/r1/trajectory.xyz' }), onOpenTrajectory: vi.fn(), trajectoryAvailable: true }));
+    expect(element.querySelector('.live-trajectory-file')).toBeNull();
   });
 
   it('closes through the host', () => {
