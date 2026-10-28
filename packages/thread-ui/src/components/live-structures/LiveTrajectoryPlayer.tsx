@@ -122,8 +122,9 @@ export function LiveTrajectoryPlayer({
 
   const step = row ? liveStructureCell(row, 'step') : '';
   const energy = row ? liveStructureCell(row, 'energy') : '';
-  const first = frames[0]?.seq;
-  const last = frames.at(-1)?.seq;
+  // The header counts what the viewer shows, so both change together.
+  const first = shown[0]?.seq;
+  const last = shown.at(-1)?.seq;
   return (
     <section className={`live-trajectory ${className}`.trim()} data-stream={stream.id} aria-label={t('chat.liveTrajectoryLabel', { id: stream.id })}>
       <header className="live-trajectory-head">
@@ -138,7 +139,7 @@ export function LiveTrajectoryPlayer({
         ) : null}
       </header>
       <p className="live-trajectory-meta plugin-report-meta" aria-live="polite">
-        {t('chat.liveTrajectoryFrames', { count: frames.length, value: formatNumber(frames.length) })}
+        {t('chat.liveTrajectoryFrames', { count: shown.length, value: formatNumber(shown.length) })}
         {first !== undefined && last !== undefined ? <> · {t('chat.liveTrajectorySeqRange', { from: formatNumber(first), to: formatNumber(last) })}</> : null}
         {truncated ? <> · {t('chat.liveTrajectoryTruncated')}</> : null}
         {loading ? <> · <span role="status">{t('chat.liveTrajectoryLoading')}</span></> : null}
@@ -159,7 +160,7 @@ export function LiveTrajectoryPlayer({
         ) : renderViewer ? renderViewer(source) : (
           <RenderErrorBoundary className="live-structures-viewer-error">
             <Suspense fallback={<p className="live-structures-viewer-note" role="status">{t('chat.liveStructuresViewerLoading')}</p>}>
-              <GraphMoleculeViewer source={source} moleculeId={key} title={stream.id} />
+              <GraphMoleculeViewer source={source} moleculeId={key} title={stream.id} followControl />
             </Suspense>
           </RenderErrorBoundary>
         )}

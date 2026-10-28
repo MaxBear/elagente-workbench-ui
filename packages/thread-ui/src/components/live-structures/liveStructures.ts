@@ -70,6 +70,9 @@ const BUILTIN_LABELS: Record<string, string> = {
   status: 'Status',
 };
 
+/** Summary keys that are not columns: `trajectory` names a file, opened from the row instead. */
+const HIDDEN = ['trajectory'];
+
 /**
  * Columns for the loaded rows: ID, then label, stage, step and energy when
  * any row reports them, then other summary keys in alphabetical order, then
@@ -89,7 +92,7 @@ export function deriveLiveStructureColumns(
   }
   const hasUnit = keys.has('unit') && keys.has('energy');
   const extra = [...keys]
-    .filter(key => !(PREFERRED as readonly string[]).includes(key) && key !== 'id' && key !== 'status' && !(hasUnit && key === 'unit'))
+    .filter(key => !(PREFERRED as readonly string[]).includes(key) && !HIDDEN.includes(key) && key !== 'id' && key !== 'status' && !(hasUnit && key === 'unit'))
     .sort((a, b) => a.localeCompare(b));
   const label = (key: string) => labels[key] ?? BUILTIN_LABELS[key] ?? key;
   return [

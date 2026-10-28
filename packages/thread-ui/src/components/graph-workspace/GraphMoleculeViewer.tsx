@@ -144,6 +144,11 @@ export type GraphMoleculeViewerProps = {
   }) => ReactNode;
   onDownloadSource?: () => void;
   loading?: boolean;
+  /**
+   * Shows LIVE beside the frame controls rather than under Scientific
+   * actions, for a trajectory that is still growing.
+   */
+  followControl?: boolean;
 };
 
 export function GraphMoleculeViewer({
@@ -163,6 +168,7 @@ export function GraphMoleculeViewer({
   rendererSlot,
   onDownloadSource,
   loading = false,
+  followControl = false,
 }: GraphMoleculeViewerProps) {
   const viewerHostRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<RenderViewer | null>(null);
@@ -1439,6 +1445,18 @@ export function GraphMoleculeViewer({
     }
   }
 
+  const liveButton = (
+    <Button
+      type="button"
+      onClick={() => {
+        setLive(true);
+        setIsPlaying(false);
+      }}
+      aria-pressed={live}
+    >
+      LIVE{live ? ' following' : ''}
+    </Button>
+  );
   return (
     <GraphMoleculeFigureFrame
       expanded={expanded}
@@ -1928,6 +1946,7 @@ export function GraphMoleculeViewer({
                     Frame <strong>{currentIndex + 1}</strong> /{' '}
                     {xyzArray.length}
                   </span>
+                  {followControl ? liveButton : null}
                   <div className="thread-graph-molecule-frame-buttons">
                     {[
                       {
@@ -2022,16 +2041,7 @@ export function GraphMoleculeViewer({
                   {!viewerInitError && toolbar?.({ target, selectedIds })}
                 </div>
                 {rendererSlot?.({ target, selectedIds })}
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setLive(true);
-                    setIsPlaying(false);
-                  }}
-                  aria-pressed={live}
-                >
-                  LIVE{live ? ' following' : ''}
-                </Button>
+                {followControl ? null : liveButton}
                 {onScreenshot && (
                   <Button
                     type="button"

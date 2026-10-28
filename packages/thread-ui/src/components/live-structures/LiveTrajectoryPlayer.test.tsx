@@ -81,10 +81,12 @@ describe('LiveTrajectoryPlayer', () => {
     rerender(player({ frames: frames(1, 4) }));
     rerender(player({ frames: frames(1, 5) }));
     expect(shownFrames(element)).toBe(3);
+    expect(element.querySelector('.live-trajectory-meta')?.textContent).toContain('3 frames');
     act(() => { vi.advanceTimersByTime(999); });
     expect(shownFrames(element)).toBe(3);
     act(() => { vi.advanceTimersByTime(1); });
     expect(shownFrames(element)).toBe(5);
+    expect(element.querySelector('.live-trajectory-meta')?.textContent).toContain('5 frames · seq 1–5');
     expect(sources.length - before).toBeLessThanOrEqual(3);
     expect(new Set(sources.map(source => source.uuid)).size).toBe(1);
   });

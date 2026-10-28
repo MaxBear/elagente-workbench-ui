@@ -20,6 +20,9 @@ describe('live structure columns', () => {
     expect(columns.find(column => column.key === 'step')?.numeric).toBe(true);
     expect(columns.find(column => column.key === 'stage')?.numeric).toBe(false);
   });
+  it('leaves the trajectory path out of the columns', () => {
+    expect(deriveLiveStructureColumns([row('a', { step: 1, trajectory: 'runs/r1/trajectory.xyz' })]).map(column => column.key)).toEqual(['id', 'step', 'status']);
+  });
   it('keeps a unit column when no energy is reported and always shows id and status', () => {
     expect(deriveLiveStructureColumns([row('a', { unit: 'eV' })]).map(column => column.key)).toEqual(['id', 'unit', 'status']);
     expect(deriveLiveStructureColumns([]).map(column => column.key)).toEqual(['id', 'status']);

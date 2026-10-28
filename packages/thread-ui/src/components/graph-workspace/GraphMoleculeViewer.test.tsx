@@ -751,6 +751,23 @@ it('keeps the camera and scrubbed frame while a stream appends, and resumes foll
   expect(() => oldHandle.captureScreenshot()).toThrow('target changed');
 });
 
+it('shows LIVE beside the frame controls for a growing trajectory', async () => {
+  const frames = [first, first.replace('first', 'second'), first.replace('first', 'third')];
+  await act(async () =>
+    root.render(<GraphMoleculeViewer source={{ content: frames, uuid: 'o' }} followControl />),
+  );
+  const controls = node.querySelector('[aria-label="Trajectory controls"]')!;
+  const live = Array.from(controls.querySelectorAll('button')).find((b) => b.textContent?.startsWith('LIVE'))!;
+  expect(live.getAttribute('aria-pressed')).toBe('true');
+  expect(node.querySelector('.molecule-scientific-actions')?.textContent).not.toContain('LIVE');
+  await click('First frame');
+  expect(live.getAttribute('aria-pressed')).toBe('false');
+  expect(controls.textContent).toContain('Frame 1 / 3');
+  await act(async () => live.click());
+  expect(live.getAttribute('aria-pressed')).toBe('true');
+  expect(controls.textContent).toContain('Frame 3 / 3');
+});
+
 it('applies browser commands, rejects stale targets, and retains immutable coordinates', async () => {
   const source = { content: [first], target };
   await act(async () =>
