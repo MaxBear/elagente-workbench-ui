@@ -254,3 +254,16 @@ describe('frameCell', () => {
     expect(frameCell(undefined, 0)).toBeUndefined();
   });
 });
+
+describe('pre-split trajectories', () => {
+  it('uses each content entry as one frame without re-splitting', () => {
+    const frames = ['1\na\nHe 0 0 0\n', '1\nb\nHe 0 0 1\n'];
+    const data = readGraphMoleculeViewerData({ content: frames, format: 'xyz', framesSplit: true });
+    expect(data.frames).toBe(frames);
+    expect(data.exportContent).toBe(frames.join(''));
+  });
+  it('still splits multi-frame entries when the source is not pre-split', () => {
+    const data = readGraphMoleculeViewerData({ content: [`${xyz}${xyz}`], format: 'xyz' });
+    expect(data.frames).toHaveLength(2);
+  });
+});

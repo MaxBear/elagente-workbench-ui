@@ -10,6 +10,12 @@ export type GraphMoleculeViewerSnapshot = {
   target?: ScientificTarget;
   /** Immutable targets supplied by the producer, in trajectory order. */
   frameTargets?: ScientificTarget[];
+  /**
+   * Each XYZ `content` entry is exactly one frame, already validated: the
+   * viewer uses the entries as its frames instead of re-splitting a growing
+   * trajectory on every update.
+   */
+  framesSplit?: boolean;
 };
 export type GraphMoleculeViewerSource =
   | GraphMoleculeViewerSnapshot
@@ -53,8 +59,11 @@ export function readGraphMoleculeViewerData(
   if (!['xyz', 'extxyz', 'cif', 'pdb', 'sdf', 'mol'].includes(format))
     throw new Error(`Unsupported structure format: ${format}`);
   const content = typeof source === 'string' ? [source] : source.content;
+  const xyz = format === 'xyz' || format === 'extxyz';
+  if (xyz && typeof source !== 'string' && source.framesSplit)
+    return { frames: content, format, exportContent: content.join('') };
   const frames =
-    format === 'xyz' || format === 'extxyz'
+    xyz
       ? content.flatMap(splitXyzTrajectory)
       : format === 'sdf'
         ? content.flatMap(

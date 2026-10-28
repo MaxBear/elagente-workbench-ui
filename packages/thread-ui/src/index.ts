@@ -33,6 +33,11 @@ export {
 } from './components/live-structures/LiveStructuresPanel';
 export { LiveStructureFrameViewer } from './components/live-structures/LiveStructureFrameViewer';
 export {
+  LIVE_TRAJECTORY_UPDATE_MS,
+  LiveTrajectoryPlayer,
+  type LiveTrajectoryPlayerProps,
+} from './components/live-structures/LiveTrajectoryPlayer';
+export {
   deriveLiveStructureColumns,
   formatLiveStructureValue,
   LIVE_STRUCTURES_MAX_SELECTED,
@@ -40,6 +45,7 @@ export {
   liveStructureCell,
   liveStructureKey,
   liveStructurePageCount,
+  liveStructureTrajectoryPath,
   sameLiveStructure,
   toggleLiveStructure,
   type LiveStructureColumn,
@@ -52,6 +58,7 @@ export {
   type LiveStructureSummary,
   type LiveStructureSummaryValue,
   type LiveStructureTotals,
+  type LiveTrajectoryFrame,
 } from './components/live-structures/liveStructures';
 
 export type {
@@ -109,6 +116,8 @@ export {
   ThreadGraphWorkspacePanel,
   type ThreadGraphWorkspaceFeatures,
   type ThreadGraphWorkspacePanelProps,
+  type WorkspaceHostPanel,
+  type WorkspaceHostPanelRequest,
   type WorkspaceTab,
 } from './components/ThreadGraphWorkspacePanelLazy';
 export { ConfirmDialog } from './components/ConfirmDialog';

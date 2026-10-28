@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, PanelRightOpen, X } from 'lucide-react';
 import { useId, useMemo, useState, type ReactNode } from 'react';
 import { formatNumber, useI18n, type TranslationKey } from '../../i18n';
 import { LiveStructureFrameViewer } from './LiveStructureFrameViewer';
@@ -55,6 +55,11 @@ export interface LiveStructuresPanelProps {
   columns?: readonly LiveStructureColumn[];
   /** Replaces the default inline molecule viewer for one frame. */
   renderViewer?: (frame: LiveStructureFrame) => ReactNode;
+  /**
+   * Opens a stream's trajectory player in the host's side panel. When given,
+   * watched viewers and table rows offer "Open trajectory".
+   */
+  onOpenTrajectory?: (stream: LiveStructureKey) => void;
   className?: string;
 }
 
@@ -107,6 +112,7 @@ export function LiveStructuresPanel({
   defaultOpen = true,
   columns: columnsOverride,
   renderViewer,
+  onOpenTrajectory,
   className = '',
 }: LiveStructuresPanelProps) {
   const { t, locale } = useI18n();
@@ -147,6 +153,11 @@ export function LiveStructuresPanel({
     return map;
   }, [rows, selectedRows]);
   const number = (value: number) => formatNumber(value);
+  const openButton = (key: LiveStructureKey) => onOpenTrajectory ? (
+    <button type="button" className="live-structures-icon-button live-structures-open-trajectory"
+      aria-label={t('chat.liveStructuresOpenTrajectoryOf', { id: key.id })} title={t('chat.liveStructuresOpenTrajectory')}
+      onClick={() => onOpenTrajectory({ producer: key.producer, id: key.id })}><PanelRightOpen size={14} aria-hidden="true" /></button>
+  ) : null;
   const first = total === 0 ? 0 : page * pageSize + 1;
   const last = Math.min(total, page * pageSize + shownRows.length);
 
@@ -205,7 +216,8 @@ export function LiveStructuresPanel({
               {row ? <span className={`plugin-report-tag ${STATUS_TAG[row.status]}`}>{t(STATUS_LABEL[row.status])}</span> : null}
               {step ? <span className="plugin-report-meta">{t('chat.liveStructuresColumnStep')} {step}</span> : null}
               {energy ? <span className="plugin-report-meta">{energy}</span> : null}
-              <button type="button" className="live-structures-icon-button" aria-label={t('chat.liveStructuresStopWatching', { id: key.id })}
+              {openButton(key)}
+              <button type="button" className="live-structures-icon-button live-structures-stop-watching" aria-label={t('chat.liveStructuresStopWatching', { id: key.id })}
                 onClick={() => toggle(key)}><X size={14} aria-hidden="true" /></button>
             </figcaption>
             <div className="live-structures-viewer-body">
@@ -227,6 +239,7 @@ export function LiveStructuresPanel({
           <tr aria-rowindex={1}>
             <th scope="col" className="live-structures-select-cell"><span className="live-structures-sr">{t('chat.liveStructuresWatchColumn')}</span></th>
             {columns.map(column => <th key={column.key} scope="col" className={column.numeric ? 'is-numeric' : undefined}>{column.label}</th>)}
+            {onOpenTrajectory ? <th scope="col" className="live-structures-open-cell">{t('chat.liveStructuresColumnTrajectory')}</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -252,6 +265,7 @@ export function LiveStructuresPanel({
                     {liveStructureCell(row, column.key)}
                   </td>
                 ))}
+                {onOpenTrajectory ? <td className="live-structures-open-cell">{openButton(row)}</td> : null}
               </tr>
             );
           })}

@@ -24,6 +24,12 @@ export interface LiveStructureFrame extends LiveStructureKey {
   format: string;
   xyz: string;
 }
+/** One frame of a watched stream's trajectory, in `seq` order. */
+export interface LiveTrajectoryFrame {
+  seq: number;
+  format: string;
+  xyz: string;
+}
 export interface LiveStructureTotals {
   streams: number;
   running: number;
@@ -130,4 +136,16 @@ export function liveStructurePageCount(total: number, pageSize = LIVE_STRUCTURES
 }
 export function totalForFilter(totals: LiveStructureTotals, filter: LiveStructureStatusFilter) {
   return filter ? totals[filter] : totals.streams;
+}
+
+/**
+ * The durable trajectory file a stream's summary names (`summary.trajectory`),
+ * when it is a plain workspace-relative path; null otherwise.
+ */
+export function liveStructureTrajectoryPath(row: Pick<LiveStructureRow, 'summary'> | null | undefined): string | null {
+  const path = row?.summary?.trajectory;
+  if (typeof path !== 'string' || !path || path.length > 1024) return null;
+  if (/^[\\/]|^[a-z][a-z0-9+.-]*:/i.test(path) || path.includes('\\')) return null;
+  if (path.split('/').some(part => part === '..')) return null;
+  return path;
 }

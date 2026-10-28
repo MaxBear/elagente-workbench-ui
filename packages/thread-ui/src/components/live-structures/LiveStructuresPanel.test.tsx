@@ -128,4 +128,22 @@ describe('LiveStructuresPanel', () => {
     expect(element.querySelector('.live-structures')?.getAttribute('data-ended')).toBe('true');
     expect(element.querySelector('.live-structures-head')?.textContent).toContain('Ended');
   });
+
+  it('opens a trajectory in the side panel from a watched viewer and from a row, without toggling the row', () => {
+    const onOpenTrajectory = vi.fn(), onSelectionChange = vi.fn();
+    const selected = [{ producer: 'pyscf/batch-7f3a', id: 'mol-0001' }];
+    const element = render(panel({ selected, onSelectionChange, frames: [frame('mol-0001')], onOpenTrajectory }));
+    const headers = [...element.querySelectorAll('thead th')].map(cell => cell.textContent);
+    expect(headers.at(-1)).toBe('Trajectory');
+    flushSync(() => element.querySelector<HTMLButtonElement>('figure[data-stream="mol-0001"] button[aria-label="Open the trajectory of mol-0001 in the side panel"]')!.click());
+    flushSync(() => element.querySelector<HTMLButtonElement>('tbody tr:nth-child(3) button[aria-label="Open the trajectory of mol-0003 in the side panel"]')!.click());
+    expect(onOpenTrajectory.mock.calls.map(([key]) => key)).toEqual([selected[0], { producer: 'pyscf/batch-7f3a', id: 'mol-0003' }]);
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
+  it('offers no trajectory action when the host cannot open one', () => {
+    const element = render(panel({ selected: [{ producer: 'pyscf/batch-7f3a', id: 'mol-0001' }], frames: [frame('mol-0001')] }));
+    expect(element.querySelector('[aria-label^="Open the trajectory"]')).toBeNull();
+    expect([...element.querySelectorAll('thead th')].map(cell => cell.textContent)).not.toContain('Trajectory');
+  });
 });
