@@ -6,6 +6,7 @@ import {
   Terminal,
   Trash2,
   Wrench,
+  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -35,6 +36,29 @@ export interface ThreadGraphWorkspacePanelProps {
   focusPathRequest?: { path: string; line?: number; requestId: number; artifactId?: string } | null;
   /** The workspace-relative path of the file being read, or null. */
   onActiveFileChange?: (relativePath: string | null) => void;
+  /** Host content shown as extra side-panel tabs, such as a trajectory player. */
+  hostPanels?: readonly WorkspaceHostPanel[];
+  /** Shows the host panel `id`; each new `requestId` shows it again. */
+  hostPanelRequest?: WorkspaceHostPanelRequest | null;
+}
+
+/**
+ * A host-supplied side-panel tab. It stays mounted while another tab is
+ * shown, so its personal state (for example a viewer's camera) is kept.
+ */
+export interface WorkspaceHostPanel {
+  /** Stable identity, such as a stream key. */
+  id: string;
+  label: string;
+  /** The tab's tooltip; defaults to the label. */
+  title?: string;
+  content: ReactNode;
+  /** Adds a close button to the tab. */
+  onClose?: () => void;
+}
+export interface WorkspaceHostPanelRequest {
+  id: string;
+  requestId: number;
 }
 
 export type WorkspaceTab =
@@ -313,6 +337,8 @@ export function ThreadGraphWorkspacePanel({
   features: featureConfig,
   focusPathRequest = null,
   onActiveFileChange,
+  hostPanels = [],
+  hostPanelRequest = null,
 }: ThreadGraphWorkspacePanelProps) {
   const { locale: i18nLocale } = useI18n();
   const features = useMemo(
@@ -321,6 +347,7 @@ export function ThreadGraphWorkspacePanel({
   );
   const initialTab = firstEnabledWorkspaceTab(features, featureConfig?.defaultTab);
   const [activeTab, setActiveTab] = useState<WorkspaceTab | null>(initialTab);
+  const [activeHostPanel, setActiveHostPanel] = useState<string | null>(null);
   const artifacts = useMemo(() => collectArtifacts(detail), [detail]);
   const toolEvents = useMemo(() => collectToolEvents(detail), [detail, i18nLocale]);
   const threadPanels = plugins.getThreadPanels();
@@ -355,25 +382,37 @@ export function ThreadGraphWorkspacePanel({
   useEffect(() => {
     if (focusPathRequest && features.workspace) {
       setActiveTab('workspace');
+      setActiveHostPanel(null);
     }
   }, [features.workspace, focusPathRequest?.requestId]);
 
-  if (!activeTab) {
+  const requestedPanel = hostPanelRequest?.id ?? null;
+  const panelRequestId = hostPanelRequest?.requestId ?? null;
+  useEffect(() => {
+    if (requestedPanel !== null) setActiveHostPanel(requestedPanel);
+  }, [requestedPanel, panelRequestId]);
+  const shownHostPanel = hostPanels.some(panel => panel.id === activeHostPanel) ? activeHostPanel : null;
+  const selectTab = (tab: WorkspaceTab) => {
+    setActiveTab(tab);
+    setActiveHostPanel(null);
+  };
+
+  if (!activeTab && hostPanels.length === 0) {
     return null;
   }
 
   return (
     <div className="thread-graph-right-panel flex h-full min-h-0 flex-col overflow-hidden">
-      {primaryTabs.length + secondaryTabs.length > 1 && <div className="thread-graph-right-tabs flex h-9 shrink-0 items-center gap-0 overflow-hidden border-b px-1">
+      {primaryTabs.length + secondaryTabs.length + hostPanels.length > 1 && <div className="thread-graph-right-tabs flex h-9 shrink-0 items-center gap-0 overflow-hidden border-b px-1">
         {primaryTabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => selectTab(tab.id)}
               className={`thread-graph-right-tab inline-flex h-9 shrink-0 items-center gap-1.5 px-2.5 text-xs font-medium transition ${
-                activeTab === tab.id ? 'is-active' : ''
+                !shownHostPanel && activeTab === tab.id ? 'is-active' : ''
               }`}
             >
               {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
@@ -381,6 +420,30 @@ export function ThreadGraphWorkspacePanel({
             </button>
           );
         })}
+        {hostPanels.map((panel) => (
+          <span key={panel.id} className={`thread-graph-right-host-tab inline-flex h-9 min-w-0 shrink items-center ${shownHostPanel === panel.id ? 'is-active' : ''}`}>
+            <button
+              type="button"
+              onClick={() => setActiveHostPanel(panel.id)}
+              title={panel.title ?? panel.label}
+              className={`thread-graph-right-tab inline-flex h-9 min-w-0 shrink items-center px-2.5 text-xs font-medium transition ${
+                shownHostPanel === panel.id ? 'is-active' : ''
+              }`}
+            >
+              <span className="truncate">{panel.label}</span>
+            </button>
+            {panel.onClose ? (
+              <button
+                type="button"
+                className="thread-graph-right-host-tab-close inline-flex h-6 w-6 shrink-0 items-center justify-center"
+                aria-label={translate("files.closeHostPanel", { name: panel.label })}
+                onClick={panel.onClose}
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            ) : null}
+          </span>
+        ))}
         {secondaryTabs.length ? (
           <div
             className="thread-graph-right-tab-secondary ml-auto flex h-6 min-w-0 shrink items-center gap-0.5 border-l pl-1"
@@ -392,9 +455,9 @@ export function ThreadGraphWorkspacePanel({
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => selectTab(tab.id)}
                   className={`thread-graph-right-tab inline-flex h-8 w-8 shrink-0 items-center justify-center text-xs font-medium transition ${
-                    activeTab === tab.id ? 'is-active' : ''
+                    !shownHostPanel && activeTab === tab.id ? 'is-active' : ''
                   }`}
                   title={tab.label}
                   aria-label={tab.label}
@@ -407,7 +470,12 @@ export function ThreadGraphWorkspacePanel({
         ) : null}
       </div>}
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      {hostPanels.map((panel) => (
+        <div key={panel.id} className="thread-graph-host-panel min-h-0 flex-1 overflow-auto" hidden={shownHostPanel !== panel.id}>
+          {panel.content}
+        </div>
+      ))}
+      <div className="min-h-0 flex-1 overflow-hidden" hidden={Boolean(shownHostPanel)}>
         {activeTab === 'workspace' ? (
           <GraphWorkspaceExplorer
             activeView={activeView}

@@ -178,6 +178,7 @@ export const filesEn = {
   "files.device": "Device",
   "files.supervisorMaintenanceAndReusableDeviceTemplates": "Supervisor maintenance and reusable device templates.",
   "files.workspace": "Workspace",
+  "files.closeHostPanel": "Close {{name}}",
   "files.defaultLocationsForProjectsOnThisDevice": "Default locations for projects on this device.",
   "files.plugins": "Plugins",
   "files.renderersAndExtensionsForYourWorkspace": "Renderers and extensions for your workspace.",

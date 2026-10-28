@@ -57,5 +57,7 @@ export const MemoizedThreadGraphWorkspacePanel = memo(
 export type {
   ThreadGraphWorkspaceFeatures,
   ThreadGraphWorkspacePanelProps,
+  WorkspaceHostPanel,
+  WorkspaceHostPanelRequest,
   WorkspaceTab,
 } from './ThreadGraphWorkspacePanel';

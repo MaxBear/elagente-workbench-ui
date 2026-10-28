@@ -45,6 +45,8 @@ import {
 import {
   ThreadGraphWorkspacePanel,
   type ThreadGraphWorkspaceFeatures,
+  type WorkspaceHostPanel,
+  type WorkspaceHostPanelRequest,
 } from "./components/ThreadGraphWorkspacePanelLazy";
 import {
   GraphChatThreadChatPanel,
@@ -195,6 +197,10 @@ export interface ThreadDetailSurfaceProps {
     line?: number;
     requestId: number;
   } | null;
+  /** Host tabs in the workspace side panel, such as a live trajectory player. */
+  workspacePanels?: readonly WorkspaceHostPanel[];
+  /** Opens the side panel on the host panel `id`; each new `requestId` opens it again. */
+  workspacePanelRequest?: WorkspaceHostPanelRequest | null;
   onNewThreadTitle?: (title: string) => Promise<void> | void;
   beforeTimelineContent?: ReactNode;
   errorContent?: ReactNode;
@@ -276,6 +282,8 @@ export function ThreadDetailSurface({
   workspaceActions,
   workspaceFeatures,
   workspaceFocusPathRequest = null,
+  workspacePanels,
+  workspacePanelRequest = null,
   onNewThreadTitle,
   beforeTimelineContent,
   errorContent,
@@ -423,6 +431,8 @@ export function ThreadDetailSurface({
         activeView={activeView}
         features={workspaceFeatures}
         focusPathRequest={workspaceFocusPathRequest}
+        {...(workspacePanels?.length ? { hostPanels: workspacePanels } : {})}
+        hostPanelRequest={workspacePanelRequest}
       />
     ) : null);
 
@@ -577,8 +587,9 @@ export function ThreadDetailSurface({
       workspaceContent={resolvedWorkspaceContent}
       workspaceTitle={workspaceTitle ?? translate("workbench.workspace")}
       workspaceActions={workspaceActions}
-      {...(workspaceFocusPathRequest
-        ? { workspaceRevealRequestKey: workspaceFocusPathRequest.requestId }
+      {...(workspaceFocusPathRequest || workspacePanelRequest
+        // Both request counters only grow, so their sum changes whenever either does.
+        ? { workspaceRevealRequestKey: (workspaceFocusPathRequest?.requestId ?? 0) + (workspacePanelRequest?.requestId ?? 0) }
         : {})}
       {...(onNewThreadTitle ? { onNewThreadTitle } : {})}
       {...(onCloseAppNavigation ? { onCloseAppNavigation } : {})}

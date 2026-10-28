@@ -178,6 +178,7 @@ export const filesZhCN = {
   "files.device": "设备",
   "files.supervisorMaintenanceAndReusableDeviceTemplates": "Supervisor 维护和可复用的设备模板。",
   "files.workspace": "工作区",
+  "files.closeHostPanel": "关闭 {{name}}",
   "files.defaultLocationsForProjectsOnThisDevice": "此设备上项目的默认位置。",
   "files.plugins": "插件",
   "files.renderersAndExtensionsForYourWorkspace": "工作区的渲染器和扩展。",
