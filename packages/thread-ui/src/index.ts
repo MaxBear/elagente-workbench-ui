@@ -10,6 +10,7 @@ import './styles/composer-compact.css';
 import './styles/composer-reasoning.css';
 import './styles/mermaid-diagrams.css';
 import './styles/plugin-reports.css';
+import './styles/live-structures.css';
 import './styles/terminal-panel.css';
 import './styles/transcript-log.css';
 import './styles/thread-map.css';
@@ -26,6 +27,32 @@ export { useModalFocus } from './components/menu/useModalFocus';
 export { useLongPress } from './components/menu/useLongPress';
 export { confirmAsync } from './components/menu/confirmAsync';
 export { StatusMark, navigationStatusLabel } from './components/StatusMark';
+export {
+  LiveStructuresPanel,
+  type LiveStructuresPanelProps,
+} from './components/live-structures/LiveStructuresPanel';
+export { LiveStructureFrameViewer } from './components/live-structures/LiveStructureFrameViewer';
+export {
+  deriveLiveStructureColumns,
+  formatLiveStructureValue,
+  LIVE_STRUCTURES_MAX_SELECTED,
+  LIVE_STRUCTURES_PAGE_SIZE,
+  liveStructureCell,
+  liveStructureKey,
+  liveStructurePageCount,
+  sameLiveStructure,
+  toggleLiveStructure,
+  type LiveStructureColumn,
+  type LiveStructureFrame,
+  type LiveStructureKey,
+  type LiveStructureProducer,
+  type LiveStructureRow,
+  type LiveStructureStatus,
+  type LiveStructureStatusFilter,
+  type LiveStructureSummary,
+  type LiveStructureSummaryValue,
+  type LiveStructureTotals,
+} from './components/live-structures/liveStructures';
 
 export type {
   DescribeThread,

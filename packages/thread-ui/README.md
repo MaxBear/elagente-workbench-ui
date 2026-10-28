@@ -22,3 +22,17 @@ viewer styles imported by the package plugin renderer.
 The production molecule figure and full-view interaction contract, local demo,
 validation commands and deliberate differences from the Matter prototype are
 documented in [Molecule viewer](docs/molecule-viewer.md).
+
+## Live structures
+
+`LiveStructuresPanel` shows many concurrently streamed structures: totals and
+producers, a paged summary table (ID, label, stage, step, energy with its unit,
+other summary keys, status) and inline viewers of the latest frame of the
+selected streams (at most four by default). It is data-only. The host supplies
+`totals`, `producers`, `rows`, `frames` and the controlled `selected` keys, and
+turns `onSelectionChange` into its own watch request. With `onPageChange` (and
+optionally `onStatusFilterChange`) the host pages from its server; otherwise the
+panel pages through `rows` itself. Each frame is single-frame XYZ/extXYZ text
+rendered by the shared molecule viewer; the viewer is keyed by stream, so new
+frames keep the camera. `ThreadTimeline`'s `renderTurnContent(turnId)` places
+host content such as this panel below a turn, open or folded.

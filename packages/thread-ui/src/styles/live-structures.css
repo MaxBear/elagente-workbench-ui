@@ -1,0 +1,47 @@
+/* Live structures panel (ELA-264): totals, a paged summary table and inline viewers. */
+.live-structures { display: grid; gap: 8px; min-width: 0; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--theme-border); border-radius: 9px; background: var(--theme-surface, transparent); color: var(--theme-fg); font-size: 12px; line-height: 1.5; }
+.live-structures-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.live-structures-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 0; border: 0; background: none; color: var(--theme-fg); font: inherit; font-weight: 600; cursor: pointer; border-radius: 5px; }
+.live-structures-toggle:focus-visible,
+.live-structures-icon-button:focus-visible,
+.live-structures-total:focus-visible,
+.live-structures-table input:focus-visible { outline: 2px solid var(--theme-accent-solid); outline-offset: 2px; }
+.live-structures-chevron { transition: transform .15s; }
+.live-structures-toggle[aria-expanded='false'] .live-structures-chevron { transform: rotate(-90deg); }
+.live-structures-totals { display: inline-flex; flex-wrap: wrap; gap: 4px; margin: 0 0 0 auto; padding: 0; list-style: none; }
+.live-structures-total { font-variant-numeric: tabular-nums; }
+button.live-structures-total { border: 1px solid transparent; cursor: pointer; font: inherit; font-size: 10.5px; }
+button.live-structures-total[aria-pressed='true'] { border-color: var(--theme-accent-border, var(--theme-accent-solid)); color: var(--theme-fg); }
+.live-structures-body { display: grid; gap: 8px; min-width: 0; }
+.live-structures-body[hidden] { display: none; }
+.live-structures-producers { margin: 0; overflow-wrap: anywhere; }
+.live-structures-producers code, .live-structures-viewer-title code { font: 11px var(--thread-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); color: var(--theme-fg-muted); }
+.live-structures-note { margin: 0; color: var(--theme-fg-muted); }
+.live-structures-selection { margin: 0; }
+.live-structures-table-scroll { max-height: 18rem; overflow: auto; border: 1px solid var(--theme-border); border-radius: 7px; }
+.live-structures-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.live-structures-table th, .live-structures-table td { padding: 3px 8px; border-bottom: 1px solid var(--theme-border); text-align: left; white-space: nowrap; }
+.live-structures-table th { position: sticky; top: 0; z-index: 1; background: var(--theme-panel, var(--theme-surface)); color: var(--theme-fg-muted); font-weight: 500; font-size: 11px; }
+.live-structures-table .is-numeric { text-align: right; }
+.live-structures-table tbody tr { cursor: pointer; }
+.live-structures-table tbody tr:hover { background: var(--theme-hover); }
+.live-structures-table tbody tr.is-selected { background: var(--theme-accent-soft); }
+.live-structures-table tbody tr:last-child td { border-bottom: 0; }
+.live-structures-table td:nth-child(2) { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; font-family: var(--thread-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 11px; }
+.live-structures-select-cell { width: 1.75rem; }
+.live-structures-table-scroll > .live-structures-note { padding: 8px; }
+.live-structures-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.live-structures-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 1px solid var(--theme-border); border-radius: 6px; background: none; color: var(--theme-fg); cursor: pointer; }
+.live-structures-icon-button:hover:not(:disabled) { background: var(--theme-hover); }
+.live-structures-icon-button:disabled { opacity: .45; cursor: default; }
+.live-structures-viewers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 8px; }
+/* Four compact inline viewers fit one row; the full view keeps its own size. */
+.live-structures .live-structures-viewer-body .molecule-figure-frame:not(.is-expanded) .thread-graph-molecule-stage { height: 200px; min-height: 160px; flex: none; }
+.live-structures-viewer { display: grid; grid-template-rows: auto 1fr; gap: 4px; min-width: 0; margin: 0; padding: 6px; border: 1px solid var(--theme-border); border-radius: 7px; }
+.live-structures-viewer-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.live-structures-viewer-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-structures-viewer-head > .live-structures-icon-button { margin-left: auto; width: 22px; height: 22px; border-color: transparent; }
+.live-structures-viewer-body { min-width: 0; min-height: 160px; }
+.live-structures-viewer-note { margin: 0; padding: 24px 8px; text-align: center; color: var(--theme-fg-muted); }
+.live-structures-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (prefers-reduced-motion: reduce) { .live-structures-chevron { transition: none; } }
