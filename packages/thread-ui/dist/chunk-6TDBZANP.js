@@ -4,10 +4,37 @@ import {
   TooltipContent,
   TooltipTrigger,
   cn
-} from "./chunk-5LLLXMOS.js";
+} from "./chunk-R24MQJGW.js";
 import {
   translate
-} from "./chunk-KMRLYZDW.js";
+} from "./chunk-M2F5UQVE.js";
+
+// src/components/graph-workspace/GraphMoleculeViewer.tsx
+import {
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+  ChevronLeft,
+  ChevronRight,
+  PanelRightOpen,
+  Ruler,
+  Waypoints,
+  RotateCcw as RotateCcw2,
+  HelpCircle,
+  Download as Download2,
+  Pin,
+  X as X2,
+  Undo2,
+  Redo2
+} from "lucide-react";
+import {
+  useEffect,
+  useLayoutEffect as useLayoutEffect2,
+  useMemo,
+  useRef as useRef2,
+  useState as useState2
+} from "react";
 
 // src/components/graph-workspace/GraphMoleculeViewerCommands.ts
 import {
@@ -296,184 +323,6 @@ function createViewerCommandExecutor(getState, apply) {
     return structuredClone(await completion);
   };
 }
-
-// src/components/graph-workspace/GraphMoleculeViewerData.ts
-function splitXyzTrajectory(content) {
-  const lines = content.match(/[^\r\n]*(?:\r\n|\r|\n|$)/g)?.filter(Boolean) ?? [];
-  const frames = [];
-  let cursor = 0;
-  while (cursor < lines.length) {
-    while (cursor < lines.length && !lines[cursor]?.trim()) cursor++;
-    if (cursor === lines.length) break;
-    if (!/^\d+$/.test(lines[cursor]?.trim() ?? ""))
-      throw new Error("Invalid XYZ atom count");
-    const count = Number(lines[cursor]?.trim());
-    if (cursor + count + 2 > lines.length)
-      throw new Error("Incomplete XYZ frame");
-    frames.push(lines.slice(cursor, cursor + count + 2).join(""));
-    cursor += count + 2;
-  }
-  return frames;
-}
-function readGraphMoleculeViewerData(source) {
-  if (!source) return { format: "xyz", frames: [], exportContent: "" };
-  const format = typeof source === "string" ? "xyz" : source.format?.trim().toLowerCase() || "xyz";
-  if (!["xyz", "extxyz", "cif", "pdb", "sdf", "mol"].includes(format))
-    throw new Error(`Unsupported structure format: ${format}`);
-  const content = typeof source === "string" ? [source] : source.content;
-  const frames = format === "xyz" || format === "extxyz" ? content.flatMap(splitXyzTrajectory) : format === "sdf" ? content.flatMap(
-    (text) => text.match(/[\s\S]*?\$\$\$\$(?:\r\n|\n|\r|$)|[\s\S]+$/g)?.filter((text2) => text2.trim()) ?? []
-  ) : content.filter((text) => text.trim());
-  return { frames, format, exportContent: content.join("") };
-}
-function frameTarget(snapshot, index, frameCount) {
-  if (snapshot?.frameTargets) return snapshot.frameTargets[index];
-  const target = snapshot?.target;
-  if (!target) return void 0;
-  if (frameCount <= 1) return target;
-  if (target.frameIndex === index && target.frameId) return target;
-  return void 0;
-}
-function frameCell(metadata, index) {
-  if (!metadata?.frameCells) return metadata?.cell;
-  const cell = metadata.frameCells[index];
-  if (cell === void 0)
-    throw new Error(`Frame cell metadata has no entry for frame ${index}`);
-  return cell;
-}
-function readExtXyzCell(content) {
-  const comment = content.split(/\r\n|\r|\n/)[1] ?? "";
-  const lattice = /\bLattice="([^"]+)"/i.exec(comment)?.[1]?.trim().split(/\s+/).map(Number);
-  if (!lattice) return void 0;
-  if (lattice.length !== 9 || lattice.some((value) => !Number.isFinite(value)))
-    throw new Error("Invalid extXYZ Lattice");
-  const pbc = /\bpbc="([^"]+)"/i.exec(comment)?.[1]?.trim().split(/\s+/);
-  if (pbc && (pbc.length !== 3 || pbc.some((value) => !/^(T|F|true|false|1|0)$/i.test(value))))
-    throw new Error("Invalid extXYZ pbc");
-  return {
-    vectors: [
-      lattice.slice(0, 3),
-      lattice.slice(3, 6),
-      lattice.slice(6, 9)
-    ],
-    periodic: pbc?.map((value) => /^(T|true|1)$/i.test(value)) ?? [
-      true,
-      true,
-      true
-    ],
-    unit: "angstrom"
-  };
-}
-function applyStructureMetadata(model, metadata) {
-  const atoms = model.selectedAtoms({});
-  if (!atoms.length || atoms.some((atom) => ![atom.x, atom.y, atom.z].every(Number.isFinite)))
-    throw new Error("Structure has no valid atomic coordinates");
-  if (metadata?.atoms?.some((atom, index) => atom.element !== atoms[index]?.elem))
-    throw new Error("Atom metadata elements differ from the rendered model");
-  if (metadata?.atoms && metadata.atoms.length !== atoms.length)
-    throw new Error("Atom metadata count differs from the rendered model");
-  const ids = atoms.map(
-    (_atom, index) => metadata?.atoms?.[index]?.id ?? String(index)
-  );
-  if (new Set(ids).size !== ids.length)
-    throw new Error("Duplicate atom identity");
-  atoms.forEach((atom, index) => {
-    atom.index = index;
-  });
-  const bonding = metadata?.render?.bonding;
-  if (bonding === "provided" && !metadata?.bonds)
-    throw new Error("Provided bonding requires bond metadata");
-  const indexById = new Map(ids.map((id, index) => [id, index]));
-  if (metadata?.bonds || bonding === "none") {
-    atoms.forEach((atom) => {
-      atom.bonds = [];
-      atom.bondOrder = [];
-    });
-    if (bonding !== "none")
-      metadata?.bonds?.forEach((bond) => {
-        const a = indexById.get(bond.atomIds[0]), b = indexById.get(bond.atomIds[1]);
-        if (a === void 0 || b === void 0 || a === b)
-          throw new Error("Bond metadata refers to unknown atoms");
-        atoms[a].bonds.push(b);
-        atoms[a].bondOrder.push(bond.order);
-        atoms[b].bonds.push(a);
-        atoms[b].bondOrder.push(bond.order);
-      });
-  }
-  if (metadata?.render?.coordinateUnit === "bohr")
-    atoms.forEach((atom) => {
-      atom.x *= 0.529177210903;
-      atom.y *= 0.529177210903;
-      atom.z *= 0.529177210903;
-    });
-  return ids;
-}
-function structureRenderFrame(content, format) {
-  if (format !== "extxyz")
-    return { content, format: format === "mol" ? "sdf" : format };
-  const lines = content.split(/\r\n|\r|\n/);
-  const properties = /\bProperties=(?:"([^"]+)"|([^\s]+))/.exec(lines[1] ?? "");
-  if (!properties) return { content, format: "xyz" };
-  const fields = (properties[1] ?? properties[2]).split(":");
-  if (fields.length % 3) throw new Error("Invalid extXYZ Properties");
-  let offset = 0, species = -1, position = -1;
-  for (let index = 0; index < fields.length; index += 3) {
-    const count2 = Number(fields[index + 2]);
-    if (!Number.isInteger(count2) || count2 <= 0 || count2 > 1e4)
-      throw new Error("Invalid extXYZ property width");
-    if (fields[index] === "species" && fields[index + 1] === "S" && count2 === 1)
-      species = offset;
-    if (fields[index] === "pos" && fields[index + 1] === "R" && count2 === 3)
-      position = offset;
-    offset += count2;
-  }
-  if (species < 0 || position < 0)
-    throw new Error("extXYZ requires species and pos properties");
-  const count = Number(lines[0]?.trim());
-  const atoms = lines.slice(2, count + 2).map((line) => {
-    const values = line.trim().split(/\s+/);
-    if (values.length < offset || !/^[A-Z][a-z]?$/.test(values[species]))
-      throw new Error("Invalid extXYZ atom properties");
-    const coords = values.slice(position, position + 3).map(Number);
-    if (coords.some((value) => !Number.isFinite(value)))
-      throw new Error("Invalid extXYZ coordinates");
-    return `${values[species]} ${coords.join(" ")}`;
-  });
-  return {
-    content: `${count}
-${lines[1]}
-${atoms.join("\n")}
-`,
-    format: "xyz"
-  };
-}
-
-// src/components/graph-workspace/GraphMoleculeViewer.tsx
-import {
-  Pause,
-  Play,
-  SkipBack,
-  SkipForward,
-  ChevronLeft,
-  ChevronRight,
-  PanelRightOpen,
-  Ruler,
-  Waypoints,
-  RotateCcw as RotateCcw2,
-  HelpCircle,
-  Download as Download2,
-  Pin,
-  X as X2,
-  Undo2,
-  Redo2
-} from "lucide-react";
-import {
-  useEffect,
-  useLayoutEffect as useLayoutEffect2,
-  useMemo,
-  useRef as useRef2,
-  useState as useState2
-} from "react";
 
 // src/components/graph-workspace/GraphMoleculeViewerLowerButtonGroup.tsx
 import {
@@ -1199,6 +1048,157 @@ async function load3Dmol() {
     });
   }
   return threeDmolPromise;
+}
+
+// src/components/graph-workspace/GraphMoleculeViewerData.ts
+function splitXyzTrajectory(content) {
+  const lines = content.match(/[^\r\n]*(?:\r\n|\r|\n|$)/g)?.filter(Boolean) ?? [];
+  const frames = [];
+  let cursor = 0;
+  while (cursor < lines.length) {
+    while (cursor < lines.length && !lines[cursor]?.trim()) cursor++;
+    if (cursor === lines.length) break;
+    if (!/^\d+$/.test(lines[cursor]?.trim() ?? ""))
+      throw new Error("Invalid XYZ atom count");
+    const count = Number(lines[cursor]?.trim());
+    if (cursor + count + 2 > lines.length)
+      throw new Error("Incomplete XYZ frame");
+    frames.push(lines.slice(cursor, cursor + count + 2).join(""));
+    cursor += count + 2;
+  }
+  return frames;
+}
+function readGraphMoleculeViewerData(source) {
+  if (!source) return { format: "xyz", frames: [], exportContent: "" };
+  const format = typeof source === "string" ? "xyz" : source.format?.trim().toLowerCase() || "xyz";
+  if (!["xyz", "extxyz", "cif", "pdb", "sdf", "mol"].includes(format))
+    throw new Error(`Unsupported structure format: ${format}`);
+  const content = typeof source === "string" ? [source] : source.content;
+  const frames = format === "xyz" || format === "extxyz" ? content.flatMap(splitXyzTrajectory) : format === "sdf" ? content.flatMap(
+    (text) => text.match(/[\s\S]*?\$\$\$\$(?:\r\n|\n|\r|$)|[\s\S]+$/g)?.filter((text2) => text2.trim()) ?? []
+  ) : content.filter((text) => text.trim());
+  return { frames, format, exportContent: content.join("") };
+}
+function frameTarget(snapshot, index, frameCount) {
+  if (snapshot?.frameTargets) return snapshot.frameTargets[index];
+  const target = snapshot?.target;
+  if (!target) return void 0;
+  if (frameCount <= 1) return target;
+  if (target.frameIndex === index && target.frameId) return target;
+  return void 0;
+}
+function frameCell(metadata, index) {
+  if (!metadata?.frameCells) return metadata?.cell;
+  const cell = metadata.frameCells[index];
+  if (cell === void 0)
+    throw new Error(`Frame cell metadata has no entry for frame ${index}`);
+  return cell;
+}
+function readExtXyzCell(content) {
+  const comment = content.split(/\r\n|\r|\n/)[1] ?? "";
+  const lattice = /\bLattice="([^"]+)"/i.exec(comment)?.[1]?.trim().split(/\s+/).map(Number);
+  if (!lattice) return void 0;
+  if (lattice.length !== 9 || lattice.some((value) => !Number.isFinite(value)))
+    throw new Error("Invalid extXYZ Lattice");
+  const pbc = /\bpbc="([^"]+)"/i.exec(comment)?.[1]?.trim().split(/\s+/);
+  if (pbc && (pbc.length !== 3 || pbc.some((value) => !/^(T|F|true|false|1|0)$/i.test(value))))
+    throw new Error("Invalid extXYZ pbc");
+  return {
+    vectors: [
+      lattice.slice(0, 3),
+      lattice.slice(3, 6),
+      lattice.slice(6, 9)
+    ],
+    periodic: pbc?.map((value) => /^(T|true|1)$/i.test(value)) ?? [
+      true,
+      true,
+      true
+    ],
+    unit: "angstrom"
+  };
+}
+function applyStructureMetadata(model, metadata) {
+  const atoms = model.selectedAtoms({});
+  if (!atoms.length || atoms.some((atom) => ![atom.x, atom.y, atom.z].every(Number.isFinite)))
+    throw new Error("Structure has no valid atomic coordinates");
+  if (metadata?.atoms?.some((atom, index) => atom.element !== atoms[index]?.elem))
+    throw new Error("Atom metadata elements differ from the rendered model");
+  if (metadata?.atoms && metadata.atoms.length !== atoms.length)
+    throw new Error("Atom metadata count differs from the rendered model");
+  const ids = atoms.map(
+    (_atom, index) => metadata?.atoms?.[index]?.id ?? String(index)
+  );
+  if (new Set(ids).size !== ids.length)
+    throw new Error("Duplicate atom identity");
+  atoms.forEach((atom, index) => {
+    atom.index = index;
+  });
+  const bonding = metadata?.render?.bonding;
+  if (bonding === "provided" && !metadata?.bonds)
+    throw new Error("Provided bonding requires bond metadata");
+  const indexById = new Map(ids.map((id, index) => [id, index]));
+  if (metadata?.bonds || bonding === "none") {
+    atoms.forEach((atom) => {
+      atom.bonds = [];
+      atom.bondOrder = [];
+    });
+    if (bonding !== "none")
+      metadata?.bonds?.forEach((bond) => {
+        const a = indexById.get(bond.atomIds[0]), b = indexById.get(bond.atomIds[1]);
+        if (a === void 0 || b === void 0 || a === b)
+          throw new Error("Bond metadata refers to unknown atoms");
+        atoms[a].bonds.push(b);
+        atoms[a].bondOrder.push(bond.order);
+        atoms[b].bonds.push(a);
+        atoms[b].bondOrder.push(bond.order);
+      });
+  }
+  if (metadata?.render?.coordinateUnit === "bohr")
+    atoms.forEach((atom) => {
+      atom.x *= 0.529177210903;
+      atom.y *= 0.529177210903;
+      atom.z *= 0.529177210903;
+    });
+  return ids;
+}
+function structureRenderFrame(content, format) {
+  if (format !== "extxyz")
+    return { content, format: format === "mol" ? "sdf" : format };
+  const lines = content.split(/\r\n|\r|\n/);
+  const properties = /\bProperties=(?:"([^"]+)"|([^\s]+))/.exec(lines[1] ?? "");
+  if (!properties) return { content, format: "xyz" };
+  const fields = (properties[1] ?? properties[2]).split(":");
+  if (fields.length % 3) throw new Error("Invalid extXYZ Properties");
+  let offset = 0, species = -1, position = -1;
+  for (let index = 0; index < fields.length; index += 3) {
+    const count2 = Number(fields[index + 2]);
+    if (!Number.isInteger(count2) || count2 <= 0 || count2 > 1e4)
+      throw new Error("Invalid extXYZ property width");
+    if (fields[index] === "species" && fields[index + 1] === "S" && count2 === 1)
+      species = offset;
+    if (fields[index] === "pos" && fields[index + 1] === "R" && count2 === 3)
+      position = offset;
+    offset += count2;
+  }
+  if (species < 0 || position < 0)
+    throw new Error("extXYZ requires species and pos properties");
+  const count = Number(lines[0]?.trim());
+  const atoms = lines.slice(2, count + 2).map((line) => {
+    const values = line.trim().split(/\s+/);
+    if (values.length < offset || !/^[A-Z][a-z]?$/.test(values[species]))
+      throw new Error("Invalid extXYZ atom properties");
+    const coords = values.slice(position, position + 3).map(Number);
+    if (coords.some((value) => !Number.isFinite(value)))
+      throw new Error("Invalid extXYZ coordinates");
+    return `${values[species]} ${coords.join(" ")}`;
+  });
+  return {
+    content: `${count}
+${lines[1]}
+${atoms.join("\n")}
+`,
+    format: "xyz"
+  };
 }
 
 // src/components/graph-workspace/GraphMoleculeViewer.tsx

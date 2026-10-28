@@ -1,5 +1,5 @@
 import * as react from 'react';
-import { RefObject, TouchEvent, MouseEvent, Dispatch, SetStateAction, ReactNode, Component, ErrorInfo, Ref, ComponentType, ForwardRefExoticComponent, RefAttributes, ComponentProps } from 'react';
+import { RefObject, TouchEvent, MouseEvent, ReactNode, Dispatch, SetStateAction, Component, ErrorInfo, Ref, ComponentType, ForwardRefExoticComponent, RefAttributes, ComponentProps } from 'react';
 import { T as ThreadShellControlState$1, P as PromptAttachmentUpload, S as SettingsSection, a as ThreadTimelineAdapter, b as ThreadShellAdapter, c as ThreadGraphWorkspacePanelProps, d as PluginContextValue, e as ThreadDetailUiAdapter, f as ThreadGraphWorkspaceFeatures, g as SettingsPanels, h as ThreadWorkspaceAdapter } from './workspace-panel-DEoMY4Fr.js';
 export { D as DescribeThread, E as ExtensionPluginApi, i as PluginContext, j as PluginProvider, k as PluginProviderAdapter, l as SendPromptInput, m as ShellSocketConnection, n as ShellSocketHandlers, o as ThreadImageAssetVariant, p as ThreadLinkInfo, q as ThreadToolArtifact, r as ThreadWorkspaceArchiveFormat, s as ThreadWorkspaceCapabilities, t as ThreadWorkspaceTrashEntry, u as ThreadWorkspaceTrashList, W as WorkspaceDocumentSaveInput, v as WorkspaceDocumentSnapshot, w as WorkspaceSaveReceipt, x as WorkspaceTab, y as createDefaultPluginContextValue, z as createExtensionPluginApi, A as extensionModuleAvailable, B as mergePluginState } from './workspace-panel-DEoMY4Fr.js';
 import { ReasoningEffortDto, ModelOptionDto, CollaborationModeDto, SandboxModeDto, ThreadContextUsageDto, AgentProviderCapabilitiesDto, AgentBackendToolboxItemSchemaDto, AgentBackendHookCommandTemplateDto, AgentBackendManagementSchemaDto, PromptAttachmentKindDto, ThreadSkillsDto, ThreadMcpServersDto, ThreadHooksDto, ThreadForkTurnOptionDto, ThreadGoalDto, CreateThreadHookInput, UpdateThreadHookInput, ThreadGoalStatusDto, ProviderHostFileDto, AgentSubscriptionUsageDto, UpdateThreadSettingsInput, StructuredUsage, ThreadTurnDto, ThreadTurnTokenBreakdownDto, ThreadTurnPriceEstimateDto, AgentBackendIdDto, ThreadDto, AgentRuntimeStatusDto, ThreadActionRequestDto, ThreadHistoryItemDto, RespondThreadActionRequestInput, ThreadAnsweredRequestNoteDto, ThreadActivityNoteDto, ThreadPendingSteerDto, ThreadHistoryItemDetailDto, ShellStatusDto, ThreadExportTurnOptionsDto, ThreadExportFormatDto, ExportThreadTranscriptInput, ThreadDetailDto, PluginDto, ImportPluginInput } from '@remote-codex/shared';
@@ -87,6 +87,123 @@ declare function navigationStatusLabel(status: string): string;
 declare function StatusMark({ status, label }: {
     status: string;
     label?: string | undefined;
+}): react.JSX.Element;
+
+/**
+ * Generic live-structure data for {@link LiveStructuresPanel}. Hosts translate
+ * their transport (for example a latest-only telemetry stream) into these
+ * shapes; the panel never talks to a server.
+ */
+type LiveStructureStatus = 'running' | 'done' | 'failed';
+type LiveStructureSummaryValue = string | number | boolean | null;
+type LiveStructureSummary = Record<string, LiveStructureSummaryValue>;
+/** A stream is identified by its producer and its ID within that producer. */
+interface LiveStructureKey {
+    producer: string;
+    id: string;
+}
+interface LiveStructureRow extends LiveStructureKey {
+    status: LiveStructureStatus;
+    seq?: number;
+    summary?: LiveStructureSummary | null;
+    updatedAt?: string | null;
+}
+/** The latest single frame of a watched stream (XYZ or extXYZ text). */
+interface LiveStructureFrame extends LiveStructureKey {
+    seq?: number;
+    format: string;
+    xyz: string;
+}
+interface LiveStructureTotals {
+    streams: number;
+    running: number;
+    done: number;
+    failed: number;
+}
+interface LiveStructureProducer {
+    id: string;
+    streams: number;
+    updatedAt?: string | null;
+}
+type LiveStructureStatusFilter = LiveStructureStatus | null;
+interface LiveStructureColumn {
+    /** `id` and `status` are the row's own fields; other keys read the summary. */
+    key: string;
+    label: string;
+    numeric?: boolean;
+}
+declare const LIVE_STRUCTURES_MAX_SELECTED = 4;
+declare const LIVE_STRUCTURES_PAGE_SIZE = 100;
+/** A stable string identity for a stream. */
+declare function liveStructureKey(key: LiveStructureKey): string;
+declare function sameLiveStructure(a: LiveStructureKey, b: LiveStructureKey): boolean;
+/**
+ * Columns for the loaded rows: ID, then label, stage, step and energy when
+ * any row reports them, then other summary keys in alphabetical order, then
+ * status. `unit` is shown with the energy rather than as its own column.
+ */
+declare function deriveLiveStructureColumns(rows: readonly LiveStructureRow[], labels?: Partial<Record<string, string>>): LiveStructureColumn[];
+declare function formatLiveStructureValue(value: LiveStructureSummaryValue | undefined): string;
+/** The text of one cell; energy carries its unit when the row has one. */
+declare function liveStructureCell(row: LiveStructureRow, key: string): string;
+/**
+ * Toggles one stream in a selection of at most `max` streams. Selecting past
+ * the limit returns the selection unchanged.
+ */
+declare function toggleLiveStructure(selected: readonly LiveStructureKey[], key: LiveStructureKey, max?: number): LiveStructureKey[];
+declare function liveStructurePageCount(total: number, pageSize?: number): number;
+
+interface LiveStructuresPanelProps {
+    totals: LiveStructureTotals;
+    producers?: readonly LiveStructureProducer[];
+    /**
+     * The rows to show. With `onPageChange` these are the rows of `page`
+     * (the host pages); without it the panel pages through them itself.
+     */
+    rows: readonly LiveStructureRow[];
+    /** Zero-based page; host-controlled together with `onPageChange`. */
+    page?: number;
+    onPageChange?: (page: number) => void;
+    /** Rows available across all pages (host paging); defaults to the matching total. */
+    rowCount?: number;
+    pageSize?: number;
+    /** Host-controlled status filter; the totals become filter toggles. */
+    statusFilter?: LiveStructureStatusFilter;
+    onStatusFilterChange?: (filter: LiveStructureStatusFilter) => void;
+    selected: readonly LiveStructureKey[];
+    onSelectionChange: (selected: LiveStructureKey[]) => void;
+    maxSelected?: number;
+    /** Latest frames of watched streams; others are ignored. */
+    frames?: readonly LiveStructureFrame[];
+    /** Latest known rows of selected streams that may not be on the shown page. */
+    selectedRows?: readonly LiveStructureRow[];
+    /** The producing turn has ended: the panel shows the last reported state. */
+    ended?: boolean;
+    loading?: boolean;
+    error?: string | null;
+    title?: ReactNode;
+    defaultOpen?: boolean;
+    columns?: readonly LiveStructureColumn[];
+    /** Replaces the default inline molecule viewer for one frame. */
+    renderViewer?: (frame: LiveStructureFrame) => ReactNode;
+    className?: string;
+}
+/**
+ * Summaries and latest frames of many concurrently relaxing or simulated
+ * structures. Totals and producers head a paged summary table; selected rows
+ * (at most four by default) open inline viewers of their latest frame. The
+ * panel is data-only: the host supplies rows, frames and paging, and turns
+ * selection changes into whatever watch request its transport needs.
+ */
+declare function LiveStructuresPanel({ totals, producers, rows, page: controlledPage, onPageChange, rowCount, pageSize, statusFilter, onStatusFilterChange, selected, onSelectionChange, maxSelected, frames, selectedRows, ended, loading, error, title, defaultOpen, columns: columnsOverride, renderViewer, className, }: LiveStructuresPanelProps): react.JSX.Element;
+
+/**
+ * The shared molecule viewer for one inline frame. The object identity is the
+ * stream, not the frame, so a new frame redraws the model and keeps the
+ * personal camera, as a streamed trajectory revision does.
+ */
+declare function LiveStructureFrameViewer({ frame }: {
+    frame: LiveStructureFrame;
 }): react.JSX.Element;
 
 interface SlashPanelState<T> {
@@ -648,6 +765,12 @@ interface ThreadTimelineProps {
     threadRunning?: boolean;
     backgroundAgentCount?: number;
     renderTurnNotification?: ((turnId: string) => React.ReactNode) | undefined;
+    /**
+     * Host content shown below a turn whether it is open or folded, such as a
+     * live structures panel. Return null for turns without content; keep the
+     * function stable and let the returned element subscribe to its own data.
+     */
+    renderTurnContent?: ((turnId: string) => React.ReactNode) | undefined;
     backendProgress?: {
         turnId: string;
         receivedAt: string;
@@ -715,7 +838,7 @@ interface ThreadTimelineProps {
     adapter?: ThreadTimelineAdapter | undefined;
     autoCollapseCompletedTurns?: boolean;
 }
-declare function ThreadTimelineComponent({ roomUsage, threadId, turns, totalTurnCount, pendingRequests, activeTurnId, threadRunning, backgroundAgentCount, renderTurnNotification, pendingSteers, livePlan, liveItems, backendProgress, respondingRequestId, onRespondToRequest, liveOutput, scrollRequestKey, searchTarget, previousTurnScrollRequestKey, nextTurnScrollRequestKey, bottomSpacer, className, onTailVisibilityChange, onPreviousTurnAvailabilityChange, onNextTurnAvailabilityChange, loadingEarlier, onLoadEarlier, ephemeralUserNote, answeredRequestNotes, activityNotes, optimisticSteers, optimisticTurn, onLoadHistoryItemDetail, onLoadTurnDetail, onOpenThread, onSelectArtifact, onSelectHistoryItemDetail, adapter, autoCollapseCompletedTurns, }: ThreadTimelineProps): react.JSX.Element;
+declare function ThreadTimelineComponent({ roomUsage, threadId, turns, totalTurnCount, pendingRequests, activeTurnId, threadRunning, backgroundAgentCount, renderTurnNotification, renderTurnContent, pendingSteers, livePlan, liveItems, backendProgress, respondingRequestId, onRespondToRequest, liveOutput, scrollRequestKey, searchTarget, previousTurnScrollRequestKey, nextTurnScrollRequestKey, bottomSpacer, className, onTailVisibilityChange, onPreviousTurnAvailabilityChange, onNextTurnAvailabilityChange, loadingEarlier, onLoadEarlier, ephemeralUserNote, answeredRequestNotes, activityNotes, optimisticSteers, optimisticTurn, onLoadHistoryItemDetail, onLoadTurnDetail, onOpenThread, onSelectArtifact, onSelectHistoryItemDetail, adapter, autoCollapseCompletedTurns, }: ThreadTimelineProps): react.JSX.Element;
 declare const ThreadTimeline: react.MemoExoticComponent<typeof ThreadTimelineComponent>;
 
 interface ThreadShellControlState {
@@ -1291,4 +1414,4 @@ declare function TurnNotificationButton({ subscribed, busy, error, onToggle, onR
     onRetry: () => void;
 }): react.JSX.Element;
 
-export { type AgentBackendId, AppShellMenuButton, AppShellNavContext, type AppShellNavContextValue, type AppShellNavigationItem, AppShellNavigationMenu, type AppShellNavigationMenuProps, AppShellSettingsDialog, type AppShellSettingsDialogProps, type ComposerModelPolicyProps, type ComposerSendShortcut, ConfirmDialog, ConversationSearchExcerpt, type ConversationSearchScope, ConversationSearchScopePicker, CopyButton, type CreateThreadShareInput, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, ExportTranscriptDialog, GraphChatThreadChatPanel, LongTextDialog, MatterWorkbench, type MatterWorkbenchOptions, MemoizedThreadGraphWorkspacePanel, type ModelPolicyDisplay, type ModelPolicyGroupDto, type ModelPolicyPresetDto, type ModelPolicySelectionDto, type ModelPolicyUpdateSelection, type ModelPolicyViewDto, PathChip, type PhoneHand, PhoneHandChoice, PluginActionOutput, PluginActionOutputContext, PluginContextValue, PluginSettingsButton, PromptAttachmentUpload, PublicTranscript, type PublicTranscriptSnapshot, type ReferenceMode, RenderErrorBoundary, RenderErrorFallback, SettingsDialog, SettingsPanels, SettingsSection, StatusMark, THEME_AGENT_KEY_PATTERN, THEME_FEATURES, type ThemeFeature, type ThemeMode, ThreadActionsDialog, type ThreadActionsDialogProps, ThreadCards, ThreadComposer, type ThreadComposerProps, ThreadDetailSurface, type ThreadDetailSurfaceProps, ThreadDetailUiAdapter, ThreadGraphWorkspaceFeatures, ThreadGraphWorkspacePanel, ThreadGraphWorkspacePanelProps, ThreadLoadingIndicator, ThreadMap, type ThreadMapDevice, ThreadMapDialog, type ThreadMapPrice, type ThreadMapThread, type ThreadMapWorkspace, type ThreadMenuContext, ThreadPluginAdapter, ThreadPluginScope, ThreadPluginsControl, type ThreadShareSummary, ThreadShellAdapter, ThreadShellControlState$1 as ThreadShellControlState, ThreadShellPanel, type ThreadShellPanelHandle, ThreadTimeline, ThreadTimelineAdapter, type ThreadTimelineProps, ThreadWorkspaceAdapter, ThreadWorkspaceLayout, TokenUsageCost, type TokenUsageCostProps, type TurnClock, TurnClockContext, TurnNotificationButton, type WorkbenchNotification, type WorkbenchPanelsOptions, type WorkbenchPresentation, type WorkbenchThread, type WorkbenchToolPanel, type WorkbenchToolPanelControls, confirmAsync, confirmWorkspaceDocumentLeave, copyText, createWorkspacePathResolver, documentThemeFeatures, formatFileSize, formatLongTimestamp, formatShortTimestamp, hasLikelyMarkdownSyntax, historyItemAccentClassName, historyItemLabel, isStaleBuildError, isThemeFeature, navigationStatusLabel, themeAgentKey, themeAgentName, threadStatusClassName, threadStatusLabel, threadThemeAgentKey, transcriptSnapshot, turnStatusLabel, useAppShellNav, useCopy, useDevicePlugins, useLongPress, useMenuKeyboard, useModalFocus, usePlugins, useThemeFeature, useWorkbenchPresentation };
+export { type AgentBackendId, AppShellMenuButton, AppShellNavContext, type AppShellNavContextValue, type AppShellNavigationItem, AppShellNavigationMenu, type AppShellNavigationMenuProps, AppShellSettingsDialog, type AppShellSettingsDialogProps, type ComposerModelPolicyProps, type ComposerSendShortcut, ConfirmDialog, ConversationSearchExcerpt, type ConversationSearchScope, ConversationSearchScopePicker, CopyButton, type CreateThreadShareInput, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, ExportTranscriptDialog, GraphChatThreadChatPanel, LIVE_STRUCTURES_MAX_SELECTED, LIVE_STRUCTURES_PAGE_SIZE, type LiveStructureColumn, type LiveStructureFrame, LiveStructureFrameViewer, type LiveStructureKey, type LiveStructureProducer, type LiveStructureRow, type LiveStructureStatus, type LiveStructureStatusFilter, type LiveStructureSummary, type LiveStructureSummaryValue, type LiveStructureTotals, LiveStructuresPanel, type LiveStructuresPanelProps, LongTextDialog, MatterWorkbench, type MatterWorkbenchOptions, MemoizedThreadGraphWorkspacePanel, type ModelPolicyDisplay, type ModelPolicyGroupDto, type ModelPolicyPresetDto, type ModelPolicySelectionDto, type ModelPolicyUpdateSelection, type ModelPolicyViewDto, PathChip, type PhoneHand, PhoneHandChoice, PluginActionOutput, PluginActionOutputContext, PluginContextValue, PluginSettingsButton, PromptAttachmentUpload, PublicTranscript, type PublicTranscriptSnapshot, type ReferenceMode, RenderErrorBoundary, RenderErrorFallback, SettingsDialog, SettingsPanels, SettingsSection, StatusMark, THEME_AGENT_KEY_PATTERN, THEME_FEATURES, type ThemeFeature, type ThemeMode, ThreadActionsDialog, type ThreadActionsDialogProps, ThreadCards, ThreadComposer, type ThreadComposerProps, ThreadDetailSurface, type ThreadDetailSurfaceProps, ThreadDetailUiAdapter, ThreadGraphWorkspaceFeatures, ThreadGraphWorkspacePanel, ThreadGraphWorkspacePanelProps, ThreadLoadingIndicator, ThreadMap, type ThreadMapDevice, ThreadMapDialog, type ThreadMapPrice, type ThreadMapThread, type ThreadMapWorkspace, type ThreadMenuContext, ThreadPluginAdapter, ThreadPluginScope, ThreadPluginsControl, type ThreadShareSummary, ThreadShellAdapter, ThreadShellControlState$1 as ThreadShellControlState, ThreadShellPanel, type ThreadShellPanelHandle, ThreadTimeline, ThreadTimelineAdapter, type ThreadTimelineProps, ThreadWorkspaceAdapter, ThreadWorkspaceLayout, TokenUsageCost, type TokenUsageCostProps, type TurnClock, TurnClockContext, TurnNotificationButton, type WorkbenchNotification, type WorkbenchPanelsOptions, type WorkbenchPresentation, type WorkbenchThread, type WorkbenchToolPanel, type WorkbenchToolPanelControls, confirmAsync, confirmWorkspaceDocumentLeave, copyText, createWorkspacePathResolver, deriveLiveStructureColumns, documentThemeFeatures, formatFileSize, formatLiveStructureValue, formatLongTimestamp, formatShortTimestamp, hasLikelyMarkdownSyntax, historyItemAccentClassName, historyItemLabel, isStaleBuildError, isThemeFeature, liveStructureCell, liveStructureKey, liveStructurePageCount, navigationStatusLabel, sameLiveStructure, themeAgentKey, themeAgentName, threadStatusClassName, threadStatusLabel, threadThemeAgentKey, toggleLiveStructure, transcriptSnapshot, turnStatusLabel, useAppShellNav, useCopy, useDevicePlugins, useLongPress, useMenuKeyboard, useModalFocus, usePlugins, useThemeFeature, useWorkbenchPresentation };

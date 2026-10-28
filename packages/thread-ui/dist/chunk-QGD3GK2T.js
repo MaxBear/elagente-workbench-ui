@@ -1,10 +1,10 @@
 import {
   cn
-} from "./chunk-5LLLXMOS.js";
+} from "./chunk-R24MQJGW.js";
 import {
   translate,
   useI18n
-} from "./chunk-KMRLYZDW.js";
+} from "./chunk-M2F5UQVE.js";
 
 // src/components/shell/terminalClipboard.ts
 async function copyText(text) {
