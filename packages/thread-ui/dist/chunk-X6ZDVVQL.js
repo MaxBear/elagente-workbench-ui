@@ -7,7 +7,7 @@ import {
 } from "./chunk-R24MQJGW.js";
 import {
   translate
-} from "./chunk-MD7OWVR2.js";
+} from "./chunk-YFGJC2TV.js";
 
 // src/components/graph-workspace/GraphMoleculeViewer.tsx
 import {

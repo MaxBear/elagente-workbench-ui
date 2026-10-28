@@ -242,11 +242,17 @@ interface LiveTrajectoryPlayerProps {
     updateIntervalMs?: number;
     /**
      * Opens the durable trajectory file (`summary.trajectory`, workspace-relative)
-     * through the host's file viewer. Without it the player stays on live frames.
+     * through the host's file viewer when the reader asks; the player never opens
+     * it by itself. The file is offered only with this handler and
+     * `trajectoryAvailable`.
      */
     onOpenTrajectory?: (path: string) => void;
-    /** Opens the file once when the stream is done; default true. */
-    autoOpenTrajectory?: boolean;
+    /**
+     * The host has seen the trajectory file in the workspace. A stream can be
+     * done well before its run syncs the file, so until then the player says the
+     * file will be available when the run syncs and keeps playing its frames.
+     */
+    trajectoryAvailable?: boolean;
     onClose?: () => void;
     /** Replaces the default molecule viewer (tests, custom hosts). */
     renderViewer?: (source: GraphMoleculeViewerSnapshot) => ReactNode;
@@ -257,9 +263,10 @@ interface LiveTrajectoryPlayerProps {
  * frames received so far through the shared molecule viewer (play/pause,
  * frame slider, LIVE follow) and grows as frames arrive, at most once per
  * second, keeping the camera. Once the stream is done and its summary names a
- * durable `trajectory` file, the player hands over to that file.
+ * durable `trajectory` file, the player keeps playing and offers that file as
+ * soon as the host reports it in the workspace.
  */
-declare function LiveTrajectoryPlayer({ stream, row, frames, truncated, loading, error, ended, updateIntervalMs, onOpenTrajectory, autoOpenTrajectory, onClose, renderViewer, className, }: LiveTrajectoryPlayerProps): react.JSX.Element;
+declare function LiveTrajectoryPlayer({ stream, row, frames, truncated, loading, error, ended, updateIntervalMs, onOpenTrajectory, trajectoryAvailable, onClose, renderViewer, className, }: LiveTrajectoryPlayerProps): react.JSX.Element;
 
 interface SlashPanelState<T> {
     status: 'idle' | 'loading' | 'ready' | 'failed';

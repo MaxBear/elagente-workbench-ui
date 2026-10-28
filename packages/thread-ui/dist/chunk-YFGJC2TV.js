@@ -1406,6 +1406,7 @@ var chatEn = {
   "chat.liveTrajectoryLoading": "Loading frames\u2026",
   "chat.liveTrajectoryEnded": "This turn has ended. These are the frames received while it ran.",
   "chat.liveTrajectoryFileReady": "The complete trajectory is saved as",
+  "chat.liveTrajectoryFilePending": "The trajectory file will be available when the run syncs.",
   "chat.liveTrajectoryOpenFile": "Open trajectory file",
   "chat.liveTrajectoryClose": "Close trajectory {{id}}"
 };
@@ -5462,6 +5463,7 @@ var chatZhCN = {
   "chat.liveTrajectoryLoading": "\u6B63\u5728\u52A0\u8F7D\u5E27\u2026",
   "chat.liveTrajectoryEnded": "\u672C\u8F6E\u5DF2\u7ED3\u675F\u3002\u4EE5\u4E0B\u662F\u8FD0\u884C\u671F\u95F4\u6536\u5230\u7684\u5E27\u3002",
   "chat.liveTrajectoryFileReady": "\u5B8C\u6574\u8F68\u8FF9\u5DF2\u4FDD\u5B58\u4E3A",
+  "chat.liveTrajectoryFilePending": "\u8FD0\u884C\u540C\u6B65\u540E\u5373\u53EF\u6253\u5F00\u8F68\u8FF9\u6587\u4EF6\u3002",
   "chat.liveTrajectoryOpenFile": "\u6253\u5F00\u8F68\u8FF9\u6587\u4EF6",
   "chat.liveTrajectoryClose": "\u5173\u95ED\u8F68\u8FF9 {{id}}"
 };

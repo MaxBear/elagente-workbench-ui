@@ -38,7 +38,7 @@ import {
   useMenuKeyboard,
   useModalFocus,
   useTabScrollEdges
-} from "./chunk-Q7CBNQCT.js";
+} from "./chunk-VGOEFHQQ.js";
 import {
   Button,
   Tooltip,
@@ -57,7 +57,7 @@ import {
   shellThemeProps,
   useDocumentThemeRevision,
   useThemeFeature
-} from "./chunk-OCCN4GOQ.js";
+} from "./chunk-4M4LA7D5.js";
 import {
   DEFAULT_LOCALE,
   I18nProvider,
@@ -75,7 +75,7 @@ import {
   t,
   translate,
   useI18n
-} from "./chunk-MD7OWVR2.js";
+} from "./chunk-YFGJC2TV.js";
 
 // #style-inject:#style-inject
 function styleInject(css, { insertAt } = {}) {
@@ -362,7 +362,7 @@ function liveStructureTrajectoryPath(row) {
 // src/components/live-structures/LiveStructureFrameViewer.tsx
 import { jsx as jsx3 } from "react/jsx-runtime";
 var GraphMoleculeViewer = lazy(
-  () => import("./GraphMoleculeViewer-ZQKG32FW.js").then((module) => ({ default: module.GraphMoleculeViewer }))
+  () => import("./GraphMoleculeViewer-4QNBWETM.js").then((module) => ({ default: module.GraphMoleculeViewer }))
 );
 function LiveStructureFrameViewer({ frame }) {
   const { t: t2 } = useI18n();
@@ -653,7 +653,7 @@ import { FileText, X as X2 } from "lucide-react";
 import { lazy as lazy2, Suspense as Suspense2, useEffect, useMemo as useMemo3, useRef, useState as useState2 } from "react";
 import { Fragment as Fragment2, jsx as jsx5, jsxs as jsxs3 } from "react/jsx-runtime";
 var GraphMoleculeViewer2 = lazy2(
-  () => import("./GraphMoleculeViewer-ZQKG32FW.js").then((module) => ({ default: module.GraphMoleculeViewer }))
+  () => import("./GraphMoleculeViewer-4QNBWETM.js").then((module) => ({ default: module.GraphMoleculeViewer }))
 );
 var LIVE_TRAJECTORY_UPDATE_MS = 1e3;
 var STATUS_LABEL2 = {
@@ -695,7 +695,7 @@ function LiveTrajectoryPlayer({
   ended = false,
   updateIntervalMs = LIVE_TRAJECTORY_UPDATE_MS,
   onOpenTrajectory,
-  autoOpenTrajectory = true,
+  trajectoryAvailable = false,
   onClose,
   renderViewer,
   className = ""
@@ -708,12 +708,6 @@ function LiveTrajectoryPlayer({
     [shown, key, stream.id]
   );
   const path = row?.status === "done" ? liveStructureTrajectoryPath(row) : null;
-  const opened = useRef(null);
-  useEffect(() => {
-    if (!path || !autoOpenTrajectory || !onOpenTrajectory || opened.current === path) return;
-    opened.current = path;
-    onOpenTrajectory(path);
-  }, [path, autoOpenTrajectory, onOpenTrajectory]);
   const step = row ? liveStructureCell(row, "step") : "";
   const energy = row ? liveStructureCell(row, "energy") : "";
   const first = shown[0]?.seq;
@@ -751,7 +745,7 @@ function LiveTrajectoryPlayer({
     ] }),
     ended && !path ? /* @__PURE__ */ jsx5("p", { className: "live-structures-note", children: t2("chat.liveTrajectoryEnded") }) : null,
     error ? /* @__PURE__ */ jsx5("p", { className: "plugin-report-error", role: "alert", children: error }) : null,
-    path && onOpenTrajectory ? /* @__PURE__ */ jsxs3("p", { className: "live-trajectory-file", children: [
+    path && trajectoryAvailable && onOpenTrajectory ? /* @__PURE__ */ jsxs3("p", { className: "live-trajectory-file", children: [
       /* @__PURE__ */ jsxs3("span", { children: [
         t2("chat.liveTrajectoryFileReady"),
         " ",
@@ -762,7 +756,7 @@ function LiveTrajectoryPlayer({
         " ",
         t2("chat.liveTrajectoryOpenFile")
       ] })
-    ] }) : null,
+    ] }) : path && !trajectoryAvailable ? /* @__PURE__ */ jsx5("p", { className: "live-trajectory-file", role: "status", children: t2("chat.liveTrajectoryFilePending") }) : null,
     /* @__PURE__ */ jsx5("div", { className: "live-trajectory-body", children: shown.length === 0 ? /* @__PURE__ */ jsx5("p", { className: "live-structures-viewer-note", role: "status", children: loading ? t2("chat.liveTrajectoryLoading") : t2("chat.liveStructuresWaitingFrame") }) : renderViewer ? renderViewer(source) : /* @__PURE__ */ jsx5(RenderErrorBoundary, { className: "live-structures-viewer-error", children: /* @__PURE__ */ jsx5(Suspense2, { fallback: /* @__PURE__ */ jsx5("p", { className: "live-structures-viewer-note", role: "status", children: t2("chat.liveStructuresViewerLoading") }), children: /* @__PURE__ */ jsx5(GraphMoleculeViewer2, { source, moleculeId: key, title: stream.id, followControl: true }) }) }) })
   ] });
 }

@@ -3560,6 +3560,7 @@ declare const en: {
     readonly "chat.liveTrajectoryLoading": "Loading frames…";
     readonly "chat.liveTrajectoryEnded": "This turn has ended. These are the frames received while it ran.";
     readonly "chat.liveTrajectoryFileReady": "The complete trajectory is saved as";
+    readonly "chat.liveTrajectoryFilePending": "The trajectory file will be available when the run syncs.";
     readonly "chat.liveTrajectoryOpenFile": "Open trajectory file";
     readonly "chat.liveTrajectoryClose": "Close trajectory {{id}}";
     readonly "auth.ui.signInTitle": "Sign in";
@@ -7668,6 +7669,7 @@ declare const zhCN: {
     "chat.liveTrajectoryLoading": "正在加载帧…";
     "chat.liveTrajectoryEnded": "本轮已结束。以下是运行期间收到的帧。";
     "chat.liveTrajectoryFileReady": "完整轨迹已保存为";
+    "chat.liveTrajectoryFilePending": "运行同步后即可打开轨迹文件。";
     "chat.liveTrajectoryOpenFile": "打开轨迹文件";
     "chat.liveTrajectoryClose": "关闭轨迹 {{id}}";
     "auth.ui.signInTitle": "登录";
@@ -11798,6 +11800,7 @@ declare const resources: {
         readonly "chat.liveTrajectoryLoading": "Loading frames…";
         readonly "chat.liveTrajectoryEnded": "This turn has ended. These are the frames received while it ran.";
         readonly "chat.liveTrajectoryFileReady": "The complete trajectory is saved as";
+        readonly "chat.liveTrajectoryFilePending": "The trajectory file will be available when the run syncs.";
         readonly "chat.liveTrajectoryOpenFile": "Open trajectory file";
         readonly "chat.liveTrajectoryClose": "Close trajectory {{id}}";
         readonly "auth.ui.signInTitle": "Sign in";
@@ -15905,6 +15908,7 @@ declare const resources: {
         "chat.liveTrajectoryLoading": "正在加载帧…";
         "chat.liveTrajectoryEnded": "本轮已结束。以下是运行期间收到的帧。";
         "chat.liveTrajectoryFileReady": "完整轨迹已保存为";
+        "chat.liveTrajectoryFilePending": "运行同步后即可打开轨迹文件。";
         "chat.liveTrajectoryOpenFile": "打开轨迹文件";
         "chat.liveTrajectoryClose": "关闭轨迹 {{id}}";
         "auth.ui.signInTitle": "登录";
