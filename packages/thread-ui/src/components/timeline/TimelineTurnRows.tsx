@@ -425,6 +425,7 @@ interface ThreadTurnRowProps {
   forceActive?: boolean;
   backgroundAgentCount?: number;
   renderTurnNotification?: ((turnId: string) => ReactNode) | undefined;
+  renderTurnContent?: ((turnId: string) => ReactNode) | undefined;
   onToggleCollapse: (turn: TimelineTurn, currentCollapsed: boolean, loadDetails?: boolean) => void;
   /** Loads a folded turn's operations without opening the turn. */
   onLoadTurnItems?: (turn: TimelineTurn) => void;
@@ -592,6 +593,7 @@ export const ThreadTurnRow = memo(function ThreadTurnRow({
   forceActive = false,
   backgroundAgentCount = 0,
   renderTurnNotification,
+  renderTurnContent,
   onToggleCollapse,
   onLoadTurnItems,
   narrationMode = false,
@@ -1082,6 +1084,7 @@ export const ThreadTurnRow = memo(function ThreadTurnRow({
       timeLabel={turnTimeLabel}
       timeTitle={turnTimeTitle}
       tokenSummary={<TurnTokenSummary turn={turn} />}
+      attachment={renderTurnContent?.(turn.id)}
     />
     </TurnPromptContext.Provider>
     </TurnEvidenceStatusContext.Provider>

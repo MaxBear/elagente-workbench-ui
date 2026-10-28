@@ -63,6 +63,12 @@ export interface ThreadTimelineProps {
   threadRunning?: boolean;
   backgroundAgentCount?: number;
   renderTurnNotification?: ((turnId: string) => React.ReactNode) | undefined;
+  /**
+   * Host content shown below a turn whether it is open or folded, such as a
+   * live structures panel. Return null for turns without content; keep the
+   * function stable and let the returned element subscribe to its own data.
+   */
+  renderTurnContent?: ((turnId: string) => React.ReactNode) | undefined;
   backendProgress?: { turnId: string; receivedAt: string } | null;
   livePlan?: {
     turnId: string;
@@ -190,6 +196,7 @@ function ThreadTimelineComponent({
   threadRunning = false,
   backgroundAgentCount = 0,
   renderTurnNotification,
+  renderTurnContent,
   pendingSteers = [],
   livePlan = null,
   liveItems = null,
@@ -825,6 +832,7 @@ function ThreadTimelineComponent({
         revealTarget={searchTarget?.turnId === displayTurn.id ? searchTarget : undefined}
         backgroundAgentCount={backgroundAgentCount}
         renderTurnNotification={renderTurnNotification}
+        renderTurnContent={renderTurnContent}
         absoluteIndex={visibleTurnAbsoluteOffset + visibleIndex + 1}
         isCollapsed={rowCollapsed}
         livePlan={rowLivePlan}
@@ -1026,6 +1034,7 @@ function ThreadTimelineComponent({
                     turn={optimisticTurn}
                     backgroundAgentCount={backgroundAgentCount}
         renderTurnNotification={renderTurnNotification}
+        renderTurnContent={renderTurnContent}
                     absoluteIndex={optimisticAbsoluteIndex}
                     isCollapsed={rowCollapsed}
                     livePlan={null}
@@ -1143,6 +1152,7 @@ function ThreadTimelineComponent({
               turn={unattachedLiveTurn}
               backgroundAgentCount={backgroundAgentCount}
         renderTurnNotification={renderTurnNotification}
+        renderTurnContent={renderTurnContent}
               absoluteIndex={unattachedLiveTurnIndex}
               isCollapsed={collapsedTurnOverrides[unattachedLiveTurn.id] ?? false}
               livePlan={livePlan?.turnId === unattachedLiveTurn.id ? livePlan : null}

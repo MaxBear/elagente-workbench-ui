@@ -290,6 +290,15 @@ describe('ThreadTimeline', () => {
     expect(element.textContent).not.toContain('old-command');
   });
 
+  it('renders host turn content for each turn, open or folded (ELA-264)', () => {
+    const first = { ...completedTurn([{ id: 'p1', kind: 'userMessage', text: 'First' }, { id: 'a1', kind: 'agentMessage', text: 'Done.' }]), id: 'turn-a' };
+    const second: ThreadTurnDto = { ...completedTurn([{ id: 'p2', kind: 'userMessage', text: 'Second' }]), id: 'turn-b', status: 'inProgress' };
+    const content = vi.fn((turnId: string) => turnId === 'turn-b' ? null : <p data-live-turn={turnId}>panel</p>);
+    const element = render(<ThreadTimeline turns={[first, second]} liveOutput="" threadRunning activeTurnId="turn-b" renderTurnContent={content} />);
+    expect([...element.querySelectorAll('[data-live-turn]')].map(node => node.getAttribute('data-live-turn'))).toEqual(['turn-a']);
+    expect(content).toHaveBeenCalledWith('turn-b');
+  });
+
   it('opens the live run while earlier runs fold after narration or a later run follows', () => {
     const turn: ThreadTurnDto = { ...completedTurn([{ id: 'prompt', kind: 'userMessage', text: 'Inspect' }]), status: 'inProgress' };
     const command = (id: string) => ({ id, kind: 'commandExecution' as const, text: id, status: 'completed' });

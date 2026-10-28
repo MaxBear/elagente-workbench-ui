@@ -18,6 +18,8 @@ export interface GraphChatTurnFrameProps {
   timeLabel: string;
   timeTitle: string;
   tokenSummary?: ReactNode;
+  /** Host content below the body, shown whether the turn is open or folded. */
+  attachment?: ReactNode;
 }
 
 export function GraphChatTurnFrame({
@@ -36,6 +38,7 @@ export function GraphChatTurnFrame({
   timeLabel,
   timeTitle,
   tokenSummary,
+  attachment,
 }: GraphChatTurnFrameProps) {
   useI18n();
   return (
@@ -69,6 +72,7 @@ export function GraphChatTurnFrame({
         {head}
         {collapsed ? collapsedBody : body}
         {!collapsed ? footer : null}
+        {attachment}
         {error ? <div className="thread-graph-turn-error" role="alert">
           <strong>Run needs attention</strong>
           <p>{error}</p>

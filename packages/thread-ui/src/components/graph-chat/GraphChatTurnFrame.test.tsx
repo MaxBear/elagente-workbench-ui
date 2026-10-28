@@ -16,3 +16,12 @@ describe('turn failures', () => {
     expect(html).not.toContain('role="alert"');
   });
 });
+
+describe('turn attachments', () => {
+  for (const collapsed of [true, false]) it(`shows host content below the turn (collapsed=${collapsed})`, () => {
+    const html=renderToStaticMarkup(<GraphChatTurnFrame absoluteIndex={1} body={<p>activity</p>} collapsedBody={<p>summary</p>}
+      collapsed={collapsed} timeLabel="now" timeTitle="now" attachment={<section data-testid="live">live</section>}/>);
+    expect(html).toContain('data-testid="live"');
+    expect(html.indexOf('data-testid="live"')).toBeGreaterThan(html.indexOf(collapsed ? 'summary' : 'activity'));
+  });
+});
