@@ -18086,11 +18086,20 @@ var dated = (at) => new Date(at).toLocaleString(getLocale(), {
   minute: "2-digit",
   ...new Date(at).getFullYear() !== (/* @__PURE__ */ new Date()).getFullYear() ? { year: "numeric" } : {}
 });
+var preciseTimestamp = (at) => new Date(at).toLocaleString(getLocale(), {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+  timeZoneName: "short"
+});
 function TurnHead({ turn, active, added, onBeforeResize }) {
   useI18n();
   const wide = useWideScreen();
   const [open, setOpen] = useState52(false);
-  const [withDate, setWithDate] = useState52(false);
+  const [withDate, setWithDate] = useState52(true);
   const now = useSecondClock(active);
   const turnClock = useContext13(TurnClockContext);
   const unconfirmed = active && turnClock?.frozenAt != null;
@@ -18117,7 +18126,7 @@ function TurnHead({ turn, active, added, onBeforeResize }) {
       {
         type: "button",
         className: "thread-turn-head-time",
-        title: formatLongTimestamp(started),
+        title: preciseTimestamp(started),
         "aria-pressed": withDate,
         onClick: () => setWithDate((value) => !value),
         children: /* @__PURE__ */ jsx77("time", { dateTime: started, children: withDate ? dated(started) : clock(started) })
